@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Build outputs
+backend/dist/
+frontend/build/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Docker volumes
+mongo-data/
+
+# Uploads
+backend/uploads/
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+.nyc_output/
