@@ -24,8 +24,6 @@ services:
     restart: unless-stopped
     ports:
       - "5001:5000"
-    env_file:
-      - ./backend/.env
     depends_on:
       - mongodb
     volumes:
@@ -33,6 +31,16 @@ services:
       - /app/node_modules
     networks:
       - university-network
+    environment:
+      - PORT=${PORT}
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE=${JWT_EXPIRE}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
 
   frontend:
     build:
@@ -42,8 +50,6 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file:
-      - ./frontend/.env
     depends_on:
       - backend
     volumes:
@@ -53,6 +59,9 @@ services:
       - university-network
     stdin_open: true
     tty: true
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING}
 
 volumes:
   mongo-data:
