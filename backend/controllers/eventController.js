@@ -173,5 +173,68 @@ module.exports = {
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
+    },
+
+    // PUT /events/update/:id - Update event details (Admin/Staff only)(as long as the event hasn't started yet)
+    async updateEvent(req, res) {
+        try {
+            const {id} = req.params;
+            const {type} = req.body;
+            const event = await Event.findById(id);
+            if (!event) {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+            if (event.startDate <= new Date()) {
+                return res.status(400).json({ error: 'Cannot update an event that has already started' });
+            }
+            const {title, shortDescription, description, category, tags, startDate, endDate, location, capacity, status, registrationDeadline,
+                    // Child-specific fields
+                    professors,
+                    facultyName,
+                    requiredBudget,
+                    fundingSource,
+                    extraRequiredResourses,
+                    price,
+                    vendors} = req.body;
+
+            const updatedData = {
+                ...(title && { title }),
+                ...(shortDescription && { shortDescription }),
+                ...(description && { description }),
+                ...(category && { category }),
+                ...(tags && { tags }),
+                ...(startDate && { startDate }),
+                ...(endDate && { endDate }),
+                ...(location && { location }),
+                ...(capacity && { capacity }),
+                ...(status && { status }),
+                ...(registrationDeadline && { registrationDeadline })
+            };
+
+            switch (event.eventType) {
+                case 'Workshop':
+                    if (professors) updatedData.professors = professors;
+                    if (facultyName) updatedData.facultyName = facultyName;
+                    if (requiredBudget) updatedData.requiredBudget = requiredBudget;
+                    if (fundingSource) updatedData.fundingSource = fundingSource;
+                    if (extraRequiredResourses) updatedData.extraRequiredResourses = extraRequiredResourses;
+                    break;
+                case 'Trip':
+                    if (price) updatedData.price = price;
+                    break;
+                case 'Bazaar':
+                    if (vendors) updatedData.vendors = vendors;
+                    break;
+            }
+
+            const updatedEvent = await Event.findByIdAndUpdate(id, updateData, { new: true, runValidators: true }).populate({ path: 'vendors', options: { strictPopulate: false } });
+            res.status(200).json({
+                success: true,
+                message: 'Event updated successfully',
+                event: updatedEvent
+            });
+        } catch (err) {
+            res.status(400).json({ error: err.message });
+        }
     }
 };

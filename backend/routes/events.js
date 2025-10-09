@@ -8,6 +8,12 @@ const router = express.Router();
 // Protect the create route so the creating user is available on req.user
 router.post('/create', /*auth,*/ eventController.createEvent);
 
+// PUT /events/update/:id - Update an event (recommended: protect this route with auth middleware)
+router.put('/update/:id', /*auth,*/ eventController.updateEvent);
+
+// DELETE /events/delete/:id - Delete an event (recommended: protect this route with auth middleware)
+router.delete('/delete/:id', /*auth,*/ eventController.deleteEvent);
+
 // GET /events - View all upcoming events with details and vendors
 router.get('/', eventController.getAllEvents);
 
