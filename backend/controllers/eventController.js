@@ -1,6 +1,9 @@
 const Event = require('../models/Event');
 const Vendor = require('../models/Vendor'); 
 const User = require('../models/User');
+const Workshop = require('../models/Workshop');
+const Trip = require('../models/Trip');
+const Bazaar = require('../models/Bazaar');
 
 module.exports = {
     // POST /events/create - Create a new event
@@ -11,6 +14,7 @@ module.exports = {
                 return res.status(401).json({ success: false, error: 'Authentication required' });
             }*/
 
+            //has all the fields for all event types
             const{
                 title,
                 shortDescription,
@@ -23,10 +27,18 @@ module.exports = {
                 type,
                 vendors,
                 capacity,
-                status
+                status,
+                registrationDeadline, 
+                professors, //starting here added fields for the different event types
+                facultyName,
+                requiredBudget,
+                fundingSource,
+                extraRequiredResourses,
+                price
                 //createdBy: req.user._id // for testing purposes
             } = req.body;
         
+            //has only the parent class fields
             const eventData = {
                 title,
                 shortDescription,
@@ -37,17 +49,34 @@ module.exports = {
                 endDate,
                 location,
                 type,
-                vendors,
+                registrationDeadline,
                 capacity,
                 status
                 //createdBy: req.user._id // for testing purposes
             };
 
-            const event = await Event.create(eventData);
+            let event;
+
+            switch (type) {
+                //creates a workshop event
+                case 'Workshop':
+                    event = await Workshop.create({...eventData, professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses});
+                    break;
+                //creates a trip event
+                case 'Trip':
+                    event = await Trip.create({...eventData, price});
+                    break;
+                //creates a bazaar event
+                case 'Bazaar':  
+                    event = await Bazaar.create({...eventData, vendors});
+                    break;
+                default:
+                    event = await Event.create(eventData);
+            }
 
             res.status(201).json({
                 success: true,
-                message: 'Event created successfully.',
+                message: `${type || 'Event'} created successfully.`,
                 event
             });
     } catch (err) {
@@ -59,7 +88,7 @@ module.exports = {
     async getAllEvents(req, res) {
         try {
             const events = await Event.find({ startDate: { $gte: new Date() } , status:'published'})
-                .populate('vendors')
+                .populate({ path: 'vendors', options: { strictPopulate: false } })//adjusted as vendors only exist in bazaars now
                 .exec();
             res.json(events);
         } catch (err) {
@@ -78,9 +107,9 @@ module.exports = {
                     { description: regex },
                     { type: regex },
                     { category: regex },
-                    { professorName: regex }
+                    { 'professorName': regex } // adjusted this as professor name only exists for workshops
                 ]
-            }).populate('vendors');
+            }).populate({ path: 'vendors', options: { strictPopulate: false } });//adjusted as vendors only exist in bazaars now
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -107,11 +136,11 @@ module.exports = {
         if (startDate) filter.startDate = { $gte: new Date(startDate) };
 
         // Filter by professor name (case-insensitive, partial match)
-        if (professorName) filter.professorName = new RegExp(professorName, 'i'); 
+        if (professorName) filter['professors.name'] = { $regex: new RegExp(professorName, 'i') }; // adjusted this as professor name only exists for workshops
         
 
         const events = await Event.find(filter)
-        .populate('vendors')
+        .populate({ path: 'vendors', options: { strictPopulate: false } })//adjusted as vendors only exist in bazaars now
         .sort({ startDate: 1 })
         .exec();
 
@@ -125,7 +154,7 @@ module.exports = {
     // GET /events/sort - Sort events by date
     async sortEvents(req, res) {
         try {
-            const events = await Event.find().sort({ startDate: 1 }).populate('vendors');
+            const events = await Event.find().sort({ startDate: 1 }).populate({ path: 'vendors', options: { strictPopulate: false } });//adjusted as vendors only exist in bazaars now
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -138,7 +167,7 @@ module.exports = {
             const userId = req.user._id; //dah 7aslo set bel auth middleware
             const user = await User.findById(userId).populate({
                 path: 'registeredEvents',
-                populate: { path: 'vendors' }
+                populate: { path: 'vendors', options: { strictPopulate: false } } //adjusted as vendors only exist in bazaars now
             });
             res.json(user.registeredEvents || []);
         } catch (err) {

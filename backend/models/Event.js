@@ -15,23 +15,24 @@ const eventSchema = new Schema({
 
 	location: { type: String, required: true },
 
-	vendors: [{ type: Schema.Types.ObjectId, ref: 'Vendor' }],
 
 	// Capacity
 	capacity: { type: Number, default: 0, min: 0 },
 
 	// Status
 	status: { type: String, enum: ['draft', 'published', 'cancelled', 'completed'], default: 'draft', index: true },
-	
-    professorName: {type: String},
+
     // Event type
-    type: { type: String, enum: ['workshops', 'trips', 'bazaars', 'booths', 'conferences'], required: true },
+    type: { type: String, enum: ['Workshop', 'Trip', 'Bazaar', 'Booth', 'Conference'], required: true },
+
+	// added the registration deadline as its required for all event types
+	registrationDeadline: { type: Date },
     
     // Who created this event (could be staff/admin)
 	//createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
 
 
-}, { timestamps: true });
+}, { discriminatorKey: 'eventType',timestamps: true }); // added this line for having different event type subclasses
 
 
 module.exports = mongoose.model('Event', eventSchema);
