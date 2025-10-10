@@ -175,6 +175,25 @@ module.exports = {
         }
     },
 
+    //GET /events/workshops/mine - View a list of my created workshops (Professors only)
+    async getMyWorkshops(req, res) {
+        try {
+            // Ensure the request is authenticated and the user is a professor
+            /*if (!req.user || req.user.role !== 'professor') {
+                return res.status(403).json({ error: 'Access denied. Only professors can view their workshops.' });
+            }*/
+
+            //const workshops = await Workshop.find({ createdBy: req.user._id });
+            // TEMPORARY for testing without auth
+            const professorId = req.query.professorId || '670abc12345...'; // put any test professor _id from your DB
+            const workshops = await Workshop.find({ createdBy: professorId });
+
+            res.status(200).json(workshops);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    },
+
     // PUT /events/update/:id - Update event details (Admin/Staff only)(as long as the event hasn't started yet)
     async updateEvent(req, res) {
         try {
@@ -211,7 +230,7 @@ module.exports = {
                 ...(registrationDeadline && { registrationDeadline })
             };
 
-            switch (event.eventType) {
+            switch (event.type) {
                 case 'Workshop':
                     if (professors) updatedData.professors = professors;
                     if (facultyName) updatedData.facultyName = facultyName;
@@ -227,7 +246,7 @@ module.exports = {
                     break;
             }
 
-            const updatedEvent = await Event.findByIdAndUpdate(id, updateData, { new: true, runValidators: true }).populate({ path: 'vendors', options: { strictPopulate: false } });
+            const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true }).populate({ path: 'vendors', options: { strictPopulate: false } });
             res.status(200).json({
                 success: true,
                 message: 'Event updated successfully',
@@ -235,6 +254,40 @@ module.exports = {
             });
         } catch (err) {
             res.status(400).json({ error: err.message });
+        }
+    },
+
+    //DELETE /events/delete/:id - Delete an event (Admin/Staff only)(as long as the event hasn't started yet)
+    async deleteEvent(req, res) {
+        try {
+            const {id} = req.params;
+            const event = await Event.findById(id);
+            if (!event) {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+            if (event.startDate <= new Date()) {
+                return res.status(400).json({ error: 'Cannot delete an event that has already started' });
+            }
+            // Ensure only admins or the event creator can delete
+            /*if (req.user.role != 'admin' && req.user.role != 'event office' && event.createdBy.toString() !== req.user._id.toString()) {
+                return res.status(403).json({ success: false, message: 'Not authorized to delete this event' });
+            }*/
+            switch (event.type) {
+            case 'Workshop':
+                await Workshop.findByIdAndDelete(id);
+                break;
+            case 'Trip':
+                await Trip.findByIdAndDelete(id);
+                break;
+            case 'Bazaar':
+                await Bazaar.findByIdAndDelete(id);
+                break;
+            default:
+                await Event.findByIdAndDelete(id);
+            }
+            res.status(200).json({ success: true, message: 'Event deleted successfully' });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
         }
     }
 };
