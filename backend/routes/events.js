@@ -14,6 +14,9 @@ router.put('/update/:id', /*auth,*/ eventController.updateEvent);
 // DELETE /events/delete/:id - Delete an event (recommended: protect this route with auth middleware)
 router.delete('/delete/:id', /*auth,*/ eventController.deleteEvent);
 
+// GET /events/workshops/mine - View my created workshops (professors only)
+router.get('/workshops/mine', /*auth,*/ eventController.getMyWorkshops);
+
 // GET /events - View all upcoming events with details and vendors
 router.get('/', eventController.getAllEvents);
 

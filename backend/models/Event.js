@@ -32,7 +32,7 @@ const eventSchema = new Schema({
 	//createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
 
 
-}, { discriminatorKey: 'eventType',timestamps: true }); // added this line for having different event type subclasses
+}, { discriminatorKey: 'type',timestamps: true }); // added this line for having different event type subclasses
 
 
 module.exports = mongoose.model('Event', eventSchema);
