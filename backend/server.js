@@ -13,6 +13,7 @@ app.use(express.json());//thats allows the server to understand the json data th
 app.use(express.urlencoded({ extended: true }));// thats another middleware that allows the server to understand the url encoded data that been sent into the http request body as <form> in html and after parsing it will be available in req.body as js object
 app.use('/api/events', require('./routes/events'));// simply if the request come with /api/events then it will be handled by events route that we created in routes folder
 app.use('/api/auth', require('./routes/Auth'));// simply if the request come with /api/auth then it will be handled by auth route that we created in routes folder
+app.use('/api/admin', require('./routes/admin'));//same for request with /api/admin, telling express to use my admin routes
 app.get('/',(req,res)=>{ //law khabat fel url yrod 3ala el root url bas 34an a check if the server is running or not
    res.send('University Event Management API is running');
   });
