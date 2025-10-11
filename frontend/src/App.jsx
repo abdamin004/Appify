@@ -1,10 +1,10 @@
-import React from 'react';
+import React from "react";
+import ChooseRole from "./components/ChooseRole"; // make sure path is correct
 
 function App() {
   return (
     <div>
-      <h1>University Event Management - Skeleton</h1>
-      <p>Docker is running successfully!</p>
+      <ChooseRole />
     </div>
   );
 }

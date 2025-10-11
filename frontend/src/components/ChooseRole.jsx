@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import SignupStudent from './SignupStudent';
 import SignupStaff from './SignupStaff';
 import SignupVendor from './SignupVendor';
-import Navbar from './Navbar';
+import Navbar from './Navbar.jsx';
 
 function ChooseRole() {
   const [selectedRole, setSelectedRole] = useState('');
