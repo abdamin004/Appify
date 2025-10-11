@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Workshop = require('../models/Workshop');
 const Trip = require('../models/Trip');
 const Bazaar = require('../models/Bazaar');
+const Conference = require('../models/Conference');
 
 module.exports = {
     // POST /events/create - Create a new event
@@ -34,7 +35,8 @@ module.exports = {
                 requiredBudget,
                 fundingSource,
                 extraRequiredResourses,
-                price
+                price,
+                websiteLink
                 //createdBy: req.user._id // for testing purposes
             } = req.body;
         
@@ -69,6 +71,9 @@ module.exports = {
                 //creates a bazaar event
                 case 'Bazaar':  
                     event = await Bazaar.create({...eventData, vendors});
+                    break;
+                case 'Conference':
+                    event = await Conference.create({...eventData, websiteLink, requiredBudget, fundingSource, extraRequiredResourses});
                     break;
                 default:
                     event = await Event.create(eventData);
@@ -214,6 +219,7 @@ module.exports = {
                     fundingSource,
                     extraRequiredResourses,
                     price,
+                    websiteLink,
                     vendors} = req.body;
 
             const updatedData = {
@@ -243,6 +249,12 @@ module.exports = {
                     break;
                 case 'Bazaar':
                     if (vendors) updatedData.vendors = vendors;
+                    break;
+                case 'Conference':
+                    if (websiteLink) updatedData.websiteLink = websiteLink;
+                    if (requiredBudget) updatedData.requiredBudget = requiredBudget;
+                    if (fundingSource) updatedData.fundingSource = fundingSource;
+                    if (extraRequiredResourses) updatedData.extraRequiredResourses = extraRequiredResourses;
                     break;
             }
 
@@ -281,6 +293,9 @@ module.exports = {
                 break;
             case 'Bazaar':
                 await Bazaar.findByIdAndDelete(id);
+                break;
+            case 'Conference':
+                await Conference.findByIdAndDelete(id);
                 break;
             default:
                 await Event.findByIdAndDelete(id);
