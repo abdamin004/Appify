@@ -1,25 +1,63 @@
-const crypto = require('crypto'); // ye3mel unique email verification token
-const bcrypt = require('bcryptjs'); // ashan nhash el password securely
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const sendEmail = require('../utils/sendEmail'); // mail utility ashan yeb3at verification mail
+const sendEmail = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
 
-// admin ye3mel assign lel user role (Staff / TA / Professor) 
-// w yeb3at verification email yedous 3aleih el user before ma yetverifi
+// List all users with optional filtering
+exports.listAllUsers = async (req, res) => {
+  try {
+    const { role, isVerified, isBlocked, search } = req.query;
+    const filter = {};
+    
+    if (role) filter.role = role;
+    
+    if (isVerified !== undefined) {
+      filter.isVerified = isVerified === 'true';
+    }
+    
+    if (isBlocked !== undefined) {
+      filter.isBlocked = isBlocked === 'true';
+    }
+    
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const users = await User.find(filter)
+      .select('-password -verificationToken')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({ 
+      success: true, 
+      count: users.length, 
+      users 
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ 
+      message: 'Error fetching users', 
+      error: error.message 
+    });
+  }
+};
+
 exports.assignUserRole = async (req, res) => {
     try {
-        const { userId, role } = req.body; // extract userId and role from request body
+        const { userId, role } = req.body;
 
-        // validation for required fields
         if (!userId || !role) {
             return res.status(400).json({
                 message: 'Both userId and role are required fields.'
             });
         }
 
-        // check if the role is valid
         const validRoles = ['Staff', 'TA', 'Professor'];
         if (!validRoles.includes(role)) {
             return res.status(400).json({
@@ -27,7 +65,6 @@ exports.assignUserRole = async (req, res) => {
             });
         }
 
-        // find user in the database
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({
@@ -35,16 +72,13 @@ exports.assignUserRole = async (req, res) => {
             });
         }
 
-        // assign the new role and create a verification token
         user.role = role;
-        user.isVerified = false; // el user lazem ye verify abl ma yelogin
-        user.verificationToken = crypto.randomBytes(32).toString('hex'); // unique random token
+        user.isVerified = false;
+        user.verificationToken = crypto.randomBytes(32).toString('hex');
         await user.save();
 
-        // create verification link ashan el user yedous 3aleih
         const verifyUrl = `${process.env.FRONTEND_URL}/verify/${user.verificationToken}`;
 
-        // email subject and message
         const subject = 'Verify Your Account';
         const message = `
       <p>Hello ${user.firstName || ''} ${user.lastName || ''},</p>
@@ -59,14 +93,12 @@ exports.assignUserRole = async (req, res) => {
       <p>Best regards,<br>University Events Management Team</p>
     `;
 
-        // send verification email (object-based, matching your sendEmail.js)
         await sendEmail({
             email: user.email,
             subject,
             message
         });
 
-        // return success response
         return res.status(200).json({
             message: `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`,
             user: {
@@ -86,16 +118,15 @@ exports.assignUserRole = async (req, res) => {
     }
 };
 
+// ✅ FIXED: Removed manual hashing
 exports.createAdminAccount = async (req, res) => {
     try {
         const { firstName, lastName, email, password, role } = req.body;
 
-        // Basic validation
         if (!firstName || !lastName || !email || !password || !role) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
 
-        // Only allow Admin or EventOffice roles
         const allowedRoles = ['Admin', 'EventOffice'];
         if (!allowedRoles.includes(role)) {
             return res.status(400).json({
@@ -103,22 +134,17 @@ exports.createAdminAccount = async (req, res) => {
             });
         }
 
-        // Check if email already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists with this email.' });
         }
 
-        // Hash password before saving
-        const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create the new admin/Event Office user (auto-verified)
+        // ✅ FIXED: Pass plain password, let User model pre-save hook hash it
         const newUser = await User.create({
             firstName,
             lastName,
             email,
-            password: hashedPassword,
+            password,  // Plain text - will be hashed by pre-save hook
             role,
             isVerified: true,
             verificationToken: undefined
@@ -145,22 +171,19 @@ exports.createAdminAccount = async (req, res) => {
 
 exports.deleteAdminAccount = async (req, res) => {
     try {
-        const { id } = req.params; // extract user id from the URL
+        const { id } = req.params;
 
-        // Check if the user exists
         const user = await User.findById(id);
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        // Allow deleting only Admin or EventOffice accounts
         if (!['Admin', 'EventOffice'].includes(user.role)) {
             return res.status(403).json({
                 message: `Cannot delete user with role '${user.role}'. Only Admin or EventOffice accounts can be deleted.`
             });
         }
 
-        // Delete the user
         await User.findByIdAndDelete(id);
 
         res.status(200).json({
@@ -176,25 +199,22 @@ exports.deleteAdminAccount = async (req, res) => {
     }
 };
 
-
 exports.blockUser = async (req, res) => {
     try {
-        const { id } = req.params;  // Get user ID from URL
-        const { action } = req.body; // Expect "block" or "unblock" in request body
+        const { id } = req.params;
+        const { action } = req.body;
 
         if (!['block', 'unblock'].includes(action)) {
             return res.status(400).json({
                 message: "Invalid action. Use 'block' or 'unblock'."
-            });//only block or unblock actions allowed
+            });
         }
 
-        // Find the user by ID then specify in body if block or unblock action required 
         const user = await User.findById(id);
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        // Update block status
         user.isBlocked = action === 'block';
         await user.save();
 
@@ -217,21 +237,17 @@ exports.blockUser = async (req, res) => {
     }
 };
 
-//by dalet comments by ID 
 exports.deleteComment = async (req, res) => {
   try {
-    const { id } = req.params; // Extract comment ID from URL
+    const { id } = req.params;
 
-    //  Check if comment exists
     const comment = await Comment.findById(id);
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found.' });
     }
 
-    //  Delete the comment
     await Comment.findByIdAndDelete(id);
 
-    //  Return success message
     res.status(200).json({
       success: true,
       message: 'Comment deleted successfully.',
@@ -247,11 +263,6 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
-
-
-// ========== Vendor Applications Review & Notifications ==========
-
-// List all pending vendor applications (for Admin/EventOffice)
 exports.listPendingVendorApplications = async (req, res) => {
   try {
     const apps = await VendorApplication.find({ status: 'pending' })
@@ -267,8 +278,6 @@ exports.listPendingVendorApplications = async (req, res) => {
   }
 };
 
-// Approve or reject a vendor application
-// Body: { action: 'approve' | 'reject', notes?: string }
 exports.reviewVendorApplication = async (req, res) => {
   try {
     const { id } = req.params;
@@ -288,7 +297,6 @@ exports.reviewVendorApplication = async (req, res) => {
     if (notes) app.notes = notes;
     await app.save();
 
-    // Notify the vendor user
     const notifType = action === 'approve' ? 'VendorApplicationApproved' : 'VendorApplicationRejected';
     const notifMsg = action === 'approve'
       ? `Your application for ${app.event.type} '${app.event.title}' has been approved.`
@@ -316,8 +324,6 @@ exports.reviewVendorApplication = async (req, res) => {
   }
 };
 
-// List notifications for Admin/EventOffice
-// Query: ?unreadOnly=true
 exports.listAdminNotifications = async (req, res) => {
   try {
     const unreadOnly = (req.query.unreadOnly || '').toString().toLowerCase() === 'true';
@@ -337,7 +343,6 @@ exports.listAdminNotifications = async (req, res) => {
   }
 };
 
-// Mark a single notification as read
 exports.markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
@@ -354,7 +359,6 @@ exports.markNotificationRead = async (req, res) => {
   }
 };
 
-// Mark all admin notifications as read
 exports.markAllAdminNotificationsRead = async (req, res) => {
   try {
     const result = await Notification.updateMany(

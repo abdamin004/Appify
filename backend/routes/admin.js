@@ -4,14 +4,17 @@ const adminController = require('../controllers/adminController');
 const auth = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
 
+// User management
 router.post('/assign-role', adminController.assignUserRole);
-router.post('/create-admin', adminController.createAdminAccount);//create ay admin or events office account
-router.delete('/delete-admin/:id', adminController.deleteAdminAccount);//delete ay admin or events office account by id
-router.patch('/block-user/:id', adminController.blockUser);//block (or unblock) any user by id
-router.delete('/delete-comment/:id', adminController.deleteComment);// Delete inappropriate comment
+router.post('/create-admin', adminController.createAdminAccount);
+router.delete('/delete-admin/:id', adminController.deleteAdminAccount);
+router.patch('/block-user/:id', adminController.blockUser);
 
+// NEW: List all users
+router.get('/users', auth, roleCheck('Admin', 'EventOffice'), adminController.listAllUsers);
 
-module.exports = router;
+// Comment moderation
+router.delete('/delete-comment/:id', adminController.deleteComment);
 
 // Vendor applications review & notifications
 router.get(
@@ -48,3 +51,5 @@ router.patch(
   roleCheck('Admin', 'EventOffice'),
   adminController.markAllAdminNotificationsRead
 );
+
+module.exports = router;

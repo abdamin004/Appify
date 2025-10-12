@@ -1,32 +1,48 @@
+// Load environment variables FIRST - only once!
+require('dotenv').config();
+
 const express = require('express');
-const dotenv=require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
-// .config db file should have the way we will config the db 
-//app.get method-app.get(path, [middleware], callback)
-//middle ware we are sing is cors   
-dotenv.config();// reading everything from .env file and then we can access it using process.env
-connectDB();//connecting to db
-const app = express();//initializing express app
-app.use(cors());// use the cors as my middle ware 
-app.use(express.json());//thats allows the server to understand the json data that been sent into the http request body
-app.use(express.urlencoded({ extended: true }));// thats another middleware that allows the server to understand the url encoded data that been sent into the http request body as <form> in html and after parsing it will be available in req.body as js object
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });// now process.env.* comes from the root .env
-app.use('/api/events', require('./routes/events'));// simply if the request come with /api/events then it will be handled by events route that we created in routes folder
-app.use('/api/courts', require('./routes/court'));// simply if the request come with /api/courts then it will be handled by court route that we created in routes folder  
-app.use('/api/auth', require('./routes/Auth'));// simply if the request come with /api/auth then it will be handled by auth route that we created in routes folder
-app.use('/api/admin', require('./routes/admin'));//same for request with /api/admin, telling express to use my admin routes
-app.use('/api/vendor', require('./routes/vendors')); //same for request with /api/vendor, telling express to use my vendor routes
-app.get('/',(req,res)=>{ //law khabat fel url yrod 3ala el root url bas 34an a check if the server is running or not
-   res.send('University Event Management API is running');
-  });
-app.use((err,req,res,next)=>{// error handling middleware
-  console.error(err.stack); //el stack daiman feha el error details zay el line number w  error message w file name w kda 
+
+// Debug: Check if environment variables are loaded
+console.log('🔍 Environment Variables Check:');
+console.log('PORT:', process.env.PORT);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✅ Loaded' : ' MISSING!');
+console.log('MONGODB_URI:', process.env.MONGODB_URI ? '✅ Loaded' : ' MISSING!');
+
+// Connect to database
+connectDB();
+
+// Initialize express app
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use('/api/events', require('./routes/events'));
+app.use('/api/courts', require('./routes/court'));
+app.use('/api/auth', require('./routes/Auth'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/vendor', require('./routes/vendors'));
+
+// Root route
+app.get('/', (req, res) => {
+  res.send('University Event Management API is running');
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
   res.status(500).send('Something broke!');
 });
 
-const PORT = process.env.PORT || 5000; //ya2ema men el .env file aw 5000
-app.listen(PORT,()=>{
-  console.log(`Server running on port ${PORT}`);
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(` Server running on port ${PORT}`);
+  console.log(` JWT_SECRET is ${process.env.JWT_SECRET ? 'SET' : 'NOT SET'}`);
 });
-
