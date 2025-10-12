@@ -10,6 +10,10 @@ function badReq(res, msg) {
   return res.status(400).json({ message: msg });
 }
 
+// Tiny helper
+const isUpcoming = (ev, now = new Date()) =>
+  ev && ev.startDate && new Date(ev.startDate) >= now;
+
 // 1) List upcoming Bazaars (visible to vendors)
 exports.listUpcomingBazaars = async (req, res, next) => {
   try {
@@ -124,6 +128,58 @@ exports.listMyApplications = async (req, res, next) => {
       .populate('event', 'title startDate endDate type status')
       .populate('organization', 'name');
     return res.json(apps);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// 5) Upcoming I am participating in (approved only) for Bazaar/Booth
+exports.listUpcomingParticipating = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const apps = await VendorApplication.find({
+      vendorUser: req.user._id,
+      status: 'approved',
+    })
+      .sort({ createdAt: -1 })
+      .populate('event', 'title type status startDate endDate location')
+      .populate('organization', 'name');
+
+    const filtered = apps.filter(
+      (a) =>
+        a.event &&
+        (a.event.type === 'Bazaar' || a.event.type === 'Booth') &&
+        a.event.status === 'published' &&
+        isUpcoming(a.event, now)
+    );
+
+    return res.json(filtered);
+  } catch (e) {
+    next(e);
+  }
+};
+
+// 6) Upcoming requests I want to participate in (pending or rejected)
+exports.listUpcomingRequests = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const apps = await VendorApplication.find({
+      vendorUser: req.user._id,
+      status: { $in: ['pending', 'rejected'] },
+    })
+      .sort({ createdAt: -1 })
+      .populate('event', 'title type status startDate endDate location')
+      .populate('organization', 'name');
+
+    const filtered = apps.filter(
+      (a) =>
+        a.event &&
+        (a.event.type === 'Bazaar' || a.event.type === 'Booth') &&
+        a.event.status === 'published' &&
+        isUpcoming(a.event, now)
+    );
+
+    return res.json(filtered);
   } catch (e) {
     next(e);
   }

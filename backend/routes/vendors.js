@@ -37,4 +37,20 @@ router.get(
   vendorCtrl.listMyApplications
 );
 
+// 5) Vendor approved + upcoming (participating) applications
+router.get(
+  '/applications/participating/upcoming',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.listUpcomingParticipating
+);
+
+// 6) pending|rejected + upcoming (requests)
+router.get(
+  '/applications/requests/upcoming',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.listUpcomingRequests
+);
+
 module.exports = router;
