@@ -13,6 +13,7 @@ app.use(express.json());//thats allows the server to understand the json data th
 app.use(express.urlencoded({ extended: true }));// thats another middleware that allows the server to understand the url encoded data that been sent into the http request body as <form> in html and after parsing it will be available in req.body as js object
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });// now process.env.* comes from the root .env
 app.use('/api/events', require('./routes/events'));// simply if the request come with /api/events then it will be handled by events route that we created in routes folder
+app.use('/api/courts', require('./routes/court'));// simply if the request come with /api/courts then it will be handled by court route that we created in routes folder  
 app.use('/api/auth', require('./routes/Auth'));// simply if the request come with /api/auth then it will be handled by auth route that we created in routes folder
 app.use('/api/admin', require('./routes/admin'));//same for request with /api/admin, telling express to use my admin routes
 app.use('/api/vendor', require('./routes/vendors')); //same for request with /api/vendor, telling express to use my vendor routes
