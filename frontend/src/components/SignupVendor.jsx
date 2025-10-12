@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import "./Form.css"; // optional, for styles
+import { useNavigate } from "react-router-dom";
 
 function SignupVendor() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -103,7 +105,13 @@ function SignupVendor() {
       )}
 
       <p className="signin">
-        Already have an account? <a href="#">Login</a>
+        Already have an account? <button
+          type="button"
+          onClick={() => navigate("/Login", { state: { role: "vendor" } })}
+          style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer" }}
+        >
+          Login
+        </button>
       </p>
     </form>
   );
