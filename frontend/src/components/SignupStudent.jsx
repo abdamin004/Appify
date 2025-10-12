@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 function SignupStudent() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -18,6 +20,8 @@ function SignupStudent() {
       [e.target.name]: e.target.value,
     });
   };
+
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,7 +59,7 @@ function SignupStudent() {
   useEffect(() => {
     if (message === "Signup successful! ✅") {
       setTimeout(() => {
-        window.location.href = "/chooserolepage";
+        navigate("/login");
       }, 1000);
     }
   }, [message]);
@@ -199,12 +203,12 @@ function SignupStudent() {
           color: '#6b7280'
         }}>
           Already have an account?{" "}
-          <a href="/signin" style={{
+          <a onClick={() => navigate('/login')} style={{
             color: '#d4af37',
             fontWeight: '600',
             textDecoration: 'none'
           }}>
-            Sign in
+            Login
           </a>
         </p>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function SignupVendor() {
   const [formData, setFormData] = useState({
@@ -8,7 +9,7 @@ function SignupVendor() {
   });
   
   const [message, setMessage] = useState("");
-
+  const navigate = useNavigate();
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -132,7 +133,7 @@ function SignupVendor() {
           color: '#6b7280'
         }}>
           Already have an account?{" "}
-          <a href="/login" style={{
+          <a onClick={() => navigate('/login')} style={{
             color: '#d4af37',
             fontWeight: '600',
             textDecoration: 'none'

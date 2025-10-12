@@ -3,12 +3,14 @@ import SignupStudent from './SignupStudent';
 import SignupStaff from './SignupStaff';
 import SignupVendor from './SignupVendor';
 import Navbar from './Navbar.jsx';
+import { useNavigate } from "react-router-dom";
 
 function ChooseRole() {
+const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState('');
-  
-  const roles = [
-    { 
+
+    const roles = [
+  { 
       id: 'student', 
       label: 'Student',
       icon: '👨‍🎓',

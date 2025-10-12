@@ -1,6 +1,9 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 function SignupStaff() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -44,6 +47,14 @@ function SignupStaff() {
       setMessage("Signup failed: " + error.message);
     }
   };
+
+  useEffect(() => {
+      if (message === "Signup successful! ✅") {
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
+      }
+    }, [message]);
 
   return (
     <div style={{
@@ -180,12 +191,12 @@ function SignupStaff() {
           color: '#6b7280'
         }}>
           Already have an account?{" "}
-          <a href="/signin" style={{
+          <a onClick={() => navigate('/login')} style={{
             color: '#d4af37',
             fontWeight: '600',
             textDecoration: 'none'
           }}>
-            Signin
+            Login
           </a>
         </p>
       </div>
