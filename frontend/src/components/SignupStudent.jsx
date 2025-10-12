@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import "./Form.css"; // Import Uiverse-style CSS
+import { useNavigate } from "react-router-dom";
 
 function SignupStudent() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -169,11 +171,14 @@ function SignupStudent() {
       )}
 
       {/* ✅ Sign in link (same style as Vendor & Staff pages) */}
-      <p className="signin-text">
-        Already have an account?{" "}
-        <a href="/signin" className="signin-link">
-          Sign in
-        </a>
+     <p className="signin">
+        Already have an account? <button
+          type="button"
+          onClick={() => navigate("/Login", { state: { role: "vendor" } })}
+          style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer" }}
+        >
+          Login
+        </button>
       </p>
     </form>
   );

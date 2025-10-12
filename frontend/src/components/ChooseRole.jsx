@@ -3,6 +3,7 @@ import SignupStudent from './SignupStudent';
 import SignupStaff from './SignupStaff';
 import SignupVendor from './SignupVendor';
 import Navbar from './Navbar.jsx';
+import Login from './Auth/Login';
 
 function ChooseRole() {
   const [selectedRole, setSelectedRole] = useState('');
