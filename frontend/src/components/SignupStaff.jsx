@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import "./Form.css"; // Optional for the Uiverse styling
 
 function SignupStaff() {
   const [formData, setFormData] = useState({
@@ -10,7 +9,7 @@ function SignupStaff() {
     role: "",
     staffId: "",
   });
-
+  
   const [message, setMessage] = useState("");
 
   const handleChange = (e) => {
@@ -20,10 +19,8 @@ function SignupStaff() {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     console.log("Staff Signup Data:", formData);
-    alert("Form submitted! Check console.");
 
     try {
       const response = await fetch("http://localhost:5001/api/auth/signup/user", {
@@ -49,105 +46,191 @@ function SignupStaff() {
   };
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <p className="title">Staff / TA / Professor Signup</p>
-      <p className="message">Register now to access your staff portal.</p>
-
-      <div className="flex">
-        <label>
-          <input
-            required
-            type="text"
-            className="input"
-            name="firstName"
-            value={formData.firstName}
-            onChange={handleChange}
-          />
-          <span>First Name</span>
-        </label>
-
-        <label>
-          <input
-            required
-            type="text"
-            className="input"
-            name="lastName"
-            value={formData.lastName}
-            onChange={handleChange}
-          />
-          <span>Last Name</span>
-        </label>
+    <div style={{
+      maxWidth: '500px',
+      margin: '0 auto',
+      padding: '30px'
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <h2 style={{ 
+          fontSize: '2rem', 
+          fontWeight: 'bold', 
+          color: '#003366', 
+          marginBottom: '10px' 
+        }}>
+          Staff / TA / Professor Signup
+        </h2>
+        <p style={{ fontSize: '1rem', color: '#6b7280' }}>
+          Register now to access your staff portal
+        </p>
       </div>
 
-      <label>
-        <input
-          required
-          type="email"
-          className="input"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-        />
-        <span>GUC Email</span>
-      </label>
+      <div>
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={labelStyle}>
+              <span style={spanStyle}>First Name</span>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
+            </div>
+          </div>
 
-      <label>
-        <input
-          required
-          type="password"
-          className="input"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-        />
-        <span>Password</span>
-      </label>
+          <div style={{ flex: 1 }}>
+            <div style={labelStyle}>
+              <span style={spanStyle}>Last Name</span>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                required
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        </div>
 
-      <label>
-        <input
-          required
-          type="text"
-          className="input"
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-        />
-        <span>Role</span>
-      </label>
+        <div style={labelStyle}>
+          <span style={spanStyle}>GUC Email</span>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
 
-      <label>
-        <input
-          required
-          type="text"
-          className="input"
-          name="staffId"
-          value={formData.staffId}
-          onChange={handleChange}
-        />
-        <span>Staff ID</span>
-      </label>
+        <div style={labelStyle}>
+          <span style={spanStyle}>Password</span>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
 
-      <button className="submit" type="submit">
-        Sign Up
-      </button>
+        <div style={labelStyle}>
+          <span style={spanStyle}>Role</span>
+          <input
+            type="text"
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+            placeholder="e.g., Professor, TA, Staff"
+          />
+        </div>
 
-      {message && (
-        <p
-          style={{
-            marginTop: "15px",
-            color: message.includes("failed") ? "red" : "green",
-            textAlign: "center",
+        <div style={labelStyle}>
+          <span style={spanStyle}>Staff ID</span>
+          <input
+            type="text"
+            name="staffId"
+            value={formData.staffId}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
+
+        <button 
+          onClick={handleSubmit}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.3)';
           }}
         >
-          {message}
-        </p>
-      )}
+          Sign Up
+        </button>
 
-      <p className="signin">
-        Already have an account? <a href="#">Signin</a>
-      </p>
-    </form>
+        {message && (
+          <p
+            style={{
+              marginTop: "15px",
+              color: message.includes("failed") ? "#dc2626" : "#d4af37",
+              textAlign: "center",
+              fontWeight: '500'
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        <p style={{
+          marginTop: '20px',
+          textAlign: 'center',
+          fontSize: '0.95rem',
+          color: '#6b7280'
+        }}>
+          Already have an account?{" "}
+          <a href="/signin" style={{
+            color: '#d4af37',
+            fontWeight: '600',
+            textDecoration: 'none'
+          }}>
+            Signin
+          </a>
+        </p>
+      </div>
+    </div>
   );
 }
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '20px'
+};
+
+const spanStyle = {
+  display: 'block',
+  marginBottom: '8px',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#003366'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '12px 16px',
+  border: '2px solid #e5e7eb',
+  borderRadius: '10px',
+  fontSize: '1rem',
+  outline: 'none',
+  transition: 'all 0.2s',
+  backgroundColor: 'white',
+  boxSizing: 'border-box'
+};
+
+const buttonStyle = {
+  width: '100%',
+  padding: '14px',
+  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+  color: '#003366',
+  border: 'none',
+  borderRadius: '10px',
+  fontSize: '1.05rem',
+  fontWeight: '700',
+  cursor: 'pointer',
+  transition: 'all 0.3s',
+  boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)',
+  marginTop: '10px'
+};
 
 export default SignupStaff;
