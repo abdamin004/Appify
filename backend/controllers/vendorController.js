@@ -2,12 +2,13 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');       // base model with discriminators
 const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
+const Notification = require('../models/Notification');
 
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
 function badReq(res, msg) {
-  return res.status(400).json({ message: msg });
+  return res.status(400).json({ success: false, message: msg });
 }
 
 // Tiny helper
@@ -23,7 +24,7 @@ exports.listUpcomingBazaars = async (req, res, next) => {
       status: 'published',        // only open/visible events
       startDate: { $gte: now }    // future
     }).select('title startDate endDate location capacity');
-    return res.json(bazaars);
+    return res.status(200).json({ success: true, message: 'Upcoming bazaars', bazaars });
   } catch (e) {
     next(e);
   }
@@ -38,7 +39,7 @@ exports.listUpcomingBooths = async (req, res, next) => {
       status: 'published',
       startDate: { $gte: now }
     }).select('title startDate endDate location capacity');
-    return res.json(booths);
+    return res.status(200).json({ success: true, message: 'Upcoming booths', booths });
   } catch (e) {
     next(e);
   }
@@ -65,7 +66,7 @@ exports.applyToEvent = async (req, res, next) => {
 
     // Load the event; must be Bazaar or Booth, published, and in the future
     const ev = await Event.findById(eventId).select('type status startDate title');
-    if (!ev) return res.status(404).json({ message: 'Event not found' });
+    if (!ev) return res.status(404).json({ success: false, message: 'Event not found' });
     if (!['Bazaar', 'Booth'].includes(ev.type)) {
       return badReq(res, 'Only Bazaar or Booth events accept vendor applications');
     }
@@ -74,7 +75,7 @@ exports.applyToEvent = async (req, res, next) => {
 
     // Organization must exist
     const org = await Organization.findById(organizationId).select('name');
-    if (!org) return res.status(404).json({ message: 'Organization not found' });
+    if (!org) return res.status(404).json({ success: false, message: 'Organization not found' });
 
     // Common business rules
     if (!['2x2', '4x4'].includes(boothSize)) {
@@ -107,14 +108,25 @@ exports.applyToEvent = async (req, res, next) => {
       notes
     });
 
-    return res.status(201).json({
-      message: 'Application submitted',
-      application: app
-    });
+    // create a notification for Admin/EventOffice to review this application
+    try {
+      await Notification.create({
+        type: 'VendorApplicationSubmitted',
+        message: `New vendor application submitted for ${ev.type} '${ev.title}'.`,
+        recipientsRoles: ['Admin', 'EventOffice'],
+        application: app._id,
+        event: ev._id,
+        organization: org._id,
+      });
+    } catch (notifyErr) {
+      console.error('Notification create failed:', notifyErr && notifyErr.message ? notifyErr.message : notifyErr);
+    }
+
+    return res.status(201).json({ success: true, message: 'Application submitted', application: app });
   } catch (e) {
     // 11000 = duplicate key: unique index (event + organization) → already applied
     if (e && e.code === 11000) {
-      return res.status(409).json({ message: 'Organization has already applied to this event' });
+      return res.status(409).json({ success: false, message: 'Organization has already applied to this event' });
     }
     next(e);
   }
@@ -127,7 +139,7 @@ exports.listMyApplications = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .populate('event', 'title startDate endDate type status')
       .populate('organization', 'name');
-    return res.json(apps);
+    return res.status(200).json({ success: true, message: 'My applications', applications: apps });
   } catch (e) {
     next(e);
   }
@@ -153,7 +165,7 @@ exports.listUpcomingParticipating = async (req, res, next) => {
         isUpcoming(a.event, now)
     );
 
-    return res.json(filtered);
+    return res.status(200).json({ success: true, message: 'Upcoming approved participations', applications: filtered });
   } catch (e) {
     next(e);
   }
@@ -179,7 +191,7 @@ exports.listUpcomingRequests = async (req, res, next) => {
         isUpcoming(a.event, now)
     );
 
-    return res.json(filtered);
+    return res.status(200).json({ success: true, message: 'Upcoming pending/rejected requests', applications: filtered });
   } catch (e) {
     next(e);
   }

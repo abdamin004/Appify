@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs'); // ashan nhash el password securely
 const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail'); // mail utility ashan yeb3at verification mail
 const Comment = require('../models/Comment');
+const VendorApplication = require('../models/VendorApplication');
+const Notification = require('../models/Notification');
 
 // admin ye3mel assign lel user role (Staff / TA / Professor) 
 // w yeb3at verification email yedous 3aleih el user before ma yetverifi
@@ -247,3 +249,121 @@ exports.deleteComment = async (req, res) => {
 
 
 
+// ========== Vendor Applications Review & Notifications ==========
+
+// List all pending vendor applications (for Admin/EventOffice)
+exports.listPendingVendorApplications = async (req, res) => {
+  try {
+    const apps = await VendorApplication.find({ status: 'pending' })
+      .sort({ createdAt: -1 })
+      .populate('event', 'title type startDate endDate location status')
+      .populate('organization', 'name')
+      .populate('vendorUser', 'email');
+
+    res.status(200).json({ success: true, applications: apps });
+  } catch (error) {
+    console.error('Error listing pending applications:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// Approve or reject a vendor application
+// Body: { action: 'approve' | 'reject', notes?: string }
+exports.reviewVendorApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body;
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
+    }
+
+    const app = await VendorApplication.findById(id).populate('event', 'title type').populate('organization', 'name');
+    if (!app) return res.status(404).json({ message: 'Application not found' });
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    app.status = newStatus;
+    app.reviewer = req.user._id;
+    app.reviewedAt = new Date();
+    if (notes) app.notes = notes;
+    await app.save();
+
+    // Notify the vendor user
+    const notifType = action === 'approve' ? 'VendorApplicationApproved' : 'VendorApplicationRejected';
+    const notifMsg = action === 'approve'
+      ? `Your application for ${app.event.type} '${app.event.title}' has been approved.`
+      : `Your application for ${app.event.type} '${app.event.title}' has been rejected.`;
+
+    try {
+      await Notification.create({
+        type: notifType,
+        message: notifMsg,
+        recipientsRoles: ['Vendor'],
+        recipientUser: app.vendorUser,
+        recipientModel: 'Vendor',
+        application: app._id,
+        event: app.event._id,
+        organization: app.organization._id,
+      });
+    } catch (notifyErr) {
+      console.error('Failed to create vendor notification:', notifyErr?.message || notifyErr);
+    }
+
+    res.status(200).json({ success: true, message: `Application ${newStatus}.`, application: app });
+  } catch (error) {
+    console.error('Error reviewing application:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// List notifications for Admin/EventOffice
+// Query: ?unreadOnly=true
+exports.listAdminNotifications = async (req, res) => {
+  try {
+    const unreadOnly = (req.query.unreadOnly || '').toString().toLowerCase() === 'true';
+    const filter = { recipientsRoles: { $in: ['Admin', 'EventOffice'] } };
+    if (unreadOnly) filter.isRead = false;
+
+    const notifs = await Notification.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('application', 'status')
+      .populate('event', 'title type startDate')
+      .populate('organization', 'name');
+
+    res.status(200).json({ success: true, notifications: notifs });
+  } catch (error) {
+    console.error('Error listing notifications:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// Mark a single notification as read
+exports.markNotificationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const notif = await Notification.findByIdAndUpdate(
+      id,
+      { isRead: true, readAt: new Date() },
+      { new: true }
+    );
+    if (!notif) return res.status(404).json({ message: 'Notification not found' });
+    res.status(200).json({ success: true, notification: notif });
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// Mark all admin notifications as read
+exports.markAllAdminNotificationsRead = async (req, res) => {
+  try {
+    const result = await Notification.updateMany(
+      { recipientsRoles: { $in: ['Admin', 'EventOffice'] }, isRead: false },
+      { $set: { isRead: true, readAt: new Date() } }
+    );
+    res.status(200).json({ success: true, updated: result.modifiedCount });
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
