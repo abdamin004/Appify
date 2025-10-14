@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 function SignupVendor() {
@@ -7,9 +7,10 @@ function SignupVendor() {
     password: "",
     companyName: "",
   });
-  
+
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -21,9 +22,7 @@ function SignupVendor() {
     try {
       const response = await fetch("http://localhost:5001/api/auth/signup/vendor", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
@@ -33,30 +32,40 @@ function SignupVendor() {
       }
 
       const data = await response.json();
-      console.log("Signup response:", data);
+
+      // Store vendor in localStorage
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          companyName: formData.companyName,
+          email: formData.email,
+          role: "vendor",
+          token: data.token,
+        })
+      );
+
       setMessage("Vendor signup successful! ✅");
     } catch (error) {
-      console.error("Signup error:", error);
       setMessage("Signup failed: " + error.message);
     }
   };
 
+  // Navigate to dashboard after success
+  useEffect(() => {
+    if (message === "Vendor signup successful! ✅") {
+      setTimeout(() => {
+        navigate("/Dashboard");
+      }, 1000);
+    }
+  }, [message, navigate]);
+
   return (
-    <div style={{
-      maxWidth: '500px',
-      margin: '0 auto',
-      padding: '30px'
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h2 style={{ 
-          fontSize: '2rem', 
-          fontWeight: 'bold', 
-          color: '#003366', 
-          marginBottom: '10px' 
-        }}>
+    <div style={{ maxWidth: "500px", margin: "0 auto", padding: "30px" }}>
+      <div style={{ textAlign: "center", marginBottom: "30px" }}>
+        <h2 style={{ fontSize: "2rem", fontWeight: "bold", color: "#003366", marginBottom: "10px" }}>
           Vendor Signup
         </h2>
-        <p style={{ fontSize: '1rem', color: '#6b7280' }}>
+        <p style={{ fontSize: "1rem", color: "#6b7280" }}>
           Signup now to register your company
         </p>
       </div>
@@ -98,16 +107,16 @@ function SignupVendor() {
           />
         </div>
 
-        <button 
+        <button
           onClick={handleSubmit}
           style={buttonStyle}
           onMouseEnter={(e) => {
-            e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.5)';
+            e.target.style.transform = "translateY(-2px)";
+            e.target.style.boxShadow = "0 6px 20px rgba(212, 175, 55, 0.5)";
           }}
           onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.3)';
+            e.target.style.transform = "translateY(0)";
+            e.target.style.boxShadow = "0 4px 12px rgba(212, 175, 55, 0.3)";
           }}
         >
           Sign Up
@@ -119,25 +128,19 @@ function SignupVendor() {
               marginTop: "15px",
               color: message.includes("failed") ? "#dc2626" : "#d4af37",
               textAlign: "center",
-              fontWeight: '500'
+              fontWeight: "500",
             }}
           >
             {message}
           </p>
         )}
 
-        <p style={{
-          marginTop: '20px',
-          textAlign: 'center',
-          fontSize: '0.95rem',
-          color: '#6b7280'
-        }}>
+        <p style={{ marginTop: "20px", textAlign: "center", fontSize: "0.95rem", color: "#6b7280" }}>
           Already have an account?{" "}
-          <a onClick={() => navigate('/login')} style={{
-            color: '#d4af37',
-            fontWeight: '600',
-            textDecoration: 'none'
-          }}>
+          <a
+            onClick={() => navigate("/login")}
+            style={{ color: "#d4af37", fontWeight: "600", textDecoration: "none" }}
+          >
             Login
           </a>
         </p>
@@ -146,44 +149,9 @@ function SignupVendor() {
   );
 }
 
-const labelStyle = {
-  display: 'block',
-  marginBottom: '20px'
-};
-
-const spanStyle = {
-  display: 'block',
-  marginBottom: '8px',
-  fontSize: '0.9rem',
-  fontWeight: '600',
-  color: '#003366'
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '12px 16px',
-  border: '2px solid #e5e7eb',
-  borderRadius: '10px',
-  fontSize: '1rem',
-  outline: 'none',
-  transition: 'all 0.2s',
-  backgroundColor: 'white',
-  boxSizing: 'border-box'
-};
-
-const buttonStyle = {
-  width: '100%',
-  padding: '14px',
-  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-  color: '#003366',
-  border: 'none',
-  borderRadius: '10px',
-  fontSize: '1.05rem',
-  fontWeight: '700',
-  cursor: 'pointer',
-  transition: 'all 0.3s',
-  boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)',
-  marginTop: '10px'
-};
+const labelStyle = { display: "block", marginBottom: "20px" };
+const spanStyle = { display: "block", marginBottom: "8px", fontSize: "0.9rem", fontWeight: "600", color: "#003366" };
+const inputStyle = { width: "100%", padding: "12px 16px", border: "2px solid #e5e7eb", borderRadius: "10px", fontSize: "1rem", outline: "none", transition: "all 0.2s", backgroundColor: "white", boxSizing: "border-box" };
+const buttonStyle = { width: "100%", padding: "14px", background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)", color: "#003366", border: "none", borderRadius: "10px", fontSize: "1.05rem", fontWeight: "700", cursor: "pointer", transition: "all 0.3s", boxShadow: "0 4px 12px rgba(212, 175, 55, 0.3)", marginTop: "10px" };
 
 export default SignupVendor;

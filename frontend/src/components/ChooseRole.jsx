@@ -18,7 +18,7 @@ const navigate = useNavigate();
     },
     { 
       id: 'staff', 
-      label: 'Staff/TA/Professor',
+      label: 'Staff/TA/Professor   /EventOffice',
       icon: '👔',
       description: 'Organize and manage academic events'
     },

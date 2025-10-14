@@ -4,10 +4,11 @@ import { useState } from "react";
 import ChooseRole from "./components/ChooseRole"; // make sure path is correct
 import Login from "./components/Auth/Login";
 import VendorDashboard from "./components/VendorDashboard";
-import StudentDashboard from "./components/StudentDashboard";
+import StudentDashboard from "./components/Dashboard";
 import StaffDashboard from "./components/StaffDashboard";
 import Navbar from "./components/Navbar";
 import WelcomePage from "./components/WelcomePage";
+import Dashboard from "./components/Dashboard";
 
 
 function App() {
@@ -22,7 +23,9 @@ function App() {
   };
   return (
     <>
+  
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+      
       <div style={{ paddingTop: '70px' }}>
         <Routes>
           <Route path="/" element={<WelcomePage />} />
@@ -30,6 +33,7 @@ function App() {
             path="/Login" 
             element={<Login onLogin={handleLogin} />} 
           />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
           <Route path="/StudentDashboard" element={<StudentDashboard />} />

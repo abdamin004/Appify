@@ -72,10 +72,10 @@ export default function Login({ onLogin }) {
       if (res.ok) {
         if (onLogin) onLogin(data.user.role || '');
         
-        if (data.user.role === "vendor") navigate("/vendor-dashboard");
-        else if (data.user.role === "student") navigate("/student-dashboard");
-        else if (data.user.role === "staff") navigate("/staff-dashboard");
-        else navigate("/dashboard");
+        if (data.user.role === "vendor") navigate("/Dashboard");
+        else if (data.user.role === "student") navigate("/Dashboard");
+        else if (data.user.role === "staff") navigate("/Dashboard");
+        else navigate("/Dashboard");
       } else {
         setError(data.message || "Login failed");
       }
