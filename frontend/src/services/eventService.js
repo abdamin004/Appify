@@ -1,4 +1,5 @@
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+export { API_BASE };
 
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
@@ -63,5 +64,31 @@ export async function listWorkshopsByProfessor(professorName) {
 
 export async function listUpcomingPublished() {
   const res = await fetch(`${API_BASE}/events`);
+  return res.json();
+}
+
+// Gym sessions (frontend-only concept, stored as base Event with type 'Conference' and category 'GymSession')
+export function createGymSession(payload) {
+  const { sessionType, ...rest } = payload;
+  const body = {
+    ...rest,
+    type: 'Conference',
+    category: 'GymSession',
+    ...(sessionType ? { tags: [sessionType] } : {}),
+  };
+  return http('POST', `${API_BASE}/events/create`, body);
+}
+
+export function updateGymSession(id, payload) {
+  return updateEvent(id, payload);
+}
+
+export function cancelGymSession(id) {
+  return updateEvent(id, { status: 'cancelled' });
+}
+
+export async function listGymSessions() {
+  const q = new URLSearchParams({ category: 'GymSession' });
+  const res = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
   return res.json();
 }
