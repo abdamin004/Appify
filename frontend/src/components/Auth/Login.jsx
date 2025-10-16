@@ -80,7 +80,7 @@ export default function Login({ onLogin }) {
         if (role === "vendor") {
           navigate("/VendorDashboard");
         } else if (role === "student") {
-          navigate("/StudentDashboard");
+          navigate("/student-dashboard");
         } else if (role === "ta") {
           navigate("/TaDashboard");
         } else if (role === "professor") {
