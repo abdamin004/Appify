@@ -30,8 +30,8 @@ exports.signupUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // generate random verification token 3ashan el email verification
-    const verificationToken = crypto.randomBytes(32).toString('hex');
+    // generate random verification token 3ashan el email verification (disabled for now)
+    const verificationToken = undefined;
 
     // Create el user fe el database
     const user = await User.create({
@@ -42,40 +42,15 @@ exports.signupUser = async (req, res) => {
       role,
       studentStaffId,
       verificationToken,
-      isVerified: true // el Student byakhod email verification, el ba2y byestanno admin approval
+      // Email verification disabled: mark verified on signup
+      isVerified: true
     });
 
-    // law el role Student, eb3at email verification
-    if (role === 'Student') {
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify/${verificationToken}`;
-      const message = `
-        Email Verification
-        Hello ${firstName},
-        Please click the link below to verify your email:
-        ${verificationUrl}
-      `;
-
-      try {
-        await sendEmail({
-          email: user.email,
-          subject: 'Email Verification',
-          message
-        });
-      } catch (error) {
-        console.error('Email sending failed:', error);
-      }
-
-      res.status(201).json({
-        success: true,
-        message: 'User registered successfully. Please check your email for verification.'
-      });
-    } else {
-      // law el role Staff / TA / Professor lazem yestanna admin approval
-      res.status(201).json({
-        success: true,
-        message: 'Registration submitted. Waiting for admin approval.'
-      });
-    }
+    // Email verification disabled: respond success immediately
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully.'
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -157,14 +132,7 @@ exports.login = async (req, res) => {
       return res.status(403).json({ message: 'Your account has been blocked. Please contact admin.' });
     }
 
-    // check law el user verified (for users bs, msh vendors)
-    if (!isVendor && !user.isVerified) {
-      return res.status(403).json({ 
-        message: user.role === 'Student' 
-          ? 'Please verify your email before logging in.' 
-          : 'Your account is pending admin approval.'
-      });
-    }
+    // Email verification disabled: skip isVerified check
 
     // generate el JWT token
     const token = generateToken(user._id);
