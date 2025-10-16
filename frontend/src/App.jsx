@@ -11,6 +11,13 @@ import ProfessorDashboard from "./components/Dashboards/ProfessorDashboard";
 import EventOfficeDashboard from "./components/Dashboards/EventOfficeDashboard";
 import StaffDashboard from "./components/Dashboards/StaffDashboard";
 import TaDashboard from "./components/Dashboards/TaDashboard";
+import RequestBooth from "./components/Vendor/RequestBooth";
+import AdminDashboard from "./components/Admin/AdminDashboard";
+import UserManagement from "./components/Admin/UserManagement";
+import CreateAdmin from "./components/Admin/CreateAdmin";
+import VendorApplications from "./components/Admin/VendorApplications";
+import AdminNotifications from "./components/Admin/AdminNotifications";
+import CommentModeration from "./components/Admin/CommentModeration";
 
 
 function App() {
@@ -43,6 +50,13 @@ function App() {
           <Route path="/ProfessorDashboard" element={<ProfessorDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
           <Route path="/TaDashboard" element={<TaDashboard />} />
+          <Route path="/vendor/request-booth" element={<RequestBooth />} />
+          <Route path="/Admin" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UserManagement />} />
+          <Route path="/admin/create" element={<CreateAdmin />} />
+          <Route path="/admin/vendor-applications" element={<VendorApplications />} />
+          <Route path="/admin/notifications" element={<AdminNotifications />} />
+          <Route path="/admin/comments" element={<CommentModeration />} />
         </Routes>
       </div>
     </>

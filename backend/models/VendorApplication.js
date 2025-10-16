@@ -10,7 +10,7 @@ const vendorApplicationSchema = new mongoose.Schema({
   event:        { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
 
   // Company and vendor user applying on its behalf
-  organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
+  organization: { type: String, required: true, index: true },
   vendorUser:   { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
 
   // Common fields between Bazaar & Booth 

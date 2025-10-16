@@ -19,11 +19,26 @@ const isUpcoming = (ev, now = new Date()) =>
 exports.listUpcomingBazaars = async (req, res, next) => {
   try {
     const now = new Date();
-    const bazaars = await Event.find({
-      type: 'Bazaar',             // discriminator type
-      status: 'published',        // only open/visible events
-      startDate: { $gte: now }    // future
-    }).select('title startDate endDate location capacity');
+    let bazaars;
+    try {
+      // Try a robust comparison that converts stored startDate to Date (works if startDate is a string)
+      bazaars = await Event.find({
+        type: 'Bazaar',
+        status: 'published',
+        $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
+      })
+        .select('title startDate endDate location capacity vendors')
+        .populate({ path: 'vendors', select: 'companyName email' });
+    } catch (err) {
+      // Fallback for older Mongo versions where $toDate / $expr may not be available
+      bazaars = await Event.find({
+        type: 'Bazaar',
+        status: 'published',
+        startDate: { $gte: now }
+      })
+        .select('title startDate endDate location capacity vendors')
+        .populate({ path: 'vendors', select: 'companyName email' });
+    }
     return res.status(200).json({ success: true, message: 'Upcoming bazaars', bazaars });
   } catch (e) {
     next(e);
@@ -34,12 +49,35 @@ exports.listUpcomingBazaars = async (req, res, next) => {
 exports.listUpcomingBooths = async (req, res, next) => {
   try {
     const now = new Date();
-    const booths = await Event.find({
-      type: 'Booth',
-      status: 'published',
-      startDate: { $gte: now }
-    }).select('title startDate endDate location capacity');
+    let booths;
+    try {
+      booths = await Event.find({
+        type: 'Booth',
+        status: 'published',
+        $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
+      })
+        .select('title startDate endDate location capacity vendors')
+        .populate({ path: 'vendors', select: 'companyName email' });
+    } catch (err) {
+      booths = await Event.find({
+        type: 'Booth',
+        status: 'published',
+        startDate: { $gte: now }
+      })
+        .select('title startDate endDate location capacity vendors')
+        .populate({ path: 'vendors', select: 'companyName email' });
+    }
     return res.status(200).json({ success: true, message: 'Upcoming booths', booths });
+  } catch (e) {
+    next(e);
+  }
+};
+
+// 2.a) List organizations (simple helper for frontend dropdown)
+exports.listOrganizations = async (req, res, next) => {
+  try {
+    const orgs = await Organization.find().select('name email phone');
+    return res.status(200).json({ success: true, organizations: orgs });
   } catch (e) {
     next(e);
   }
@@ -49,34 +87,43 @@ exports.listUpcomingBooths = async (req, res, next) => {
 // Body expects: { organizationId, boothSize, attendees?, setupDurationWeeks?, setupLocation?, notes? }
 exports.applyToEvent = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    // Accept eventId from URL param or request body (defensive)
+    const body = req.body || {};
+    let eventId = req.params.eventId || body.eventId || body.eventName || '';
     const {
-      organizationId,
-      boothSize = '2x2',
+      organization,
+      boothSize ,
       attendees = [],
       setupDurationWeeks,      // required only for Booth
       setupLocation,           // required only for Booth
       notes
-    } = req.body;
+    } = body;
 
+    /*
     // Basic id validation early
     if (!isValidId(eventId) || !isValidId(organizationId)) {
       return badReq(res, 'Invalid eventId or organizationId');
     }
+    */
 
-    // Load the event; must be Bazaar or Booth, published, and in the future
-    const ev = await Event.findById(eventId).select('type status startDate title');
-    if (!ev) return res.status(404).json({ success: false, message: 'Event not found' });
-    if (!['Bazaar', 'Booth'].includes(ev.type)) {
-      return badReq(res, 'Only Bazaar or Booth events accept vendor applications');
+    // Normalize input - if it's an id-like string we'll try by id first, otherwise try title
+    let ev = null;
+    if (isValidId(eventId)) {
+      ev = await Event.findById(eventId).select('type status startDate title');
     }
-    if (ev.status !== 'published') return badReq(res, 'Event not open for applications');
-    if (new Date(ev.startDate) < new Date()) return badReq(res, 'Event already started or finished');
+    if (!ev) {
+      // Treat eventId as title (exact match) or eventName provided
+      const titleToFind = body.eventName || eventId;
+      if (titleToFind && typeof titleToFind === 'string') {
+        ev = await Event.findOne({ title: titleToFind, status: 'published' }).select('type status startDate title');
+      }
+    }
+    if (!ev) return res.status(404).json({ success: false, message: 'Event not found' });
 
+    /*
     // Organization must exist
-    const org = await Organization.findById(organizationId).select('name');
     if (!org) return res.status(404).json({ success: false, message: 'Organization not found' });
-
+    */
     // Common business rules
     if (!['2x2', '4x4'].includes(boothSize)) {
       return badReq(res, 'Invalid booth size (allowed: 2x2, 4x4)');
@@ -99,7 +146,7 @@ exports.applyToEvent = async (req, res, next) => {
     // Create the application. The (event, organization) unique index will prevent duplicates.
     const app = await VendorApplication.create({
       event: ev._id,
-      organization: org._id,
+      organization: organization,
       vendorUser: req.user._id,     // the logged-in Vendor who submitted
       attendees,
       boothSize,
@@ -116,7 +163,7 @@ exports.applyToEvent = async (req, res, next) => {
         recipientsRoles: ['Admin', 'EventOffice'],
         application: app._id,
         event: ev._id,
-        organization: org._id,
+        organization: organization || undefined,
       });
     } catch (notifyErr) {
       console.error('Notification create failed:', notifyErr && notifyErr.message ? notifyErr.message : notifyErr);

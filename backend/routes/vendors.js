@@ -21,6 +21,14 @@ router.get(
   vendorCtrl.listUpcomingBooths
 );
 
+// 2.a) List organizations (for vendor to choose which organization applies)
+router.get(
+  '/organizations',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.listOrganizations
+);
+
 // 3) Vendor applies to a specific event (bazaar or booth) by id
 router.post(
   '/events/:eventId/applications',

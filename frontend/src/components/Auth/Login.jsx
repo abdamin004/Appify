@@ -89,7 +89,10 @@ export default function Login({ onLogin }) {
           navigate("/EventOfficeDashboard");
         } else if (role === "staff") {
           navigate("/StaffDashboard");
-        } else {
+        }else if (role === "admin") {
+          navigate("/Admin");
+        } 
+        else {
           // fallback
           navigate('/');
         }

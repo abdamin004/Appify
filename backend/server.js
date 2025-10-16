@@ -5,14 +5,17 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 
-// Debug: Check if environment variables are loaded
-console.log('🔍 Environment Variables Check:');
-console.log('PORT:', process.env.PORT);
-console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✅ Loaded' : ' MISSING!');
-console.log('MONGODB_URI:', process.env.MONGODB_URI ? '✅ Loaded' : ' MISSING!');
-
 // Connect to database
-connectDB();
+connectDB().then(() => {
+  // initialize a default admin if none exists
+  try {
+    require('./utils/initAdmin')();
+  } catch (err) {
+    console.error('initAdmin failed to run:', err);
+  }
+}).catch(err => {
+  console.error('Failed to connect to DB on startup:', err);
+});
 
 // Initialize express app
 const app = express();

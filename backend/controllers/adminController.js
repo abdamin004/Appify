@@ -73,10 +73,10 @@ exports.assignUserRole = async (req, res) => {
         }
 
         user.role = role;
-        user.isVerified = false;
-        user.verificationToken = crypto.randomBytes(32).toString('hex');
+        //user.isVerified = false;
+        //user.verificationToken = crypto.randomBytes(32).toString('hex');
         await user.save();
-
+/*
         const verifyUrl = `${process.env.FRONTEND_URL}/verify/${user.verificationToken}`;
 
         const subject = 'Verify Your Account';
@@ -98,7 +98,7 @@ exports.assignUserRole = async (req, res) => {
             subject,
             message
         });
-
+*/
         return res.status(200).json({
             message: `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`,
             user: {

@@ -90,7 +90,8 @@ module.exports = {
 
     async getAllEvents(req, res) {
         try {
-            const events = await Event.find({ startDate: { $gte: new Date() }, status:'published'})
+            const now = new Date();
+            const events = await Event.find({  $expr: { $gte: [ { $toDate: '$startDate' }, now ] }, status:'published'})
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
                 .exec();
             res.json(events);

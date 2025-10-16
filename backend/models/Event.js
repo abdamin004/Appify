@@ -35,7 +35,7 @@ const eventSchema = new Schema({
   registrationDeadline: { type: Date },
   
   // Who created this event (could be staff/admin)
-  //createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
 }, { 
   discriminatorKey: 'type',
   timestamps: true 

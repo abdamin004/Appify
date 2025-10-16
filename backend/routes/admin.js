@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
 
 // User management
-router.post('/assign-role', adminController.assignUserRole);
+router.put('/assign-role', adminController.assignUserRole);
 router.post('/create-admin', adminController.createAdminAccount);
 router.delete('/delete-admin/:id', adminController.deleteAdminAccount);
 router.patch('/block-user/:id', adminController.blockUser);

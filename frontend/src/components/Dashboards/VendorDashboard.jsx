@@ -59,7 +59,7 @@ function VendorDashboard() {
   };
 
   const handleRequestBooth = () => {
-    window.location.href = "/request-booth";
+    window.location.href = "/vendor/request-booth";
   };
 
   const displayName = user.companyName || user.firstName || "Vendor";
