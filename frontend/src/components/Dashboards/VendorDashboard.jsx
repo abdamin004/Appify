@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
-import Navbar from "../Navbar";
+
 import MyEventsList from "../Functions/MyEventsList";
 
 function VendorDashboard() {
@@ -73,7 +73,7 @@ function VendorDashboard() {
         overflow: "hidden",
       }}
     >
-      <Navbar />
+     
 
       <div
         style={{
