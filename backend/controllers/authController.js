@@ -170,19 +170,33 @@ exports.login = async (req, res) => {
     const token = generateToken(user._id);
 
     // response elly byrga3 ll frontend
-    res.json({
-      success: true,
-      token,
+    if(isVendor) {
+      res.json({
+        success: true,
+        token,
+        vendor: {
+          id: user._id,
+          email: user.email,
+          companyName: user.companyName,
+          isBlocked: user.isBlocked,
+          role: 'Vendor'
+        }
+      });
+    } else {
+      res.json({
+        success: true,
+        token,
       user: {
         id: user._id,
         email: user.email,
-        role: isVendor ? 'Vendor' : user.role,
+        role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
         companyName: user.companyName,
         isVerified: user.isVerified
       }
     });
+  }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });

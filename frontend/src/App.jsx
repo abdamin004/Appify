@@ -38,7 +38,7 @@ function App() {
           
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
-          <Route path="/StudentDashboard" element={<StudentDashboard />} />
+          <Route path="/Student-dashboard" element={<StudentDashboard />} />
           <Route path="/EventOfficeDashboard" element={<EventOfficeDashboard />} />
           <Route path="/ProfessorDashboard" element={<ProfessorDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />

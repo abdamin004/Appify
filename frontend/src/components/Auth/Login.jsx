@@ -64,14 +64,19 @@ export default function Login({ onLogin }) {
       const data = await res.json();
 
       if (res.ok) {
+        // backend returns either data.user (for User) or data.vendor (for Vendor)
+        const userObj = data.user || data.vendor || null;
         // Store user data in localStorage
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token || "dummy-token");
-        
-        if (onLogin) onLogin(data.user.role || '');
-        
-        // Route to role-specific dashboard
-        const role = data.user.role;
+        if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
+        localStorage.setItem("token", data.token || "");
+
+        // Normalize role casing to simplify routing logic
+        const roleRaw = (userObj && (userObj.role || '')) || '';
+        const role = roleRaw.toLowerCase();
+
+        if (onLogin) onLogin(role);
+
+        // Route to role-specific dashboard (use lowercase comparisons)
         if (role === "vendor") {
           navigate("/VendorDashboard");
         } else if (role === "student") {
@@ -84,7 +89,9 @@ export default function Login({ onLogin }) {
           navigate("/EventOfficeDashboard");
         } else if (role === "staff") {
           navigate("/StaffDashboard");
-
+        } else {
+          // fallback
+          navigate('/');
         }
       } else {
         setError(data.message || "Login failed");

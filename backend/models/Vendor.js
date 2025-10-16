@@ -22,6 +22,10 @@ const vendorSchema = new mongoose.Schema({
   isBlocked: {
     type: Boolean,
     default: false // default el vendor msh ma7gz
+  },
+  role: {
+    type: String,
+    default: 'Vendor' // role beta3 el vendor
   }
 }, { timestamps: true }); // timestamps 3ashan yeb2a 3ando createdAt w updatedAt automatically
 
