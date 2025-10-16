@@ -7,6 +7,7 @@ import VendorDashboard from "./components/VendorDashboard";
 import StudentDashboard from "./components/StudentDashboard";
 import StaffDashboard from "./components/StaffDashboard";
 import Navbar from "./components/Navbar";
+import WelcomePage from "./components/WelcomePage";
 
 
 function App() {
@@ -20,16 +21,16 @@ function App() {
     setIsLoggedIn(false);
   };
   return (
-  <>
+    <>
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-      
       <div style={{ paddingTop: '70px' }}>
         <Routes>
-          <Route path="/" element={<ChooseRole />} />
+          <Route path="/" element={<WelcomePage />} />
           <Route 
             path="/Login" 
             element={<Login onLogin={handleLogin} />} 
           />
+          <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
           <Route path="/StudentDashboard" element={<StudentDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />

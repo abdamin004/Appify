@@ -1,18 +1,15 @@
 import React, { useState } from "react";
-import "./Form.css"; // optional, for styles
 import { useNavigate } from "react-router-dom";
 
 function SignupVendor() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     companyName: "",
   });
-
+  
   const [message, setMessage] = useState("");
-
-  // Update form data as the user types
+  const navigate = useNavigate();
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -20,10 +17,7 @@ function SignupVendor() {
     });
   };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleSubmit = async () => {
     try {
       const response = await fetch("http://localhost:5001/api/auth/signup/vendor", {
         method: "POST",
@@ -48,73 +42,148 @@ function SignupVendor() {
   };
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <p className="title">Vendor Signup</p>
-      <p className="message">Signup now to register your company.</p>
+    <div style={{
+      maxWidth: '500px',
+      margin: '0 auto',
+      padding: '30px'
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <h2 style={{ 
+          fontSize: '2rem', 
+          fontWeight: 'bold', 
+          color: '#003366', 
+          marginBottom: '10px' 
+        }}>
+          Vendor Signup
+        </h2>
+        <p style={{ fontSize: '1rem', color: '#6b7280' }}>
+          Signup now to register your company
+        </p>
+      </div>
 
-      <label>
-        <input
-          required
-          type="text"
-          name="companyName"
-          className="input"
-          value={formData.companyName}
-          onChange={handleChange}
-        />
-        <span>Company Name</span>
-      </label>
+      <div>
+        <div style={labelStyle}>
+          <span style={spanStyle}>Company Name</span>
+          <input
+            type="text"
+            name="companyName"
+            value={formData.companyName}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
 
-      <label>
-        <input
-          required
-          type="email"
-          name="email"
-          className="input"
-          value={formData.email}
-          onChange={handleChange}
-        />
-        <span>Business Email</span>
-      </label>
+        <div style={labelStyle}>
+          <span style={spanStyle}>Business Email</span>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
 
-      <label>
-        <input
-          required
-          type="password"
-          name="password"
-          className="input"
-          value={formData.password}
-          onChange={handleChange}
-        />
-        <span>Password</span>
-      </label>
+        <div style={labelStyle}>
+          <span style={spanStyle}>Password</span>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          />
+        </div>
 
-      <button className="submit" type="submit">
-        Sign Up
-      </button>
-
-      {message && (
-        <p
-          style={{
-            marginTop: "15px",
-            color: message.includes("failed") ? "red" : "green",
-            textAlign: "center",
+        <button 
+          onClick={handleSubmit}
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.3)';
           }}
         >
-          {message}
-        </p>
-      )}
-
-      <p className="signin">
-        Already have an account? <button
-          type="button"
-          onClick={() => navigate("/Login", { state: { role: "vendor" } })}
-          style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer" }}
-        >
-          Login
+          Sign Up
         </button>
-      </p>
-    </form>
+
+        {message && (
+          <p
+            style={{
+              marginTop: "15px",
+              color: message.includes("failed") ? "#dc2626" : "#d4af37",
+              textAlign: "center",
+              fontWeight: '500'
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        <p style={{
+          marginTop: '20px',
+          textAlign: 'center',
+          fontSize: '0.95rem',
+          color: '#6b7280'
+        }}>
+          Already have an account?{" "}
+          <a onClick={() => navigate('/login')} style={{
+            color: '#d4af37',
+            fontWeight: '600',
+            textDecoration: 'none'
+          }}>
+            Login
+          </a>
+        </p>
+      </div>
+    </div>
   );
 }
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: '20px'
+};
+
+const spanStyle = {
+  display: 'block',
+  marginBottom: '8px',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#003366'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '12px 16px',
+  border: '2px solid #e5e7eb',
+  borderRadius: '10px',
+  fontSize: '1rem',
+  outline: 'none',
+  transition: 'all 0.2s',
+  backgroundColor: 'white',
+  boxSizing: 'border-box'
+};
+
+const buttonStyle = {
+  width: '100%',
+  padding: '14px',
+  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+  color: '#003366',
+  border: 'none',
+  borderRadius: '10px',
+  fontSize: '1.05rem',
+  fontWeight: '700',
+  cursor: 'pointer',
+  transition: 'all 0.3s',
+  boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)',
+  marginTop: '10px'
+};
 
 export default SignupVendor;
