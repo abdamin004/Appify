@@ -7,9 +7,6 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  // -----------------------
-  // Styles - must be before return
-  // -----------------------
   const labelStyle = {
     display: 'block',
     marginBottom: '20px'
@@ -50,9 +47,6 @@ export default function Login({ onLogin }) {
     marginTop: '10px'
   };
 
-  // -----------------------
-  // Form submit handler
-  // -----------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -70,12 +64,28 @@ export default function Login({ onLogin }) {
       const data = await res.json();
 
       if (res.ok) {
+        // Store user data in localStorage
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("token", data.token || "dummy-token");
+        
         if (onLogin) onLogin(data.user.role || '');
         
-        if (data.user.role === "vendor") navigate("/Dashboard");
-        else if (data.user.role === "student") navigate("/Dashboard");
-        else if (data.user.role === "staff") navigate("/Dashboard");
-        else navigate("/Dashboard");
+        // Route to role-specific dashboard
+        const role = data.user.role;
+        if (role === "vendor") {
+          navigate("/VendorDashboard");
+        } else if (role === "student") {
+          navigate("/StudentDashboard");
+        } else if (role === "ta") {
+          navigate("/TaDashboard");
+        } else if (role === "professor") {
+          navigate("/ProfessorDashboard");
+        } else if (role === "eventoffice") {
+          navigate("/EventOfficeDashboard");
+        } else if (role === "staff") {
+          navigate("/StaffDashboard");
+
+        }
       } else {
         setError(data.message || "Login failed");
       }
@@ -85,9 +95,6 @@ export default function Login({ onLogin }) {
     }
   };
 
-  // -----------------------
-  // JSX
-  // -----------------------
   return (
     <div
       style={{
@@ -107,7 +114,6 @@ export default function Login({ onLogin }) {
         borderRadius: '16px',
         boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
       }}>
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#003366', marginBottom: '10px' }}>
             Welcome Back
@@ -117,7 +123,6 @@ export default function Login({ onLogin }) {
           </p>
         </div>
 
-        {/* Error Message */}
         {error && (
           <p style={{
             marginBottom: "20px",
@@ -130,7 +135,6 @@ export default function Login({ onLogin }) {
           </p>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={labelStyle}>
             <span style={spanStyle}>Email Address</span>
@@ -188,7 +192,6 @@ export default function Login({ onLogin }) {
           </button>
         </form>
 
-        {/* Footer */}
         <p style={{
           marginTop: '20px',
           textAlign: 'center',

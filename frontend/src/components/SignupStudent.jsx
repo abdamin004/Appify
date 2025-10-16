@@ -21,6 +21,8 @@ function SignupStudent() {
     });
   };
 
+  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -47,16 +49,6 @@ function SignupStudent() {
 
       const data = await response.json();
       console.log("Signup response:", data);
-      
-      // Store user data in localStorage (or use Context API)
-      localStorage.setItem("user", JSON.stringify({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        role: formData.role,
-        token: data.token // If your API returns a token
-      }));
-
       setMessage("Signup successful! ✅");
     } catch (error) {
       console.error("Signup error:", error);
@@ -67,11 +59,10 @@ function SignupStudent() {
   useEffect(() => {
     if (message === "Signup successful! ✅") {
       setTimeout(() => {
-        // Redirect to dashboard after successful signup
-        navigate("/dashboard");
+        navigate("/login");
       }, 1000);
     }
-  }, [message, navigate]);
+  }, [message]);
 
   return (
     <div style={{
@@ -212,15 +203,11 @@ function SignupStudent() {
           color: '#6b7280'
         }}>
           Already have an account?{" "}
-          <a 
-            onClick={() => navigate('/login')} 
-            style={{
-              color: '#d4af37',
-              fontWeight: '600',
-              textDecoration: 'none',
-              cursor: 'pointer'
-            }}
-          >
+          <a onClick={() => navigate('/login')} style={{
+            color: '#d4af37',
+            fontWeight: '600',
+            textDecoration: 'none'
+          }}>
             Login
           </a>
         </p>
