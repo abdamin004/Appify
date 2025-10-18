@@ -25,6 +25,7 @@ import CreateAdmin from "./components/Admin/CreateAdmin";
 import VendorApplications from "./components/Admin/VendorApplications";
 import AdminNotifications from "./components/Admin/AdminNotifications";
 import CommentModeration from "./components/Admin/CommentModeration";
+import ViewEvents from "./components/Admin/ViewEvents";
 
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
           <Route path="/admin/vendor-applications" element={<VendorApplications />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/comments" element={<CommentModeration />} />
+          <Route path="/admin/view-events" element={<ViewEvents />} />
         </Routes>
       </div>
     </>

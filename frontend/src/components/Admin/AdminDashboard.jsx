@@ -12,6 +12,7 @@ export default function AdminDashboard() {
         <li><Link to="/admin/vendor-applications">Vendor Applications</Link></li>
         <li><Link to="/admin/notifications">Notifications</Link></li>
         <li><Link to="/admin/comments">Comment Moderation</Link></li>
+        <li><Link to= "/admin/view-events">View Events</Link></li>
       </ul>
     </div>
   );
