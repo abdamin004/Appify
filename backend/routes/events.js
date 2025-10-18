@@ -5,10 +5,10 @@ const roleCheck = require('../middleware/roleCheck');
 const router = express.Router();
 
 // Create event
-router.post('/create', auth, roleCheck('Admin', 'EventOffice'), eventController.createEvent);
+router.post('/create', auth, roleCheck('Admin', 'EventOffice' , 'Professor'), eventController.createEvent);
 
 // Update event
-router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.updateEvent);
+router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.updateEvent);
 
 // Delete event
 router.delete('/delete/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.deleteEvent);

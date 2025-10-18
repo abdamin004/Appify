@@ -48,7 +48,7 @@ function App() {
       
       <div style={{ paddingTop: '70px' }}>
         <Routes>
-          <Route path="/" element={<ChooseRole />} />
+          <Route path="/" element={<WelcomePage />} />
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route 
             path="/Login" 
