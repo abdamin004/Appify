@@ -203,6 +203,26 @@ function ProfessorDashboard() {
             >
               🎯 Browse Events
             </button>
+
+            {/* Register Events direct button */}
+            <button
+              onClick={() => (window.location.href = "/register-events")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              Register Events
+            </button>
             <button
               onClick={() => setActiveTab("my-workshops")}
               style={{
