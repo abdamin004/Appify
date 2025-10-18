@@ -27,6 +27,7 @@ import AdminNotifications from "./components/Admin/AdminNotifications";
 import CommentModeration from "./components/Admin/CommentModeration";
 import ViewEvents from "./components/Admin/ViewEvents";
 import RegisterEvents from "./components/RegisterEvents";
+import GymSessions from "./components/GymSessions";
 
 
 function App() {
@@ -73,6 +74,7 @@ function App() {
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
           <Route path="/register-events" element={<RegisterEvents />} />
+          <Route path="/gym-sessions" element={<GymSessions />} />
         
         
           <Route path="/TaDashboard" element={<TaDashboard />} />

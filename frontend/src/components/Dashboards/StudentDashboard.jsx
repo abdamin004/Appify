@@ -227,6 +227,25 @@ function StudentDashboard() {
             </button>
 
             <button
+              onClick={() => (window.location.href = "/gym-sessions")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              🏋️ Gym Sessions
+            </button>
+
+            <button
               onClick={() => setActiveTab("registered")}
               style={{
                 flex: 1,

@@ -61,7 +61,7 @@ function StaffDashboard() {
               Browse all university events
             </p>
 
-            <div style={{ marginTop: "16px" }}>
+            <div style={{ marginTop: "16px", display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <button
                 onClick={() => (window.location.href = "/register-events")}
                 style={{
@@ -78,6 +78,23 @@ function StaffDashboard() {
                 }}
               >
                 Register Events
+              </button>
+              <button
+                onClick={() => (window.location.href = "/gym-sessions")}
+                style={{
+                  padding: "14px 28px",
+                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                  color: "#003366",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontSize: "1rem",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                  boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+                }}
+              >
+                🏋️ Gym Sessions
               </button>
             </div>
           </div>

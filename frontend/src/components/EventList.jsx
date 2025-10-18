@@ -261,6 +261,7 @@ function EventsList({ presetType = "" }) {
                 <option value="/events-office/gym-sessions">Gym Sessions</option>
                 <option value="/professor/workshops">Workshops</option>
                 <option value="/register-events">Register (Workshops/Trips)</option>
+                <option value="/gym-sessions">View Gym Sessions</option>
               </select>
 
               <button
