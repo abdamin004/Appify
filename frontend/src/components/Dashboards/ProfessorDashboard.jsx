@@ -44,7 +44,12 @@ function ProfessorDashboard() {
   };
 
   const handleCreateWorkshop = () => {
-    navigate("/professor/workshops");
+    try {
+      navigate("/professor/workshops");
+    } catch (_) {
+      // Fallback in case navigate fails for any reason
+      window.location.href = "/professor/workshops";
+    }
   };
 
   return (
@@ -139,8 +144,15 @@ function ProfessorDashboard() {
                 </div>
               </div>
 
-              <button
-                onClick={handleCreateWorkshop}
+              <a
+                href="/professor/workshops"
+                onClick={(e) => {
+                  // prefer client routing when available
+                  if (e && e.preventDefault) {
+                    try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) {}
+                  }
+                  // otherwise allow default anchor navigation
+                }}
                 style={{
                   padding: "14px 28px",
                   background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
@@ -155,7 +167,7 @@ function ProfessorDashboard() {
                 }}
               >
                 + Create Workshop
-              </button>
+              </a>
             </div>
           </div>
 
