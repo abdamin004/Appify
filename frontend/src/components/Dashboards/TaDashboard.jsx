@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
+import EventList from "../EventList"; // Import the EventList component
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, upcoming
+  const [filter, setFilter] = useState("all"); // all, upcoming, allevents
 
   // Mock user data - in production this would come from auth context/props
   const user = { 
@@ -267,8 +268,8 @@ function TADashboard() {
             }}
           >
             {[
-              { key: "all", label: "All Events", count: registeredEvents.length },
               { key: "upcoming", label: "Upcoming", count: upcomingCount },
+              { key: "allevents", label: "Browse All Events" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -286,13 +287,15 @@ function TADashboard() {
                   transition: "all 0.3s",
                 }}
               >
-                {tab.label} ({tab.count})
+                {tab.label} {tab.count !== undefined ? `(${tab.count})` : ''}
               </button>
             ))}
           </div>
 
           {/* Events List */}
-          {loading ? (
+          {filter === "allevents" ? (
+            <EventList />
+          ) : loading ? (
             <div
               style={{
                 textAlign: "center",
