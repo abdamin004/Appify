@@ -64,6 +64,17 @@ function WorkshopsManager() {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
+      let createdBy;
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+          const obj = JSON.parse(raw);
+          createdBy = (obj && (obj._id || obj.id)) || undefined;
+        }
+      } catch (_) {}
+      if (!createdBy) {
+        throw new Error('Please login first. Creator not found.');
+      }
       const payload = {
         title: form.title,
         shortDescription: form.shortDescription,
@@ -81,6 +92,7 @@ function WorkshopsManager() {
         professors: (form.professors || [])
           .filter(p => (p?.name || '').trim().length > 0)
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
+        createdBy,
       };
       await createWorkshop(payload);
       setSuccess('Workshop created (awaiting Events Office publish)');

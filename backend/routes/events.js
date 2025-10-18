@@ -2,20 +2,21 @@ const express = require('express');
 const eventController = require('../controllers/eventController');
 // Auth middleware (verifies JWT and attaches req.user)
 const auth = require('../middleware/auth');
+const roleCheck = require('../middleware/roleCheck');
 const router = express.Router();
 
 // post /events - Create a new event (recommended: protect this route with auth middleware)
 // Protect the create route so the creating user is available on req.user
-router.post('/create', /*auth,*/ eventController.createEvent);
+router.post('/create', auth, roleCheck('Admin', 'EventOffice'), eventController.createEvent);
 
 // PUT /events/update/:id - Update an event (recommended: protect this route with auth middleware)
-router.put('/update/:id', /*auth,*/ eventController.updateEvent);
+router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.updateEvent);
 
 // DELETE /events/delete/:id - Delete an event (recommended: protect this route with auth middleware)
-router.delete('/delete/:id', /*auth,*/ eventController.deleteEvent);
+router.delete('/delete/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.deleteEvent);
 
 // GET /events/workshops/mine - View my created workshops (professors only)
-router.get('/workshops/mine', /*auth,*/ eventController.getMyWorkshops);
+router.get('/workshops/mine', auth, roleCheck('Professor'), eventController.getMyWorkshops);
 
 // GET /events - View all upcoming events with details and vendors
 router.get('/', eventController.getAllEvents);
@@ -30,6 +31,6 @@ router.get('/filter', eventController.filterEvents);
 router.get('/sort', eventController.sortEvents);
 
 // GET /events/registered - View a list of my registered events
-router.get('/registered', eventController.getRegisteredEvents);
+router.get('/registered', auth, eventController.getRegisteredEvents);
 
 module.exports = router;

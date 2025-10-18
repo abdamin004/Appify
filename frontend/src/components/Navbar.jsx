@@ -1,17 +1,73 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
-function Navbar({ isLoggedIn, onLogout }) {
+function Navbar({ onLogout }) {
   const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check authentication status on every render
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const user = localStorage.getItem("user");
+      const hasValidAuth = !!(token && user && user !== 'null' && user !== 'undefined');
+      setIsLoggedIn(hasValidAuth);
+    };
+    
+    checkAuth();
+    
+    // Optional: Check more frequently for development
+    const interval = setInterval(checkAuth, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
-    onLogout();
+    // Clear all auth data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setIsLoggedIn(false);
+    
+    if (onLogout) {
+      onLogout();
+    }
     navigate("/");
   };
 
   const handleNavigation = (path) => {
     navigate(path);
   };
+
+  // Get user role for dashboard routing
+  const getUserRole = () => {
+    try {
+      const userData = localStorage.getItem("user");
+      if (!userData) return null;
+      const user = JSON.parse(userData);
+      return user.role ? user.role.toLowerCase() : null;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
+  };
+
+  const getDashboardPath = () => {
+    const role = getUserRole();
+    console.log("Current user role:", role);
+    
+    switch (role) {
+      case "vendor": return "/VendorDashboard";
+      case "student": return "/student-dashboard";
+      case "ta": return "/TaDashboard";
+      case "professor": return "/ProfessorDashboard";
+      case "eventoffice": return "/EventOfficeDashboard";
+      case "staff": return "/StaffDashboard";
+      case "admin": return "/Admin";
+      default: return "/";
+    }
+  };
+
+  console.log("Navbar auth status:", isLoggedIn);
 
   return (
     <nav
@@ -68,7 +124,7 @@ function Navbar({ isLoggedIn, onLogout }) {
             // Logged in: Show Dashboard and Logout buttons
             <>
               <button
-                onClick={() => handleNavigation("/dashboard")} // Adjust path as needed (e.g., based on role)
+                onClick={() => handleNavigation(getDashboardPath())}
                 style={{
                   padding: "12px 28px",
                   background: "transparent",
@@ -118,8 +174,7 @@ function Navbar({ isLoggedIn, onLogout }) {
               </button>
             </>
           ) : (
-            // Not logged in: Show Login and Sign Up buttons (styled like the second Navbar)
-            // Optionally add About/Contact as links if needed, but prioritizing the styled version's content
+            // Not logged in: Show Login and Sign Up buttons
             <>
               <button
                 onClick={() => handleNavigation("/login")}
@@ -170,7 +225,6 @@ function Navbar({ isLoggedIn, onLogout }) {
               >
                 Sign Up
               </button>
-
             </>
           )}
         </div>
