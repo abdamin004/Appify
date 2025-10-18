@@ -1,31 +1,5 @@
-// Simple role authorization middleware.
-// Usage: roleCheck('Vendor', 'Admin') returns a middleware
-// that allows requests only if the authenticated principal
-// (set by auth middleware) matches one of the allowed roles.
-
-module.exports = function roleCheck(...allowedRoles) {
-  return (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ success: false, message: 'Not authenticated' });
-      }
-
-      // Infer role: Vendors are a separate model without a role field.
-      // Users (students/staff/admin) store a role string on the document.
-      const modelName = req.user.constructor && req.user.constructor.modelName;
-      const inferredRole = modelName === 'Vendor' ? 'Vendor' : req.user.role;
-
-      if (!allowedRoles.length || allowedRoles.includes(inferredRole)) {
-        return next();
-      }
-      return res.status(403).json({ success: false, message: 'Forbidden: insufficient permissions' });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: 'Role check failed' });
-    }
-  };
-};
 /**
- * roleCheck(...allowedRoles)
+ * Simple role authorization middleware.
  *
  * Usage examples:
  *   router.post('/apply', auth, roleCheck('Vendor'), handler)
@@ -34,33 +8,45 @@ module.exports = function roleCheck(...allowedRoles) {
  * Reads req.user (set by auth) and infers the effective role:
  *  - Vendor documents => 'Vendor'
  *  - User documents   => req.user.role (e.g., 'Admin','Staff','Student',...)
- * Blocks with 403 if the role isn't allowed.
+ *
+ * Performs robust, case-insensitive comparison and ignores whitespace/dashes
+ * to tolerate values like 'Event Office' vs 'EventOffice'.
  */
 module.exports = function roleCheck(...allowedRoles) {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Unauthorized' });
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const modelName = req.user.constructor && req.user.constructor.modelName;
+      const effectiveRoleRaw = modelName === 'Vendor' ? 'Vendor' : (req.user.role || 'user');
+
+      // Canonicalize roles: lowercase and strip non-alphanumerics (spaces, dashes, etc.)
+      const toKey = (v) => (v || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+
+      const effKey = toKey(effectiveRoleRaw);
+      const allowedKeys = (allowedRoles || []).map(toKey);
+
+      // If no roles specified, only authentication is required
+      if (allowedKeys.length === 0) {
+        req.userRole = effKey;
+        return next();
+      }
+
+      if (!allowedKeys.includes(effKey)) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      req.userRole = effKey; // handy if controllers want it
+      next();
+    } catch (err) {
+      return res.status(500).json({ message: 'Role check failed' });
     }
-
-    const modelName = req.user.constructor && req.user.constructor.modelName;
-    let effectiveRole = modelName === 'Vendor' ? 'vendor' : (req.user.role || 'user').toString().trim();
-
-    // Normalize case for comparison (roles in DB may be lowercase)
-    const eff = effectiveRole.toLowerCase();
-    const allowedLower = (allowedRoles || []).map(r => (r || '').toString().trim().toLowerCase());
-
-    // If no roles specified, just require authentication
-    if (allowedLower.length === 0) {
-      req.userRole = eff;
-      return next();
-    }
-
-    if (!allowedLower.includes(eff)) {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-
-    req.userRole = eff; // handy if controllers want it
-    next();
   };
 };
 
