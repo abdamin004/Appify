@@ -1,12 +1,14 @@
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 export { API_BASE };
 
-const jsonHeaders = { 'Content-Type': 'application/json' };
-
 async function http(method, url, body) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(url, {
     method,
-    headers: jsonHeaders,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -20,19 +22,31 @@ async function http(method, url, body) {
   return res.json();
 }
 
+function currentUserId() {
+  try {
+    if (typeof localStorage === 'undefined') return undefined;
+    const raw = localStorage.getItem('user');
+    if (!raw) return undefined;
+    const obj = JSON.parse(raw);
+    return obj && (obj._id || obj.id);
+  } catch (_) {
+    return undefined;
+  }
+}
+
 // Create helpers
 export function createBazaar(payload) {
-  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Bazaar' });
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Bazaar', createdBy: currentUserId() });
 }
 export function createTrip(payload) {
-  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Trip' });
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Trip', createdBy: currentUserId() });
 }
 export function createWorkshop(payload) {
-  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Workshop' });
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Workshop', createdBy: currentUserId() });
 }
 
 export function createConference(payload) {
-  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Conference' });
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Conference', createdBy: currentUserId() });
 }
 
 // Update any event by id
@@ -67,15 +81,10 @@ export async function listUpcomingPublished() {
   return res.json();
 }
 
-// Gym sessions (frontend-only concept, stored as base Event with type 'Conference' and category 'GymSession')
+// Gym sessions
 export function createGymSession(payload) {
-  const { sessionType, ...rest } = payload;
-  const body = {
-    ...rest,
-    type: 'Conference',
-    category: 'GymSession',
-    ...(sessionType ? { tags: [sessionType] } : {}),
-  };
+  // Expect payload to include sessionType (enum) and instructor (required)
+  const body = { ...payload, type: 'GymSession', createdBy: currentUserId() };
   return http('POST', `${API_BASE}/events/create`, body);
 }
 
@@ -88,7 +97,7 @@ export function cancelGymSession(id) {
 }
 
 export async function listGymSessions() {
-  const q = new URLSearchParams({ category: 'GymSession' });
+  const q = new URLSearchParams({ type: 'GymSession' });
   const res = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
   return res.json();
 }

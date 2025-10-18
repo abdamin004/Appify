@@ -21,14 +21,22 @@ const h1Style = { margin: 0, color: '#003366', fontWeight: 800, fontSize: 28, te
 const sectionTitle = { color: '#003366', fontWeight: 700, fontSize: 18, marginTop: 8 };
 const yellow = '#d4af37';
 
-const SESSION_TYPES = ['Yoga','Pilates','Aerobics','Zumba','Cross Circuit','Kick-boxing'];
+const SESSION_TYPES = [
+  { label: 'Yoga', value: 'yoga' },
+  { label: 'Pilates', value: 'pilates' },
+  { label: 'Aerobics', value: 'cardio' },
+  { label: 'Zumba', value: 'zumba' },
+  { label: 'Cross Circuit', value: 'crossfit' },
+  { label: 'Kick-boxing', value: 'other' },
+];
 
 function GymSessionsManager() {
   const [form, setForm] = useState({
     date: '',
     time: '',
     duration: 60, // minutes
-    sessionType: 'Yoga',
+    sessionType: 'yoga',
+    instructor: '',
     capacity: '',
   });
   const [loading, setLoading] = useState(false);
@@ -58,21 +66,23 @@ function GymSessionsManager() {
     setLoading(true); setError(''); setSuccess('');
     try {
       if (!form.date || !form.time) throw new Error('Please select date and time');
+      if (!form.instructor) throw new Error('Please enter instructor name');
       const start = new Date(`${form.date}T${form.time}:00`);
       const end = new Date(start.getTime() + Number(form.duration || 0) * 60000);
       const payload = {
         title: `Gym: ${form.sessionType} Session`,
-        shortDescription: `${form.sessionType} • ${form.duration} min`,
+        shortDescription: `${form.sessionType} - ${form.duration} min`,
         location: 'GUC Gym',
         startDate: start.toISOString(),
         endDate: end.toISOString(),
         status: 'published',
         capacity: Number(form.capacity || 0),
         sessionType: form.sessionType,
+        instructor: form.instructor,
       };
       await createGymSession(payload);
       setSuccess('Gym session created');
-      setForm({ date: '', time: '', duration: 60, sessionType: 'Yoga', capacity: '' });
+      setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
       await refresh();
     } catch (err) { setError(err.message || 'Failed to create'); }
     finally { setLoading(false); }
@@ -119,7 +129,7 @@ function GymSessionsManager() {
         <div style={{ position: 'absolute', top: -40, right: -40, width: 260, height: 260, background: 'rgba(212,175,55,0.12)', borderRadius: '50%', filter: 'blur(60px)' }} />
       </div>
       <div style={panel}>
-        <h1 style={h1Style}>Events Office — Gym Sessions</h1>
+        <h1 style={h1Style}>Events Office – Gym Sessions</h1>
 
         <h2 style={sectionTitle}>Create Gym Session</h2>
         <form className="form managerForm" onSubmit={onCreate}>
@@ -140,13 +150,19 @@ function GymSessionsManager() {
           <div className="flex grid-2">
             <label>
               <select className="input" value={form.sessionType} onChange={e=>setForm({ ...form, sessionType: e.target.value })}>
-                {SESSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {SESSION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
               <span>Type</span>
             </label>
             <label>
               <input className="input" type="number" min="1" required value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
               <span>Max Participants</span>
+            </label>
+          </div>
+          <div className="flex">
+            <label style={{ width: '100%' }}>
+              <input className="input" required value={form.instructor} onChange={e=>setForm({ ...form, instructor: e.target.value })} />
+              <span>Instructor</span>
             </label>
           </div>
           <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
@@ -172,7 +188,7 @@ function GymSessionsManager() {
                 <div>
                   <div style={{ fontWeight: 800, color: '#003366' }}>{s.title || 'Gym Session'}</div>
                   <div style={{ color: '#6b7280', fontSize: 12 }}>
-                    {s.tags && s.tags[0] ? s.tags[0] : '—'} • Capacity: {s.capacity ?? '-'}
+                    {(s.sessionType ? s.sessionType : (s.tags && s.tags[0] ? s.tags[0] : '')) || '-'} • Capacity: {s.capacity ?? '-'}
                   </div>
                   <div style={{ color: '#6b7280', fontSize: 12 }}>From {s.startDate ? new Date(s.startDate).toLocaleString() : '-'} to {s.endDate ? new Date(s.endDate).toLocaleString() : '-'}</div>
                   <div style={{ color: s.status === 'cancelled' ? '#b91c1c' : '#6b7280', fontSize: 12 }}>Status: {s.status}</div>

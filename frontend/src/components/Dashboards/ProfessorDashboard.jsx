@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 
 function ProfessorDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
   const [myWorkshops, setMyWorkshops] = useState([]);
   const [user, setUser] = useState({ firstName: "Professor", lastName: "" });
@@ -42,7 +44,7 @@ function ProfessorDashboard() {
   };
 
   const handleCreateWorkshop = () => {
-    window.location.href = "/create-workshop";
+    navigate("/professor/workshops");
   };
 
   return (

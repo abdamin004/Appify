@@ -67,6 +67,7 @@ export default function UserManagement() {
                   <option>Staff</option>
                   <option>TA</option>
                   <option>Professor</option>
+                  <option>EventOffice</option>
                 </select>
               </td>
               <td style={{ padding: 8 }}>{u.isVerified ? 'Yes' : 'No'}</td>
