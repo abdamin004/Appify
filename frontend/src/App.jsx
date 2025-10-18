@@ -38,7 +38,7 @@ function App() {
     setIsLoggedIn(false);
   };
   return (
-  <>
+
     <>
   
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
