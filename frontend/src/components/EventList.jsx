@@ -4,7 +4,7 @@ import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 
-function EventsList() {
+function EventsList({ presetType = "" }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,12 @@ function EventsList() {
   useEffect(() => {
     fetchEvents();
   }, [filters]);
+
+  // Apply a preset event type filter passed from parent (e.g., Student Dashboard)
+  useEffect(() => {
+    if (!presetType) return;
+    setFilters((prev) => (prev.type === presetType ? prev : { ...prev, type: presetType }));
+  }, [presetType]);
 
   const fetchEvents = async () => {
     try {
@@ -254,6 +260,7 @@ function EventsList() {
                 <option value="/events-office/conferences">Conferences</option>
                 <option value="/events-office/gym-sessions">Gym Sessions</option>
                 <option value="/professor/workshops">Workshops</option>
+                <option value="/register-events">Register (Workshops/Trips)</option>
               </select>
 
               <button

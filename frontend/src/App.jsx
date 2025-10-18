@@ -26,6 +26,7 @@ import VendorApplications from "./components/Admin/VendorApplications";
 import AdminNotifications from "./components/Admin/AdminNotifications";
 import CommentModeration from "./components/Admin/CommentModeration";
 import ViewEvents from "./components/Admin/ViewEvents";
+import RegisterEvents from "./components/RegisterEvents";
 
 
 function App() {
@@ -57,6 +58,7 @@ function App() {
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
           <Route path="/Student-dashboard" element={<StudentDashboard />} />
+          <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/EventOfficeDashboard" element={<EventOfficeDashboard />} />
           <Route path="/ProfessorDashboard" element={<ProfessorDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
@@ -70,6 +72,7 @@ function App() {
           <Route path="/professor/workshops" element={<WorkshopsManager />} />
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
+          <Route path="/register-events" element={<RegisterEvents />} />
         
         
           <Route path="/TaDashboard" element={<TaDashboard />} />
