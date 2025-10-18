@@ -3,6 +3,7 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsList from "../Functions/CourtsList";
+import { API_BASE } from "../../services/eventService";
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
@@ -31,11 +32,21 @@ function StudentDashboard() {
 
   const fetchRegisteredEvents = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/events/registered");
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        // Likely unauthorized if no token; keep empty list gracefully
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        setRegisteredEvents([]);
+        return;
+      }
       const data = await res.json();
       setRegisteredEvents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setRegisteredEvents([]);
     }
   };
 

@@ -16,17 +16,8 @@ const eventSchema = new Schema({
   
   // Capacity & Registration
   capacity: { type: Number, default: 0, min: 0 },
-  registeredUsers: [{ 
-    type: Schema.Types.ObjectId, 
-    ref: 'User' 
-  }],
+  registeredUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   registrationDeadline: { type: Date },
-  fundingSource: {
-  type: String,
-  enum: ['Grant', 'Sponsor', 'External', 'Internal'],
-  required: true
-}
-,
 
   // Status & Type
   status: { 

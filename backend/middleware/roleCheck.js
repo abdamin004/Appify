@@ -43,25 +43,23 @@ module.exports = function roleCheck(...allowedRoles) {
     }
 
     const modelName = req.user.constructor && req.user.constructor.modelName;
-    let effectiveRole;
+    let effectiveRole = modelName === 'Vendor' ? 'vendor' : (req.user.role || 'user').toString().trim();
 
-    if (modelName === 'Vendor') {
-      effectiveRole = 'Vendor';
-    } else {
-      effectiveRole = (req.user.role || 'User').toString().trim();
-    }
+    // Normalize case for comparison (roles in DB may be lowercase)
+    const eff = effectiveRole.toLowerCase();
+    const allowedLower = (allowedRoles || []).map(r => (r || '').toString().trim().toLowerCase());
 
     // If no roles specified, just require authentication
-    if (!allowedRoles || allowedRoles.length === 0) {
-      req.userRole = effectiveRole;
+    if (allowedLower.length === 0) {
+      req.userRole = eff;
       return next();
     }
 
-    if (!allowedRoles.includes(effectiveRole)) {
+    if (!allowedLower.includes(eff)) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    req.userRole = effectiveRole; // handy if controllers want it
+    req.userRole = eff; // handy if controllers want it
     next();
   };
 };

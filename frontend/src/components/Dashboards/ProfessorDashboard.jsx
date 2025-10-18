@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
+import { API_BASE } from "../../services/eventService";
 
 function ProfessorDashboard() {
   const navigate = useNavigate();
@@ -34,7 +35,19 @@ function ProfessorDashboard() {
 
   const fetchMyWorkshops = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/events/created/mine");
+      const rawUser = (typeof localStorage !== 'undefined') ? localStorage.getItem('user') : null;
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const u = rawUser ? JSON.parse(rawUser) : {};
+      const professorId = u && (u._id || u.id);
+      if (!professorId) { setMyWorkshops([]); return; }
+
+      const url = `${API_BASE}/events/workshops/mine?professorId=${encodeURIComponent(professorId)}`;
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) {
+        try { const err = await res.json(); console.error('fetchMyWorkshops failed:', err); } catch (_) {}
+        setMyWorkshops([]);
+        return;
+      }
       const data = await res.json();
       setMyWorkshops(Array.isArray(data) ? data : []);
     } catch (err) {
