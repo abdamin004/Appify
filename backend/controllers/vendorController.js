@@ -27,7 +27,7 @@ exports.listUpcomingBazaars = async (req, res, next) => {
         status: 'published',
         $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
       })
-        .select('title startDate endDate location capacity vendors')
+        .select('title startDate endDate location capacity vendors type status')
         .populate({ path: 'vendors', select: 'companyName email' });
     } catch (err) {
       // Fallback for older Mongo versions where $toDate / $expr may not be available
@@ -36,7 +36,7 @@ exports.listUpcomingBazaars = async (req, res, next) => {
         status: 'published',
         startDate: { $gte: now }
       })
-        .select('title startDate endDate location capacity vendors')
+        .select('title startDate endDate location capacity vendors type status')
         .populate({ path: 'vendors', select: 'companyName email' });
     }
     return res.status(200).json({ success: true, message: 'Upcoming bazaars', bazaars });
