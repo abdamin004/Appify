@@ -53,7 +53,8 @@ module.exports = {
                 type,
                 registrationDeadline,
                 capacity,
-                status
+                status,
+                createdBy: req.user._id
             };
 
             let event;
