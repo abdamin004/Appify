@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import EventCard from "./EventCard";
 import Navbar from "./Navbar";
+import { API_BASE } from "../services/eventService";
 
 function EventsList() {
   const [events, setEvents] = useState([]);
@@ -35,11 +36,11 @@ function EventsList() {
       if (filters.startDate) queryParams.append("startDate", filters.startDate);
       if (filters.endDate) queryParams.append("endDate", filters.endDate);
 
-      let endpoint = "http://localhost:5001/api/events";
+      let endpoint = `${API_BASE}/events`;
       if (filters.search || filters.professorName) {
-        endpoint = "http://localhost:5001/api/events/search";
+        endpoint = `${API_BASE}/events/search`;
       } else if (filters.location || filters.startDate || filters.endDate) {
-        endpoint = "http://localhost:5001/api/events/filter";
+        endpoint = `${API_BASE}/events/filter`;
       }
 
       const response = await fetch(`${endpoint}?${queryParams}`);

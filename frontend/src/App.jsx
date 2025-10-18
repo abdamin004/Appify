@@ -6,6 +6,13 @@ import Login from "./components/Auth/Login";
 import VendorDashboard from "./components/Dashboards/VendorDashboard";
 import StudentDashboard from "./components/Dashboards/StudentDashboard";
 import Navbar from "./components/Navbar";
+import EventList from "./components/EventList";
+// Events management pages (role-based)
+import BazaarsManager from "./components/Events/EventsOffice/BazaarsManager";
+import TripsManager from "./components/Events/EventsOffice/TripsManager";
+import WorkshopsManager from "./components/Events/Professor/WorkshopsManager";
+import ConferencesManager from "./components/Events/EventsOffice/ConferencesManager";
+import GymSessionsManager from "./components/Events/EventsOffice/GymSessionsManager";
 import WelcomePage from "./components/WelcomePage";
 import ProfessorDashboard from "./components/Dashboards/ProfessorDashboard";
 import EventOfficeDashboard from "./components/Dashboards/EventOfficeDashboard";
@@ -31,13 +38,16 @@ function App() {
     setIsLoggedIn(false);
   };
   return (
+  <>
     <>
   
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
       
+      
       <div style={{ paddingTop: '70px' }}>
         <Routes>
-          <Route path="/" element={<WelcomePage />} />
+          <Route path="/" element={<ChooseRole />} />
+          <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route 
             path="/Login" 
             element={<Login onLogin={handleLogin} />} 
@@ -49,6 +59,18 @@ function App() {
           <Route path="/EventOfficeDashboard" element={<EventOfficeDashboard />} />
           <Route path="/ProfessorDashboard" element={<ProfessorDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
+          {/* Events Office */}
+          <Route path="/events-office/bazaars" element={<BazaarsManager />} />
+          <Route path="/events-office/trips" element={<TripsManager />} />
+          <Route path="/events-office/conferences" element={<ConferencesManager />} />
+          <Route path="/events-office/gym-sessions" element={<GymSessionsManager />} />
+          {/* Student */}
+          {/* Professor */}
+          <Route path="/professor/workshops" element={<WorkshopsManager />} />
+          {/* Public events listing */}
+          <Route path="/events" element={<EventList />} />
+        
+        
           <Route path="/TaDashboard" element={<TaDashboard />} />
           <Route path="/vendor/request-booth" element={<RequestBooth />} />
           <Route path="/Admin" element={<AdminDashboard />} />

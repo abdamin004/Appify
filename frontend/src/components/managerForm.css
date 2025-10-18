@@ -1,0 +1,58 @@
+.managerForm {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  max-width: 900px !important;
+  width: 100% !important;
+  padding: 24px !important;
+  border-radius: 16px !important;
+  margin: 24px auto !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Make paired fields lay out nicely and wrap */
+.managerForm .flex {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px !important;
+}
+
+/* Force a 4-column layout when space allows */
+.managerForm .grid-4 {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+}
+
+/* Force exactly 2 columns on wide screens */
+.managerForm .grid-2 {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+}
+
+@media (max-width: 700px) {
+  .managerForm .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.managerForm label { width: 100%; }
+.managerForm .input { box-sizing: border-box; }
+
+/* Ensure enough spacing for helper labels */
+.managerForm label { display: block; margin-bottom: 22px; position: relative; }
+.managerForm label span { pointer-events: none; }
+
+/* Place labels for date/time below the control to avoid overlap */
+.managerForm .input[type="date"] + span,
+.managerForm .input[type="datetime-local"] + span,
+.managerForm .input[type="time"] + span {
+  top: calc(100% + 6px) !important;
+  left: 12px !important;
+  font-size: 0.85em !important;
+  color: #4b5563 !important;
+}
+
+/* Buttons in yellow/blue theme */
+.managerForm .submit {
+  min-height: 40px;
+  font-weight: 700;
+}
