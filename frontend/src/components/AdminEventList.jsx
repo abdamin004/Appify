@@ -16,6 +16,7 @@ function EventsList({ filterByTypes = null, presetType = null }) {
     sortBy: "date",
     startDate: "",
     endDate: "",
+    professorName: ""
   });
 
   useEffect(() => {
@@ -38,15 +39,16 @@ function EventsList({ filterByTypes = null, presetType = null }) {
         queryParams.append("search", filters.search);
         queryParams.append("q", filters.search);
       }
-
+       if (filters.professorName) queryParams.append('professorName', filters.professorName);
       if (filters.location) queryParams.append("location", filters.location);
       if (filters.startDate) queryParams.append("startDate", filters.startDate);
       if (filters.endDate) queryParams.append("endDate", filters.endDate);
 
       let endpoint = `${API_BASE}/events`;
-      if (filters.search) {
+      // Use search endpoint only when doing a generic search and not searching by professor
+      if (filters.search && !filters.professorName) {
         endpoint = `${API_BASE}/events/search`;
-      } else if (filters.location || filters.startDate || filters.endDate) {
+      } else if (filters.location || filters.startDate || filters.endDate || filters.professorName) {
         endpoint = `${API_BASE}/events/filter`;
       }
 
@@ -230,6 +232,17 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                 style={inputStyle}
               />
 
+              {/* Professor name filter only for Workshops */}
+              {filters.type === 'Workshop' && (
+                <input
+                  type="text"
+                  placeholder="👩‍🏫 Professor name"
+                  value={filters.professorName}
+                  onChange={(e) => setFilters({ ...filters, professorName: e.target.value })}
+                  style={inputStyle}
+                />
+              )}
+
               <input
                 type="date"
                 value={filters.startDate}
@@ -288,6 +301,7 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                     sortBy: "date",
                     startDate: "",
                     endDate: "",
+                    professorName: "",
                   })
                 }
                 style={clearButtonStyle}
