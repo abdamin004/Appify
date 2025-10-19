@@ -11,7 +11,7 @@ export default function RequestBooth() {
 
   const [formData, setFormData] = useState({
     eventId: '',
-    organizationId: '',
+    organization: '',
     boothSize: '2x2',
     attendees: [{ name: '', email: '' }],
     setupDurationWeeks: '',
@@ -39,11 +39,16 @@ useEffect(() => {
         if (!x) return [];
         if (Array.isArray(x)) return x;
         if (Array.isArray(x.data)) return x.data;
-        if (Array.isArray(x.bazaars)) return x.bazaars;
-        if (Array.isArray(x.booths)) return x.booths;
-        if (Array.isArray(x.items)) return x.items;
-        return [];
-      };
+
+      // NEW: handle common named arrays
+        const d = x.data ?? x;
+        const keys = ['bazaars', 'booths', 'items', 'organizations', 'orgs', 'results'];
+        for (const k of keys) {
+          if (Array.isArray(d?.[k])) return d[k];
+        }
+      return [];
+    };
+
 
       const rawBazaars = toArray(bzRes);
       const rawBooths  = toArray(btRes);
@@ -78,8 +83,10 @@ useEffect(() => {
           const companyName = parsed?.companyName || parsed?.companyname || parsed?.company;
           if (companyName) {
             const found = orgsRaw.find(o => (o?.name || '').toLowerCase() === companyName.toLowerCase());
-            if (found?._id) {
-              setFormData(prev => ({ ...prev, organizationId: String(found._id) }));
+            if (found?.name) {
+              setFormData(prev => ({ ...prev, organization: found.name }));
+            } else {
+              setFormData(prev => ({ ...prev, organization: companyName }));
             }
           }
         }
@@ -130,7 +137,7 @@ useEffect(() => {
 
     const isBooth = selectedEvent?.type === 'Booth';
 
-    if (!formData.eventId || !formData.organizationId || !formData.boothSize) {
+    if (!formData.eventId || !formData.organization || !formData.boothSize) {
       return setMessage('Please select event, organization, and booth size');
     }
     if (isBooth) {
@@ -142,7 +149,7 @@ useEffect(() => {
 
     try {
       const payload = {
-        organizationId: formData.organizationId,
+        organization: formData.organization,
         boothSize: formData.boothSize,
         attendees: (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email),
         ...(isBooth ? {
@@ -152,18 +159,24 @@ useEffect(() => {
         notes: formData.notes,
       };
 
+      console.log('POST payload:', payload, 'eventId:', formData.eventId);
+      
       // eventId must be the URL param, not in body
       await vendorService.applyToEvent(formData.eventId, payload);
 
       setMessage('Application submitted successfully.');
       setTimeout(() => navigate('/VendorDashboard'), 1000);
-    } catch (err) {
-      console.error(err);
-      const msg = err?.response?.status === 409
-        ? 'This organization has already applied to this event.'
-        : (err?.response?.data?.message || err.message || 'Request failed');
-      setMessage(msg);
-    }
+      
+      } catch (err) {
+        console.error('applyToEvent error:', err);
+        const msg =
+          (err && err.message) ||
+          (err && err.error) ||
+          (err && err.response && err.response.data && err.response.data.message) ||
+          (typeof err === 'string' ? err : JSON.stringify(err));
+        setMessage(msg);
+      }
+
   };
 
   const isBooth = selectedEvent?.type === 'Booth';
@@ -194,15 +207,15 @@ useEffect(() => {
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', marginBottom: 8 }}>Organization</label>
           <select
-            name="organizationId"
-            value={formData.organizationId}
-            onChange={(e) => setField('organizationId', e.target.value)}
+            name="organization"
+            value={formData.organization}
+            onChange={(e) => setField('organization', e.target.value)}
             required
             style={{ width: '100%', padding: 10 }}
           >
             <option value="">Select organization</option>
             {organizations.map(o => (
-              <option key={o._id} value={String(o._id)}>{o.name}</option>
+              <option key={o._id} value={o.name}>{o.name}</option>
             ))}
           </select>
         </div>
