@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 
-function EventsList() {
+function EventsList({ presetType = "" }) {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -19,6 +21,12 @@ function EventsList() {
   useEffect(() => {
     fetchEvents();
   }, [filters]);
+
+  // Apply a preset event type filter passed from parent (e.g., Student Dashboard)
+  useEffect(() => {
+    if (!presetType) return;
+    setFilters((prev) => (prev.type === presetType ? prev : { ...prev, type: presetType }));
+  }, [presetType]);
 
   const fetchEvents = async () => {
     try {
@@ -233,6 +241,27 @@ function EventsList() {
               >
                 <option value="date">Sort by Date</option>
                 <option value="title">Sort by Title</option>
+              </select>
+
+              {/* Quick navigation to event-specific manager pages */}
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  const route = e.target.value;
+                  if (route) navigate(route);
+                }}
+                style={inputStyle}
+                aria-label="Go to event page"
+              >
+                <option value="">Go to page…</option>
+                <option value="/events">All Events</option>
+                <option value="/events-office/bazaars">Bazaars</option>
+                <option value="/events-office/trips">Trips</option>
+                <option value="/events-office/conferences">Conferences</option>
+                <option value="/events-office/gym-sessions">Gym Sessions</option>
+                <option value="/professor/workshops">Workshops</option>
+                <option value="/register-events">Register (Workshops/Trips)</option>
+                <option value="/gym-sessions">View Gym Sessions</option>
               </select>
 
               <button

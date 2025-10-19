@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 
 function EventOfficeDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
   const [myEvents, setMyEvents] = useState([]);
   const [vendorRequests, setVendorRequests] = useState([]);
@@ -142,12 +144,14 @@ function EventOfficeDashboard() {
 
   const handleCreateEvent = (type) => {
     const routes = {
-      bazaar: "/create-bazaar",
-      trip: "/create-trip",
-      conference: "/create-conference",
-      gym: "/create-gym-session",
+      bazaar: "/events-office/bazaars",
+      trip: "/events-office/trips",
+      conference: "/events-office/conferences",
+      gym: "/events-office/gym-sessions",
     };
-    window.location.href = routes[type] || "/create-event";
+    const dropdown = document.getElementById("create-dropdown");
+    if (dropdown) dropdown.style.display = "none";
+    navigate(routes[type] || "/events");
   };
 
   const unreadNotifications = notifications.filter(n => !n.read).length;

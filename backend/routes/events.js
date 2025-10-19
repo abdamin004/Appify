@@ -1,35 +1,44 @@
 const express = require('express');
 const eventController = require('../controllers/eventController');
-// Auth middleware (verifies JWT and attaches req.user)
 const auth = require('../middleware/auth');
+const roleCheck = require('../middleware/roleCheck');
 const router = express.Router();
 
-// post /events - Create a new event (recommended: protect this route with auth middleware)
-// Protect the create route so the creating user is available on req.user
-router.post('/create', /*auth,*/ eventController.createEvent);
+// Create event
+router.post('/create', auth, roleCheck('Admin', 'EventOffice' , 'Professor'), eventController.createEvent);
 
-// PUT /events/update/:id - Update an event (recommended: protect this route with auth middleware)
-router.put('/update/:id', /*auth,*/ eventController.updateEvent);
+// Update event
+router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.updateEvent);
 
-// DELETE /events/delete/:id - Delete an event (recommended: protect this route with auth middleware)
-router.delete('/delete/:id', /*auth,*/ eventController.deleteEvent);
+// Delete event
+router.delete('/delete/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.deleteEvent);
 
-// GET /events/workshops/mine - View my created workshops (professors only)
-router.get('/workshops/mine', /*auth,*/ eventController.getMyWorkshops);
+// Get my workshops
+router.get('/workshops/mine', auth, roleCheck('Professor'), eventController.getMyWorkshops);
 
-// GET /events - View all upcoming events with details and vendors
+// Get all events
 router.get('/', eventController.getAllEvents);
 
-// GET /events/search - Search events by professor name, event name, or type
+// Search events
 router.get('/search', eventController.searchEvents);
 
-// GET /events/filter - Filter events by professor name, location, type, or date
+// Filter events
 router.get('/filter', eventController.filterEvents);
 
-// GET /events/sort - Sort events by date
+// Sort events
 router.get('/sort', eventController.sortEvents);
 
-// GET /events/registered - View a list of my registered events
-router.get('/registered', eventController.getRegisteredEvents);
+// Get registered events
+router.get('/registered', auth, eventController.getRegisteredEvents);
+
+// POST /events/register/:eventId - Register for an event
+router.post('/register/:eventId', auth, eventController.registerForEvent);
+
+// POST /events/unregister/:eventId - Unregister from an event
+router.post('/unregister/:eventId', auth, eventController.unregisterFromEvent);
+
+// routes/events.js
+router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
+
 
 module.exports = router;

@@ -10,7 +10,12 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
   studentStaffId: { type: String },
   verificationToken: String,
   isVerified: { type: Boolean, default: false },
-  isBlocked: { type: Boolean, default: false }
+  isBlocked: { type: Boolean, default: false },
+  
+  registeredEvents: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Event' 
+  }]
 });
 
 // Password hashing middleware

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
+import { API_BASE } from "../../services/eventService";
 
 function ProfessorDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
   const [myWorkshops, setMyWorkshops] = useState([]);
   const [user, setUser] = useState({ firstName: "Professor", lastName: "" });
@@ -32,7 +35,19 @@ function ProfessorDashboard() {
 
   const fetchMyWorkshops = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/events/created/mine");
+      const rawUser = (typeof localStorage !== 'undefined') ? localStorage.getItem('user') : null;
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const u = rawUser ? JSON.parse(rawUser) : {};
+      const professorId = u && (u._id || u.id);
+      if (!professorId) { setMyWorkshops([]); return; }
+
+      const url = `${API_BASE}/events/workshops/mine?professorId=${encodeURIComponent(professorId)}`;
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) {
+        try { const err = await res.json(); console.error('fetchMyWorkshops failed:', err); } catch (_) {}
+        setMyWorkshops([]);
+        return;
+      }
       const data = await res.json();
       setMyWorkshops(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -42,7 +57,12 @@ function ProfessorDashboard() {
   };
 
   const handleCreateWorkshop = () => {
-    window.location.href = "/create-workshop";
+    try {
+      navigate("/professor/workshops");
+    } catch (_) {
+      // Fallback in case navigate fails for any reason
+      window.location.href = "/professor/workshops";
+    }
   };
 
   return (
@@ -137,8 +157,15 @@ function ProfessorDashboard() {
                 </div>
               </div>
 
-              <button
-                onClick={handleCreateWorkshop}
+              <a
+                href="/professor/workshops"
+                onClick={(e) => {
+                  // prefer client routing when available
+                  if (e && e.preventDefault) {
+                    try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) {}
+                  }
+                  // otherwise allow default anchor navigation
+                }}
                 style={{
                   padding: "14px 28px",
                   background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
@@ -153,7 +180,7 @@ function ProfessorDashboard() {
                 }}
               >
                 + Create Workshop
-              </button>
+              </a>
             </div>
           </div>
 
@@ -188,6 +215,46 @@ function ProfessorDashboard() {
               }}
             >
               🎯 Browse Events
+            </button>
+
+            {/* Register Events direct button */}
+            <button
+              onClick={() => (window.location.href = "/register-events")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              Register Events
+            </button>
+
+            {/* Gym Sessions direct button */}
+            <button
+              onClick={() => (window.location.href = "/gym-sessions")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              🏋️ Gym Sessions
             </button>
             <button
               onClick={() => setActiveTab("my-workshops")}

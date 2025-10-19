@@ -31,8 +31,7 @@ function WorkshopsManager() {
     registrationDeadline: '',
     facultyName: '',
     requiredBudget: '',
-    // UI value: 'GUC' or 'external' (map to internal/external on submit)
-    fundingSource: 'GUC',
+    fundingSource: 'Grant',
     extraRequiredResourses: false,
     // New fields
     agenda: '',
@@ -64,6 +63,17 @@ function WorkshopsManager() {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
+      let createdBy;
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+          const obj = JSON.parse(raw);
+          createdBy = (obj && (obj._id || obj.id)) || undefined;
+        }
+      } catch (_) {}
+      if (!createdBy) {
+        throw new Error('Please login first. Creator not found.');
+      }
       const payload = {
         title: form.title,
         shortDescription: form.shortDescription,
@@ -74,19 +84,20 @@ function WorkshopsManager() {
         status: 'draft',
         facultyName: form.facultyName,
         requiredBudget: Number(form.requiredBudget || 0),
-        fundingSource: form.fundingSource === 'GUC' ? 'internal' : 'external',
+        fundingSource: form.fundingSource,
         extraRequiredResourses: !!form.extraRequiredResourses,
         capacity: Number(form.capacity || 0),
         description: form.agenda || '',
         professors: (form.professors || [])
           .filter(p => (p?.name || '').trim().length > 0)
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
+        createdBy,
       };
       await createWorkshop(payload);
       setSuccess('Workshop created (awaiting Events Office publish)');
       setForm({
         title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
-        facultyName: '', requiredBudget: '', fundingSource: 'GUC', extraRequiredResourses: false,
+        facultyName: '', requiredBudget: '', fundingSource: 'Grant', extraRequiredResourses: false,
         agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'draft'
       });
       await refresh();
@@ -98,7 +109,7 @@ function WorkshopsManager() {
     title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || 'GUC Cairo',
     startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
     registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '',
-    facultyName: row.facultyName || '', requiredBudget: row.requiredBudget || 0, fundingSource: (row.fundingSource === 'internal' ? 'GUC' : 'external'),
+    facultyName: row.facultyName || '', requiredBudget: row.requiredBudget || 0, fundingSource: row.fundingSource || 'Grant',
     extraRequiredResourses: !!row.extraRequiredResourses,
     capacity: row.capacity ?? 0,
     agenda: row.description || '',
@@ -116,7 +127,7 @@ function WorkshopsManager() {
         registrationDeadline: editData.registrationDeadline,
         facultyName: editData.facultyName,
         requiredBudget: Number(editData.requiredBudget || 0),
-        fundingSource: editData.fundingSource === 'GUC' ? 'internal' : 'external',
+        fundingSource: editData.fundingSource,
         extraRequiredResourses: !!editData.extraRequiredResourses,
         capacity: Number(editData.capacity || 0),
         description: editData.agenda || '',
@@ -189,8 +200,10 @@ function WorkshopsManager() {
           <div className="flex">
             <label>
               <select className="input" value={form.fundingSource} onChange={e=>setForm({ ...form, fundingSource: e.target.value })}>
-                <option value="GUC">GUC</option>
-                <option value="external">External</option>
+                <option value="Grant">Grant</option>
+                <option value="Sponsor">Sponsor</option>
+                <option value="External">External</option>
+                <option value="Internal">Internal</option>
               </select>
               <span>Funding Source</span>
             </label>
@@ -261,8 +274,10 @@ function WorkshopsManager() {
                   <input className="input" style={{ marginBottom: 8 }} type="number" value={editData.requiredBudget} onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} placeholder="Required Budget" />
                   <input className="input" style={{ marginBottom: 8 }} type="number" min="0" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} placeholder="CAPACITY" />
                   <select className="input" style={{ marginBottom: 8 }} value={editData.fundingSource} onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}>
-                    <option value="GUC">GUC</option>
-                    <option value="external">External</option>
+                    <option value="Grant">Grant</option>
+                    <option value="Sponsor">Sponsor</option>
+                    <option value="External">External</option>
+                    <option value="Internal">Internal</option>
                   </select>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <input type="checkbox" checked={!!editData.extraRequiredResourses} onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })} />

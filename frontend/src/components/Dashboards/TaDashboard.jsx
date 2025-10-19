@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
+import EventList from "../EventList"; // Import the EventList component
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, upcoming
+  const [filter, setFilter] = useState("all"); // all, upcoming, allevents
 
   // Mock user data - in production this would come from auth context/props
   const user = { 
@@ -267,8 +268,8 @@ function TADashboard() {
             }}
           >
             {[
-              { key: "all", label: "All Events", count: registeredEvents.length },
               { key: "upcoming", label: "Upcoming", count: upcomingCount },
+              { key: "allevents", label: "Browse All Events" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -286,13 +287,53 @@ function TADashboard() {
                   transition: "all 0.3s",
                 }}
               >
-                {tab.label} ({tab.count})
+                {tab.label} {tab.count !== undefined ? `(${tab.count})` : ''}
               </button>
             ))}
+
+            <button
+              onClick={() => (window.location.href = "/register-events")}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              Register Events
+            </button>
+
+            <button
+              onClick={() => (window.location.href = "/gym-sessions")}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              🏋️ Gym Sessions
+            </button>
           </div>
 
           {/* Events List */}
-          {loading ? (
+          {filter === "allevents" ? (
+            <EventList />
+          ) : loading ? (
             <div
               style={{
                 textAlign: "center",

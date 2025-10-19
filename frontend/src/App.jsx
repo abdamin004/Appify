@@ -25,6 +25,9 @@ import CreateAdmin from "./components/Admin/CreateAdmin";
 import VendorApplications from "./components/Admin/VendorApplications";
 import AdminNotifications from "./components/Admin/AdminNotifications";
 import CommentModeration from "./components/Admin/CommentModeration";
+import ViewEvents from "./components/Admin/ViewEvents";
+import RegisterEvents from "./components/RegisterEvents";
+import GymSessions from "./components/GymSessions";
 
 
 function App() {
@@ -46,7 +49,7 @@ function App() {
       
       <div style={{ paddingTop: '70px' }}>
         <Routes>
-          <Route path="/" element={<ChooseRole />} />
+          <Route path="/" element={<WelcomePage />} />
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route 
             path="/Login" 
@@ -56,6 +59,7 @@ function App() {
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
           <Route path="/Student-dashboard" element={<StudentDashboard />} />
+          <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/EventOfficeDashboard" element={<EventOfficeDashboard />} />
           <Route path="/ProfessorDashboard" element={<ProfessorDashboard />} />
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
@@ -69,6 +73,8 @@ function App() {
           <Route path="/professor/workshops" element={<WorkshopsManager />} />
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
+          <Route path="/register-events" element={<RegisterEvents />} />
+          <Route path="/gym-sessions" element={<GymSessions />} />
         
         
           <Route path="/TaDashboard" element={<TaDashboard />} />
@@ -79,6 +85,7 @@ function App() {
           <Route path="/admin/vendor-applications" element={<VendorApplications />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/comments" element={<CommentModeration />} />
+          <Route path="/admin/view-events" element={<ViewEvents />} />
         </Routes>
       </div>
     </>
