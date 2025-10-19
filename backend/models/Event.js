@@ -23,7 +23,7 @@ const eventSchema = new Schema({
   status: { 
     type: String, 
     enum: ['draft', 'published', 'cancelled', 'completed'], 
-    default: 'draft', 
+    default: 'published', 
     index: true 
   },
   // Event type - This must be defined for the discriminator to work correctly
