@@ -532,78 +532,70 @@ function EventOfficeDashboard() {
               <h2 style={{ color: "#003366", marginBottom: "20px" }}>
                 Gym Sessions
               </h2>
-              {gymSessions.length === 0 ? (
+              {(!gymSessions || gymSessions.length === 0) ? (
                 <p style={{ color: "#6b7280" }}>No gym sessions scheduled</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                  {gymSessions.map((session) => (
-                    <div
-                      key={session._id}
-                      style={{
-                        padding: "20px",
-                        background: "rgba(212, 175, 55, 0.1)",
-                        borderRadius: "12px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <h3 style={{ color: "#003366", marginBottom: "8px" }}>
-                          {session.sessionType || "Gym Session"}
-                        </h3>
-                        <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                          Date: {session.startDate ? new Date(session.startDate).toLocaleDateString() : 'TBA'}
-                        </p>
-                        <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                          Time: {session.startDate ? new Date(session.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
-                          {session.endDate ? ` - ${new Date(session.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
-                          {session.durationMinutes ? ` | Duration: ${session.durationMinutes} mins` : ''}
-                        </p>
-                        {session.instructor && (
-                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                            Instructor: {session.instructor}
-                          </p>
-                        )}
-                        {typeof session.capacity === 'number' && (
-                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                            Capacity: {session.capacity} participants
-                          </p>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", gap: "10px" }}>
-                        <button
-                          onClick={() => navigate(`/events-office/gym-sessions?edit=${session._id}`)}
-                          style={{
-                            padding: "10px 20px",
-                            background: "#3b82f6",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            fontWeight: "600",
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGymSession(session._id)}
-                          style={{
-                            padding: "10px 20px",
-                            background: "#ef4444",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                            fontWeight: "600",
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                (() => {
+                  const typeMap = {
+                    yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba', crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
+                  };
+                  const byMonth = (gymSessions || []).reduce((acc, s) => {
+                    const d = s.startDate ? new Date(s.startDate) : null;
+                    const key = d ? d.toLocaleString(undefined, { month: 'long', year: 'numeric' }) : 'Scheduled';
+                    (acc[key] ||= []).push(s);
+                    return acc;
+                  }, {});
+                  const monthKeys = Object.keys(byMonth).sort((a, b) => {
+                    const da = new Date(a); const db = new Date(b);
+                    return (!isNaN(da) && !isNaN(db)) ? (da - db) : a.localeCompare(b);
+                  });
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      {monthKeys.map((month) => {
+                        const items = byMonth[month] || [];
+                        const byType = items.reduce((acc, s) => {
+                          const label = typeMap[s.sessionType] || s.sessionType || 'Session';
+                          (acc[label] ||= []).push(s);
+                          return acc;
+                        }, {});
+                        const typeKeys = Object.keys(byType).sort();
+                        return (
+                          <div key={month}>
+                            <div style={{ background: 'rgba(255,255,255,0.95)', padding: '18px 20px', borderRadius: 16, boxShadow: '0 6px 18px rgba(0,0,0,0.2)' }}>
+                              <h3 style={{ margin: 0, color: '#003366' }}>{month}</h3>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 12 }}>
+                                {typeKeys.map((tk) => (
+                                  <div key={tk} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
+                                    <div style={{ fontWeight: 800, color: '#003366', marginBottom: 6 }}>{tk}</div>
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#374151' }}>
+                                      {byType[tk]
+                                        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                                        .map((s) => (
+                                          <li key={s._id || s.id} style={{ padding: '8px 0', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                                            <div>
+                                              <div>{s.startDate ? new Date(s.startDate).toLocaleDateString() + ' • ' + new Date(s.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}</div>
+                                              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                                Instructor: {s.instructor || 'TBA'} {s.capacity ? ` • Capacity: ${s.capacity}` : ''}
+                                              </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                              <button onClick={() => navigate(`/events-office/gym-sessions?edit=${s._id}` , { state: { edit: s._id } })} style={{ padding: '6px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Edit</button>
+                                              <button onClick={() => handleDeleteGymSession(s._id)} style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
+                                            </div>
+                                          </li>
+                                        ))}
+                                    </ul>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
               )}
             </div>
           )}

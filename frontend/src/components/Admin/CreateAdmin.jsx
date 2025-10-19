@@ -23,8 +23,10 @@ export default function CreateAdmin() {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '24px auto', padding: 20, background: 'white', borderRadius: 12 }}>
-      <h2 style={{ color: '#003366' }}>Create Admin / EventOffice</h2>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ paddingTop: '120px', padding: '120px 40px 80px', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, background: 'rgba(255,255,255,0.95)', borderRadius: 20, boxShadow: '0 8px 25px rgba(0,0,0,0.3)' }}>
+      <h2 style={{ color: '#003366', marginTop: 0 }}>Create Admin / EventOffice</h2>
       {message && <div style={{ marginBottom: 12, color: message.type === 'error' ? '#dc2626' : '#065f46' }}>{message.text}</div>}
       <form onSubmit={submit}>
         <div style={{ marginBottom: 10 }}>
@@ -50,8 +52,10 @@ export default function CreateAdmin() {
             <option value="EventOffice">EventOffice</option>
           </select>
         </div>
-        <button type="submit" style={{ padding: '10px 16px', background: '#d4af37', border: 'none', borderRadius: 8 }}>Create</button>
+        <button type="submit" style={{ padding: '10px 16px', background: '#d4af37', color: '#003366', border: 'none', borderRadius: 10, fontWeight: 700 }}>Create</button>
       </form>
+        </div>
+      </div>
     </div>
   );
 }

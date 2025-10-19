@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createGymSession, listGymSessions, updateGymSession, cancelGymSession } from '../../../services/eventService';
@@ -45,6 +46,16 @@ function GymSessionsManager() {
   const [sessions, setSessions] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
   const [editData, setEditData] = useState({}); // { date, time, duration }
+  const autoEditApplied = useRef(false);
+  const location = useLocation();
+
+  const clearEditParam = () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('edit');
+      window.history.replaceState({}, '', url.toString());
+    } catch (_) {}
+  };
 
   function toDateInputValue(d) {
     const dt = new Date(d);
@@ -61,14 +72,20 @@ function GymSessionsManager() {
   }
   useEffect(() => { refresh(); }, []);
 
-  // If opened with ?edit=<id>, auto-start editing that session after load
+  // If opened with ?edit=<id>, auto-start editing that session once
   useEffect(() => {
     try {
+      if (autoEditApplied.current) return;
       const params = new URLSearchParams(window.location.search || "");
-      const targetId = params.get('edit');
+      const targetFromQuery = params.get('edit');
+      const targetFromState = (location && location.state && location.state.edit) || null;
+      const targetId = targetFromState || targetFromQuery;
       if (targetId && !editing && Array.isArray(sessions) && sessions.length) {
         const row = sessions.find(s => String(s._id) === String(targetId));
-        if (row) startEdit(row);
+        if (row) {
+          startEdit(row);
+          autoEditApplied.current = true;
+        }
       }
     } catch (_) {
       // ignore
@@ -132,9 +149,16 @@ function GymSessionsManager() {
       });
       setSuccess('Gym session updated');
       setEditing(null); setEditData({});
+      clearEditParam();
       await refresh();
     } catch (err) { setError(err.message || 'Failed to update'); }
     finally { setLoading(false); }
+  };
+
+  const onCancelEditClick = () => {
+    setEditing(null);
+    setEditData({});
+    clearEditParam();
   };
 
   const onCancel = async (id) => {
@@ -210,8 +234,8 @@ function GymSessionsManager() {
                   </select>
                   <input className="input" style={{ marginBottom: 8 }} type="number" min="1" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} placeholder="Max Participants" />
                   <input className="input" style={{ marginBottom: 8 }} value={editData.instructor} onChange={e=>setEditData({ ...editData, instructor: e.target.value })} placeholder="Instructor" />
-                  <button className="submit" onClick={() => onSave(s._id)} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>Save</button>
-                  <button className="submit" onClick={() => setEditing(null)} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
+                  <button type="button" className="submit" onClick={() => onSave(s._id)} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>Save</button>
+                  <button type="button" className="submit" onClick={onCancelEditClick} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
                 </div>
               ) : (
                 <div>
