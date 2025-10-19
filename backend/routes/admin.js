@@ -9,6 +9,8 @@ router.put('/assign-role', adminController.assignUserRole);
 router.post('/create-admin', adminController.createAdminAccount);
 router.delete('/delete-admin/:id', adminController.deleteAdminAccount);
 router.patch('/block-user/:id', adminController.blockUser);
+// List comments
+router.get('/comments', auth, roleCheck('Admin', 'EventOffice'), adminController.listAllComments);
 
 // NEW: List all users
 router.get('/users', auth, roleCheck('Admin', 'EventOffice'), adminController.listAllUsers);

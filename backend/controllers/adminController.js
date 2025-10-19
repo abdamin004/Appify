@@ -371,3 +371,18 @@ exports.markAllAdminNotificationsRead = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 };
+
+// List all comments with user name and event title (admin only)
+exports.listAllComments = async (req, res) => {
+  try {
+    const comments = await Comment.find()
+      .sort({ createdAt: -1 })
+      .populate('user', 'firstName lastName email')
+      .populate('event', 'title type');
+
+    res.status(200).json({ success: true, count: comments.length, comments });
+  } catch (error) {
+    console.error('Error listing comments:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
