@@ -222,7 +222,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               />
 
               {/* Professor name filter only for Workshops */}
-              {filters.type === 'Workshop' && (
+              {filters.type === 'Workshop' || filters.type === 'Conference' && (
                 <input
                   type="text"
                   placeholder="👩‍🏫 Professor name"
