@@ -149,7 +149,7 @@ function SignupStudent() {
             style={inputStyle}
           >
             <option value="">Select Role</option>
-            <option value="student">Student</option>
+            <option value="Student">Student</option>
             <option value="ta">TA</option>
             <option value="professor">Professor</option>
             <option value="staff">Staff</option>

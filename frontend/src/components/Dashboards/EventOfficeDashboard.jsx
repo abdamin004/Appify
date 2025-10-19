@@ -7,46 +7,26 @@ import adminService from "../../services/adminService";
 function EventOfficeDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
-  const [myEvents, setMyEvents] = useState([]);
   const [vendorRequests, setVendorRequests] = useState([]);
   const [gymSessions, setGymSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
-
+  
   const storedUser = localStorage.getItem("user");
   const user = storedUser
     ? JSON.parse(storedUser)
     : { firstName: "Guest", role: "eventoffice" };
 
   useEffect(() => {
-    fetchMyCreatedEvents();
     fetchNotifications();
   }, []);
 
   useEffect(() => {
-    if (activeTab === "my-events" && myEvents.length === 0) {
-      fetchMyCreatedEvents();
-    } else if (activeTab === "vendor-requests") {
+    if (activeTab === "vendor-requests") {
       fetchVendorRequests();
     } else if (activeTab === "gym-sessions") {
       fetchGymSessions();
     }
   }, [activeTab]);
-
-  const fetchMyCreatedEvents = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5001/api/events/created/mine", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      setMyEvents(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-      setMyEvents([]);
-    }
-  };
 
   const fetchVendorRequests = async () => {
     try {
@@ -103,7 +83,6 @@ function EventOfficeDashboard() {
 
   const handleDeleteGymSession = async (sessionId) => {
     if (!window.confirm("Are you sure you want to cancel this gym session?")) return;
-    
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`http://localhost:5001/api/gym/delete/${sessionId}`, {
@@ -112,7 +91,6 @@ function EventOfficeDashboard() {
           Authorization: `Bearer ${token}`,
         },
       });
-      
       if (res.ok) {
         alert("Gym session cancelled successfully!");
         fetchGymSessions();
@@ -193,7 +171,6 @@ function EventOfficeDashboard() {
                 Manage university events and coordinate activities
               </p>
             </div>
-
             <div
               style={{
                 display: "flex",
@@ -202,33 +179,6 @@ function EventOfficeDashboard() {
                 flexWrap: "wrap",
               }}
             >
-              <div
-                style={{
-                  padding: "12px 20px",
-                  background: "rgba(212, 175, 55, 0.15)",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#003366",
-                  }}
-                >
-                  {myEvents.length}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "#6b7280",
-                  }}
-                >
-                  Managed Events
-                </div>
-              </div>
-
               <div
                 style={{
                   padding: "12px 20px",
@@ -277,7 +227,32 @@ function EventOfficeDashboard() {
                   </div>
                 )}
               </div>
-
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "rgba(212, 175, 55, 0.15)",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#003366",
+                  }}
+                >
+                  {gymSessions.length}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#6b7280",
+                  }}
+                >
+                  Gym Sessions
+                </div>
+              </div>
               <div style={{ position: "relative" }}>
                 <button
                   style={{
@@ -297,7 +272,7 @@ function EventOfficeDashboard() {
                     dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
                   }}
                 >
-                  + Create Event ▼
+                  + Create/edit Event ▼
                 </button>
                 <div
                   id="create-dropdown"
@@ -328,7 +303,7 @@ function EventOfficeDashboard() {
                       borderRadius: "12px 12px 0 0",
                     }}
                   >
-                    🏪 Create Bazaar
+                    🏪 Create/edit Bazaar
                   </button>
                   <button
                     onClick={() => handleCreateEvent("trip")}
@@ -343,7 +318,7 @@ function EventOfficeDashboard() {
                       color: "#003366",
                     }}
                   >
-                    🚌 Create Trip
+                    🚌 Create/edit Trip
                   </button>
                   <button
                     onClick={() => handleCreateEvent("conference")}
@@ -358,7 +333,7 @@ function EventOfficeDashboard() {
                       color: "#003366",
                     }}
                   >
-                    🎤 Create Conference
+                    🎤 Create/edit Conference
                   </button>
                   <button
                     onClick={() => handleCreateEvent("gym")}
@@ -374,7 +349,7 @@ function EventOfficeDashboard() {
                       borderRadius: "0 0 12px 12px",
                     }}
                   >
-                    💪 Create Gym Session
+                    💪 Create/edit Gym Session
                   </button>
                 </div>
               </div>
@@ -415,29 +390,6 @@ function EventOfficeDashboard() {
             >
               🎯 Browse Events
             </button>
-
-            <button
-              onClick={() => setActiveTab("my-events")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
-                background:
-                  activeTab === "my-events"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "my-events" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-            >
-              📋 My Events
-            </button>
-
             <button
               onClick={() => setActiveTab("vendor-requests")}
               style={{
@@ -481,7 +433,6 @@ function EventOfficeDashboard() {
                 </span>
               )}
             </button>
-
             <button
               onClick={() => setActiveTab("gym-sessions")}
               style={{
@@ -507,8 +458,7 @@ function EventOfficeDashboard() {
 
           {/* Content */}
           {activeTab === "browse" && <EventsList />}
-          {activeTab === "my-events" && <MyEventsList events={myEvents} />}
-          
+
           {activeTab === "vendor-requests" && (
             <div
               style={{

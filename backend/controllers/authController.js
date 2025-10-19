@@ -80,37 +80,13 @@ exports.signupUser = async (req, res) => {
       isVerified: true // el Student byakhod email verification, el ba2y byestanno admin approval
     });
 
-    // law el role Student, eb3at email verification
-    if (role === 'Student') {
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify/${verificationToken}`;
-      const message = `
-        Email Verification
-        Hello ${firstName},
-        Please click the link below to verify your email:
-        ${verificationUrl}
-      `;
-
-      try {
-        await sendEmail({
-          email: user.email,
-          subject: 'Email Verification',
-          message
-        });
-      } catch (error) {
-        console.error('Email sending failed:', error);
-      }
+    
 
       res.status(201).json({
         success: true,
         message: 'User registered successfully. Please check your email for verification.'
       });
-    } else {
-      // law el role Staff / TA / Professor lazem yestanna admin approval
-      res.status(201).json({
-        success: true,
-        message: 'Registration submitted. Waiting for admin approval.'
-      });
-    }
+    
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });

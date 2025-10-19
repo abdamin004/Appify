@@ -290,6 +290,44 @@ function TADashboard() {
                 {tab.label} {tab.count !== undefined ? `(${tab.count})` : ''}
               </button>
             ))}
+
+            <button
+              onClick={() => (window.location.href = "/register-events")}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              Register Events
+            </button>
+
+            <button
+              onClick={() => (window.location.href = "/gym-sessions")}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              🏋️ Gym Sessions
+            </button>
           </div>
 
           {/* Events List */}

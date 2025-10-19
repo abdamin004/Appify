@@ -58,7 +58,7 @@ exports.assignUserRole = async (req, res) => {
             });
         }
 
-        const validRoles = ['Staff', 'TA', 'Professor'];
+        const validRoles = ['Student','Staff', 'TA', 'Professor','Admin','EventOffice'];
         if (!validRoles.includes(role)) {
             return res.status(400).json({
                 message: `Invalid role '${role}'. Valid roles are: ${validRoles.join(', ')}.`
@@ -73,7 +73,7 @@ exports.assignUserRole = async (req, res) => {
         }
 
         user.role = role;
-        //user.isVerified = false;
+        user.isVerified = true;
         //user.verificationToken = crypto.randomBytes(32).toString('hex');
         await user.save();
 /*

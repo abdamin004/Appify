@@ -3,11 +3,13 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsList from "../Functions/CourtsList";
+import { API_BASE } from "../../services/eventService";
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [courts, setCourts] = useState([]);
+  const [presetType, setPresetType] = useState("");
 
   const storedUser = localStorage.getItem("user");
   const user = storedUser
@@ -30,11 +32,21 @@ function StudentDashboard() {
 
   const fetchRegisteredEvents = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/events/registered");
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        // Likely unauthorized if no token; keep empty list gracefully
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        setRegisteredEvents([]);
+        return;
+      }
       const data = await res.json();
       setRegisteredEvents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setRegisteredEvents([]);
     }
   };
 
@@ -205,6 +217,45 @@ function StudentDashboard() {
               🎯 Browse Events
             </button>
 
+            {/* Register Events button inside the same bar */}
+            <button
+              onClick={() => (window.location.href = "/register-events")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              Register Events
+            </button>
+
+            <button
+              onClick={() => (window.location.href = "/gym-sessions")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                color: "#003366",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              }}
+            >
+              🏋️ Gym Sessions
+            </button>
+
             <button
               onClick={() => setActiveTab("registered")}
               style={{
@@ -246,10 +297,11 @@ function StudentDashboard() {
             >
               🏀 Courts
             </button>
+
           </div>
 
           {/* Content */}
-          {activeTab === "browse" && <EventsList />}
+          {activeTab === "browse" && <EventsList presetType={presetType} />}
           {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
           {activeTab === "courts" && <CourtsList courts={courts} />}
         </div>

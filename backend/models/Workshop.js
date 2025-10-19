@@ -8,7 +8,11 @@ const workshopSchema = new mongoose.Schema({
     professors: [{ name: {type: String, required: true}, department: {type: String}}],
     // financial information for the workshop
     requiredBudget: { type: Number, required: true },
-    fundingSource: { type: String, enum: ['internal', 'external'], required: true },
+   fundingSource: {
+  type: String,
+  enum: ['Grant', 'Sponsor', 'External', 'Internal'],
+  required: true
+    },
     extraRequiredResourses: { type: Boolean, default: false },
 });
 

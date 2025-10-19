@@ -92,7 +92,7 @@ module.exports = {
     async getAllEvents(req, res) {
         try {
             const now = new Date();
-            const events = await Event.find({  $expr: { $gte: [ { $toDate: '$startDate' }, now ] }, status:'published'})
+            const events = await Event.find({  $expr: { $gte: [ { $toDate: '$startDate' }, now ] }})
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
                 .exec();
             res.json(events);
@@ -172,7 +172,173 @@ module.exports = {
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
-    },
+    },// Add this to your eventController.js
+
+async registerForEvent(req, res) {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user._id;
+
+        // Find the event
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'Event not found' 
+            });
+        }
+
+        // Check if event has already started
+        if (new Date(event.startDate) <= new Date()) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Cannot register for an event that has already started' 
+            });
+        }
+
+        // Check if registration deadline has passed
+        if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Registration deadline has passed' 
+            });
+        }
+
+        // Check if event is published
+        if (event.status !== 'published') {
+            return res.status(400).json({ 
+                success: false,
+                message: 'This event is not available for registration' 
+            });
+        }
+
+        // Check if event is at capacity
+        if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Event is at full capacity' 
+            });
+        }
+
+        // Check if user is already registered
+        if (event.registeredUsers && event.registeredUsers.includes(userId)) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'You are already registered for this event' 
+            });
+        }
+
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'User not found' 
+            });
+        }
+
+        // Check if user already registered
+        if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'You are already registered for this event' 
+            });
+        }
+
+        // Add user to event's registeredUsers array
+        event.registeredUsers = event.registeredUsers || [];
+        event.registeredUsers.push(userId);
+        await event.save();
+
+        // Add event to user's registeredEvents array
+        user.registeredEvents = user.registeredEvents || [];
+        user.registeredEvents.push(eventId);
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Successfully registered for the event',
+            event: {
+                id: event._id,
+                title: event.title,
+                startDate: event.startDate,
+                location: event.location
+            }
+        });
+
+    } catch (err) {
+        console.error('Registration error:', err);
+        res.status(500).json({ 
+            success: false,
+            message: err.message 
+        });
+    }
+},
+
+async unregisterFromEvent(req, res) {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user._id;
+
+        // Find the event
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'Event not found' 
+            });
+        }
+
+        // Check if event has already started
+        if (new Date(event.startDate) <= new Date()) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Cannot unregister from an event that has already started' 
+            });
+        }
+
+        // Check if user is registered
+        if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'You are not registered for this event' 
+            });
+        }
+
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'User not found' 
+            });
+        }
+
+        // Remove user from event's registeredUsers array
+        event.registeredUsers = event.registeredUsers.filter(
+            id => id.toString() !== userId.toString()
+        );
+        await event.save();
+
+        // Remove event from user's registeredEvents array
+        user.registeredEvents = user.registeredEvents.filter(
+            id => id.toString() !== eventId.toString()
+        );
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Successfully unregistered from the event'
+        });
+
+    } catch (err) {
+        console.error('Unregistration error:', err);
+        res.status(500).json({ 
+            success: false,
+            message: err.message 
+        });
+    }
+},
 
     async updateEvent(req, res) {
         try {
@@ -283,5 +449,25 @@ module.exports = {
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
+    },
+    async publishEvent(req, res) {
+    try {
+        const { id } = req.params;
+        const event = await Event.findById(id);
+        if (!event) {
+            return res.status(404).json({ success: false, message: 'Event not found' });
+        }
+
+        event.status = 'published';
+        await event.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Event published successfully',
+            event
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
+}
 };
