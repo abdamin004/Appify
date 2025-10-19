@@ -10,6 +10,7 @@ connectDB().then(() => {
   // initialize a default admin if none exists
   try {
     require('./utils/initAdmin')();
+
   } catch (err) {
     console.error('initAdmin failed to run:', err);
   }

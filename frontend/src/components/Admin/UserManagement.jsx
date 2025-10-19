@@ -5,12 +5,37 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedRoles, setSelectedRoles] = useState({});
+
+  const normalizeRole = (r) => {
+    if (!r) return r;
+    const s = String(r).trim();
+    // map common lowercase inputs to backend-expected casing
+    const map = {
+      'student': 'Student',
+      'staff': 'Staff',
+      'ta': 'TA',
+      't.a.': 'TA',
+      'professor': 'Professor',
+      'admin': 'Admin',
+      'eventoffice': 'EventOffice',
+      'event office': 'EventOffice'
+    };
+    const key = s.replace(/\s+/g,'').toLowerCase();
+    return map[key] || s;
+  };
 
   const load = async () => {
     setLoading(true); setError(null);
     try {
       const res = await userService.listUsers();
-      setUsers(res.users || res);
+      const u = res.users || res;
+      setUsers(u);
+      // initialize selectedRoles map
+      const map = {};
+  // normalize roles to match backend expected casing
+  (u || []).forEach(user => { map[user._id] = normalizeRole(user.role); });
+      setSelectedRoles(map);
     } catch (err) {
       setError(err.message || JSON.stringify(err));
     } finally { setLoading(false); }
@@ -20,8 +45,11 @@ export default function UserManagement() {
 
   const handleAssign = async (id, newRole) => {
     try {
-      await userService.assignRole({ userId: id, role: newRole });
-      load();
+      const roleToSend = normalizeRole(newRole);
+      await userService.assignRole({ userId: id, role: roleToSend });
+      // reflect change locally
+      setUsers(prev => prev.map(u => u._id === id ? { ...u, role: roleToSend, isVerified: true } : u));
+      setSelectedRoles(prev => ({ ...prev, [id]: roleToSend }));
     } catch (err) { alert(err.message || JSON.stringify(err)); }
   };
 
@@ -62,11 +90,16 @@ export default function UserManagement() {
               <td style={{ padding: 8 }}>{u.firstName} {u.lastName}</td>
               <td style={{ padding: 8 }}>{u.email}</td>
               <td style={{ padding: 8 }}>
-                <select defaultValue={u.role} onChange={e=>handleAssign(u._id, e.target.value)}>
-                  <option>Student</option>
-                  <option>Staff</option>
-                  <option>TA</option>
-                  <option>Professor</option>
+                <select value={selectedRoles[u._id] || u.role} onChange={e=>{
+                  const val = e.target.value;
+                  setSelectedRoles(prev => ({ ...prev, [u._id]: val }));
+                }}>
+                  <option value="Student">Student</option>
+                  <option value="Staff">Staff</option>
+                  <option value="TA">TA</option>
+                  <option value="Professor">Professor</option>
+                  <option value="Admin">Admin</option>
+                  <option value="EventOffice">EventOffice</option>
                 </select>
               </td>
               <td style={{ padding: 8 }}>{u.isVerified ? 'Yes' : 'No'}</td>
@@ -74,7 +107,13 @@ export default function UserManagement() {
               <td style={{ padding: 8 }}>
                 <button onClick={()=>handleBlock(u._id, u.isBlocked ? 'unblock' : 'block')} style={{ marginRight: 8 }}>{u.isBlocked ? 'Unblock' : 'Block'}</button>
                 {['Admin','EventOffice'].includes(u.role) && (
-                  <button onClick={()=>handleDeleteAdmin(u._id)} style={{ color: '#dc2626' }}>Delete Admin</button>
+                  <button onClick={()=>handleDeleteAdmin(u._id)} style={{ color: '#dc2626', marginRight: 8 }}>Delete Admin</button>
+                )}
+                {/* Verify & Assign button: visible when user not verified OR selected role differs from current */}
+                {(u.isVerified === false || (selectedRoles[u._id] && selectedRoles[u._id] !== u.role)) && (
+                  <button onClick={()=>handleAssign(u._id, (selectedRoles[u._id] || u.role))} style={{ backgroundColor: '#0b69ff', color: '#fff', padding: '6px 10px', border: 'none', borderRadius: 4 }}>
+                    Verify & Assign
+                  </button>
                 )}
               </td>
             </tr>
