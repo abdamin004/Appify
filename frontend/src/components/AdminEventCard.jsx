@@ -66,6 +66,25 @@ const EventCard = ({ event, onClick, onDelete }) => {
             </div>
           )}
 
+          {(event.type === 'Bazaar' || event.type === 'Booth') && (!Array.isArray(event.vendors) || event.vendors.length === 0) &&
+            typeof event.participantsCount === 'number' && event.participantsCount > 0 && (
+            <div className="vendor-info">
+              Vendors Participating: {event.participantsCount}
+              {Array.isArray(event.participants) && event.participants.length > 0 && (
+                <div style={{ marginTop: 4, fontSize: '0.8rem', color: '#6b7280' }}>
+                  {(() => {
+                    const names = (event.participants || [])
+                      .map(p => (p && (p.organization || p.vendorCompany || p.vendorEmail)) || null)
+                      .filter(Boolean);
+                    const shown = names.slice(0, 3);
+                    const extra = Math.max(0, names.length - shown.length);
+                    return `${shown.join(', ')}${extra > 0 ? ` and ${extra} more` : ''}`;
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+
           {event.registrationDeadline && new Date(event.registrationDeadline) > new Date() && (
             <div className="deadline-info">⏰ Register by {formatDate(event.registrationDeadline)}</div>
           )}
