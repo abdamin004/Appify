@@ -206,13 +206,7 @@ async registerForEvent(req, res) {
             });
         }
 
-        // Check if event is published
-        if (event.status !== 'published') {
-            return res.status(400).json({ 
-                success: false,
-                message: 'This event is not available for registration' 
-            });
-        }
+      
 
         // Check if event is at capacity
         if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {

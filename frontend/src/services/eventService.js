@@ -81,6 +81,23 @@ export async function listUpcomingPublished() {
   return res.json();
 }
 
+// Generic: list events by type (Workshop, Trip, ...)
+export async function listEventsByType(type) {
+  const q = new URLSearchParams({ type });
+  const res = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
+  return res.json();
+}
+
+// Public registration for existing event (no auth)
+export function publicRegisterForEvent(eventId, payload) {
+  return http('POST', `${API_BASE}/events/register-public/${eventId}`, payload);
+}
+
+// Authenticated registration (adds to registeredUsers/user.registeredEvents)
+export function registerForEvent(eventId) {
+  return http('POST', `${API_BASE}/events/register/${eventId}`);
+}
+
 // Gym sessions
 export function createGymSession(payload) {
   // Expect payload to include sessionType (enum) and instructor (required)
@@ -101,7 +118,6 @@ export async function listGymSessions() {
   const res = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
   return res.json();
 }
-
 // Delete an event (Admin/EventOffice only)
 export function deleteEvent(id) {
   return http('DELETE', `${API_BASE}/events/delete/${id}`);
