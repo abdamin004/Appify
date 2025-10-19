@@ -41,8 +41,7 @@ services:
       - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
-    # NEW: Override CMD for dev mode with nodemon
-    command: npm run dev
+
 
   frontend:
     build:
@@ -63,9 +62,7 @@ services:
     tty: true
     environment:
       - REACT_APP_API_URL=${REACT_APP_API_URL}
-      - CHOKIDAR_USEPOLLING=true  # Already good for polling in Docker
-    # NEW: Ensure dev server runs (override if your Dockerfile uses something else)
-    command: npm start
+      - CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING}
 
 volumes:
   mongo-data:
