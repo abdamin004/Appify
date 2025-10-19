@@ -8,7 +8,7 @@ function SignupStudent() {
     lastName: "",
     email: "",
     password: "",
-    role: "",
+    role: "student",
     studentStaffId: "",
   });
 
@@ -26,12 +26,8 @@ function SignupStudent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.role === "student" && !formData.email.endsWith("@student.guc.edu.eg")) {
+    if (!formData.email.endsWith("@student.guc.edu.eg")) {
       setMessage("Student email must end with @student.guc.edu.eg");
-      return;
-    }
-    if (formData.role !== "student" && !formData.email.endsWith("@guc.edu.eg")) {
-      setMessage("Staff/TA/Professor email must end with @guc.edu.eg");
       return;
     }
 
@@ -39,7 +35,7 @@ function SignupStudent() {
       const response = await fetch("http://localhost:5001/api/auth/signup/user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, role: 'student' }),
       });
 
       if (!response.ok) {
@@ -139,22 +135,7 @@ function SignupStudent() {
           />
         </div>
 
-        <div style={labelStyle}>
-          <span style={spanStyle}>Role</span>
-          <select
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="">Select Role</option>
-            <option value="Student">Student</option>
-            <option value="ta">TA</option>
-            <option value="professor">Professor</option>
-            <option value="staff">Staff</option>
-          </select>
-        </div>
+        {/* Role selection removed; this form always signs up a Student */}
 
         <div style={labelStyle}>
           <span style={spanStyle}>Student / Staff ID</span>

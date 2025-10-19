@@ -48,6 +48,11 @@ exports.signupUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
+    // Disallow creating Admin/EventOffice through public signup
+    if (roleLower === 'admin' || roleLower === 'eventoffice') {
+      return res.status(400).json({ message: 'Admin and EventOffice accounts must be created by an Admin.' });
+    }
+
     // Enforce domain by role (case-insensitive)
     if (roleLower === 'student') {
       if (!isStudentEmail(email)) {

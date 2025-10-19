@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import EventsList from "../AdminEventList";
 import MyEventsList from "../Functions/MyEventsList";
 import adminService from "../../services/adminService";
+import { listGymSessions, cancelGymSession } from "../../services/eventService";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -40,14 +41,8 @@ function EventOfficeDashboard() {
 
   const fetchGymSessions = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5001/api/gym/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      setGymSessions(Array.isArray(data) ? data : []);
+      const rows = await listGymSessions();
+      setGymSessions(Array.isArray(rows) ? rows : []);
     } catch (err) {
       console.error("Error fetching gym sessions:", err);
       setGymSessions([]);
@@ -84,22 +79,12 @@ function EventOfficeDashboard() {
   const handleDeleteGymSession = async (sessionId) => {
     if (!window.confirm("Are you sure you want to cancel this gym session?")) return;
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5001/api/gym/delete/${sessionId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (res.ok) {
-        alert("Gym session cancelled successfully!");
-        fetchGymSessions();
-      } else {
-        alert("Failed to cancel gym session");
-      }
+      await cancelGymSession(sessionId);
+      alert("Gym session cancelled successfully!");
+      fetchGymSessions();
     } catch (err) {
-      console.error("Error deleting gym session:", err);
-      alert("Error deleting gym session");
+      console.error("Error cancelling gym session:", err);
+      alert(err?.message || "Error cancelling gym session");
     }
   };
 
@@ -565,21 +550,30 @@ function EventOfficeDashboard() {
                     >
                       <div>
                         <h3 style={{ color: "#003366", marginBottom: "8px" }}>
-                          {session.type || "Gym Session"}
+                          {session.sessionType || "Gym Session"}
                         </h3>
                         <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                          Date: {new Date(session.date).toLocaleDateString()}
+                          Date: {session.startDate ? new Date(session.startDate).toLocaleDateString() : 'TBA'}
                         </p>
                         <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                          Time: {session.time} | Duration: {session.duration} mins
+                          Time: {session.startDate ? new Date(session.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
+                          {session.endDate ? ` - ${new Date(session.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                          {session.durationMinutes ? ` | Duration: ${session.durationMinutes} mins` : ''}
                         </p>
-                        <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                          Capacity: {session.capacity} participants
-                        </p>
+                        {session.instructor && (
+                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                            Instructor: {session.instructor}
+                          </p>
+                        )}
+                        {typeof session.capacity === 'number' && (
+                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                            Capacity: {session.capacity} participants
+                          </p>
+                        )}
                       </div>
                       <div style={{ display: "flex", gap: "10px" }}>
                         <button
-                          onClick={() => window.location.href = `/edit-gym-session/${session._id}`}
+                          onClick={() => navigate(`/events-office/gym-sessions?edit=${session._id}`)}
                           style={{
                             padding: "10px 20px",
                             background: "#3b82f6",

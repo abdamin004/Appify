@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const Vendor = require('../models/Vendor'); 
+const VendorApplication = require('../models/VendorApplication');
 const User = require('../models/User');
 const Workshop = require('../models/Workshop');
 const Trip = require('../models/Trip');
@@ -7,6 +8,43 @@ const Bazaar = require('../models/Bazaar');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const { ObjectId } = require('mongoose').Types;
+
+// Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
+async function attachApprovedParticipants(events) {
+  try {
+    if (!Array.isArray(events) || events.length === 0) return events;
+    const ids = events.map(e => e && e._id).filter(Boolean);
+    const apps = await VendorApplication.find({ event: { $in: ids }, status: 'approved' })
+      .populate('vendorUser', 'companyName email')
+      .select('event organization status vendorUser');
+    const byEvent = new Map();
+    for (const a of apps) {
+      const key = String(a.event);
+      if (!byEvent.has(key)) byEvent.set(key, []);
+      byEvent.get(key).push({
+        organization: a.organization,
+        vendorCompany: a.vendorUser && a.vendorUser.companyName,
+        vendorEmail: a.vendorUser && a.vendorUser.email,
+        status: a.status,
+      });
+    }
+    return events.map(e => {
+      if (!e) return e;
+      const isBazaarOrBooth = e.type === 'Bazaar' || e.type === 'Booth';
+      if (!isBazaarOrBooth) return e;
+      const key = String(e._id);
+      const participants = byEvent.get(key) || [];
+      // Ensure plain object so we can append fields safely
+      const obj = typeof e.toObject === 'function' ? e.toObject() : { ...e };
+      obj.participants = participants;
+      obj.participantsCount = participants.length;
+      return obj;
+    });
+  } catch (err) {
+    // In case of error, return original events
+    return events;
+  }
+}
 
 module.exports = {
     // POST /events/create - Create a new event
@@ -93,9 +131,22 @@ module.exports = {
     async getAllEvents(req, res) {
         try {
             const now = new Date();
-            const events = await Event.find({  $expr: { $gte: [ { $toDate: '$startDate' }, now ] }})
+            let events;
+            try {
+                events = await Event.find({
+                    status: 'published',
+                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
+                })
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
                 .exec();
+            } catch (e) {
+                // Fallback if $toDate not supported
+                events = await Event.find({ status: 'published', startDate: { $gte: now } })
+                  .populate({ path: 'vendors', options: { strictPopulate: false } })
+                  .exec();
+            }
+
+            events = await attachApprovedParticipants(events);
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -105,16 +156,29 @@ module.exports = {
     async searchEvents(req, res) {
         try {
             const { q } = req.query;
-            const regex = new RegExp(q, 'i');
-            const events = await Event.find({
+            const regex = new RegExp(q || '', 'i');
+            const now = new Date();
+            const baseMatch = {
+                status: 'published',
                 $or: [
                     { title: regex },
                     { description: regex },
                     { type: regex },
-                    { category: regex },
-                    { 'professorName': regex }
+                    { category: regex }
                 ]
-            }).populate({ path: 'vendors', options: { strictPopulate: false } });
+            };
+            let events;
+            try {
+                events = await Event.find({
+                    ...baseMatch,
+                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
+                })
+                  .populate({ path: 'vendors', options: { strictPopulate: false } });
+            } catch (e) {
+                events = await Event.find({ ...baseMatch, startDate: { $gte: now } })
+                  .populate({ path: 'vendors', options: { strictPopulate: false } });
+            }
+            events = await attachApprovedParticipants(events);
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -124,19 +188,37 @@ module.exports = {
     async filterEvents(req, res) { 
         try {
             const { category, location, type, startDate, professorName } = req.query;
-            const filter = {};
+            const base = { status: 'published' };
+            if (category) base.category = new RegExp(category, 'i');
+            if (location) base.location = new RegExp(location, 'i');
+            if (type) base.type = new RegExp(type, 'i');
+            if (professorName) base['professors.name'] = { $regex: new RegExp(professorName, 'i') };
 
-            if (category) filter.category = new RegExp(category, 'i');
-            if (location) filter.location = new RegExp(location, 'i');
-            if (type) filter.type = new RegExp(type, 'i');
-            if (startDate) filter.startDate = { $gte: new Date(startDate) };
-            if (professorName) filter['professors.name'] = { $regex: new RegExp(professorName, 'i') };
+            let events;
+            if (startDate) {
+                events = await Event.find({ ...base, startDate: { $gte: new Date(startDate) } })
+                  .populate({ path: 'vendors', options: { strictPopulate: false } })
+                  .sort({ startDate: 1 })
+                  .exec();
+            } else {
+                const now = new Date();
+                try {
+                    events = await Event.find({
+                        ...base,
+                        $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
+                    })
+                      .populate({ path: 'vendors', options: { strictPopulate: false } })
+                      .sort({ startDate: 1 })
+                      .exec();
+                } catch (e) {
+                    events = await Event.find({ ...base, startDate: { $gte: now } })
+                      .populate({ path: 'vendors', options: { strictPopulate: false } })
+                      .sort({ startDate: 1 })
+                      .exec();
+                }
+            }
 
-            const events = await Event.find(filter)
-                .populate({ path: 'vendors', options: { strictPopulate: false } })
-                .sort({ startDate: 1 })
-                .exec();
-
+            events = await attachApprovedParticipants(events);
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });

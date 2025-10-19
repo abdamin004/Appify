@@ -24,6 +24,9 @@ const EventCard = ({ event, onClick, onDelete }) => {
   };
 
   const hasRegistrations = (event.registeredCount || (event.registeredUsers && event.registeredUsers.length) || 0) > 0;
+  const vendorCount = typeof event.participantsCount === 'number'
+    ? event.participantsCount
+    : (Array.isArray(event.vendors) ? event.vendors.length : 0);
 
   return (
     <div onClick={onClick} className="event-card">
@@ -60,9 +63,27 @@ const EventCard = ({ event, onClick, onDelete }) => {
             </div>
           )}
 
-          {(event.type === 'Bazaar' || event.type === 'Booth') && event.vendors?.length > 0 && (
+          {false && (event.type === 'Bazaar' || event.type === 'Booth') && event.vendors?.length > 0 && (
             <div className="vendor-info">
               🏪 {event.vendors.length} Vendor{event.vendors.length > 1 ? 's' : ''} Participating
+            </div>
+          )}
+
+          {(event.type === 'Bazaar' || event.type === 'Booth') && vendorCount > 0 && (
+            <div className="vendor-info">
+              Vendors Participating: {vendorCount}
+              {Array.isArray(event.participants) && event.participants.length > 0 && (
+                <div style={{ marginTop: 4, fontSize: '0.8rem', color: '#6b7280' }}>
+                  {(() => {
+                    const names = (event.participants || [])
+                      .map(p => (p && (p.organization || p.vendorCompany || p.vendorEmail)) || null)
+                      .filter(Boolean);
+                    const shown = names.slice(0, 3);
+                    const extra = Math.max(0, names.length - shown.length);
+                    return `${shown.join(', ')}${extra > 0 ? ` and ${extra} more` : ''}`;
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
