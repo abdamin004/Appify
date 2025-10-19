@@ -42,7 +42,7 @@ exports.signupUser = async (req, res) => {
       role,
       studentStaffId,
       verificationToken,
-      isVerified: false // el Student byakhod email verification, el ba2y byestanno admin approval
+      isVerified: true // el Student byakhod email verification, el ba2y byestanno admin approval
     });
 
     
