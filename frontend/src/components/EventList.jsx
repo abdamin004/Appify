@@ -5,7 +5,7 @@ import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 import { deleteEvent } from '../services/eventService';
 
-function EventsList({ filterByTypes = null, presetType = null }) {
+function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,8 +46,8 @@ function EventsList({ filterByTypes = null, presetType = null }) {
       if (filters.endDate) queryParams.append("endDate", filters.endDate);
 
       let endpoint = `${API_BASE}/events`;
-      // Use search endpoint only when doing a generic search and not searching by professor
-      if (filters.search && !filters.professorName) {
+      // Use search endpoint when doing a generic search
+      if (filters.search) {
         endpoint = `${API_BASE}/events/search`;
       } else if (filters.location || filters.startDate || filters.endDate || filters.professorName) {
         endpoint = `${API_BASE}/events/filter`;
@@ -267,7 +267,7 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                   const route = e.target.value;
                   if (route) navigate(route);
                 }}
-                style={inputStyle}
+                style={showQuickNav ? inputStyle : { display: 'none' }}
                 aria-label="Go to event page"
               >
                 <option value="">Go to page…</option>
@@ -290,7 +290,6 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                     sortBy: "date",
                     startDate: "",
                     endDate: "",
-                    professorName: "",
                   })
                 }
                 style={clearButtonStyle}
@@ -423,3 +422,4 @@ const clearButtonStyle = {
 };
 
 export default EventsList;
+

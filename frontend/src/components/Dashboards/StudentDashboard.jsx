@@ -324,7 +324,7 @@ function StudentDashboard() {
           </div>
 
           {/* Content */}
-          {activeTab === "browse" && <EventsList presetType={presetType} />}
+          {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} />}
           {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
           {activeTab === "courts" && <CourtsList courts={courts} />}
         </div>

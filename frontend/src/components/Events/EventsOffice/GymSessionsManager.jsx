@@ -61,6 +61,20 @@ function GymSessionsManager() {
   }
   useEffect(() => { refresh(); }, []);
 
+  // If opened with ?edit=<id>, auto-start editing that session after load
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const targetId = params.get('edit');
+      if (targetId && !editing && Array.isArray(sessions) && sessions.length) {
+        const row = sessions.find(s => String(s._id) === String(targetId));
+        if (row) startEdit(row);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, [sessions, editing]);
+
   const onCreate = async (e) => {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
@@ -97,6 +111,9 @@ function GymSessionsManager() {
       date: toDateInputValue(start),
       time: toTimeInputValue(start),
       duration: duration || 60,
+      sessionType: row.sessionType || 'yoga',
+      instructor: row.instructor || '',
+      capacity: (row.capacity ?? '').toString(),
     });
   };
 
@@ -105,7 +122,14 @@ function GymSessionsManager() {
     try {
       const start = new Date(`${editData.date}T${editData.time}:00`);
       const end = new Date(start.getTime() + Number(editData.duration || 0) * 60000);
-      await updateGymSession(id, { startDate: start.toISOString(), endDate: end.toISOString() });
+      await updateGymSession(id, {
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        sessionType: editData.sessionType,
+        instructor: editData.instructor,
+        capacity: Number(editData.capacity || 0),
+        durationMinutes: Number(editData.duration || 0),
+      });
       setSuccess('Gym session updated');
       setEditing(null); setEditData({});
       await refresh();
@@ -181,6 +205,11 @@ function GymSessionsManager() {
                   <input className="input" style={{ marginBottom: 8 }} type="date" value={editData.date} onChange={e=>setEditData({ ...editData, date: e.target.value })} />
                   <input className="input" style={{ marginBottom: 8 }} type="time" value={editData.time} onChange={e=>setEditData({ ...editData, time: e.target.value })} />
                   <input className="input" style={{ marginBottom: 8 }} type="number" min="10" step="5" value={editData.duration} onChange={e=>setEditData({ ...editData, duration: e.target.value })} />
+                  <select className="input" style={{ marginBottom: 8 }} value={editData.sessionType} onChange={e=>setEditData({ ...editData, sessionType: e.target.value })}>
+                    {SESSION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <input className="input" style={{ marginBottom: 8 }} type="number" min="1" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} placeholder="Max Participants" />
+                  <input className="input" style={{ marginBottom: 8 }} value={editData.instructor} onChange={e=>setEditData({ ...editData, instructor: e.target.value })} placeholder="Instructor" />
                   <button className="submit" onClick={() => onSave(s._id)} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>Save</button>
                   <button className="submit" onClick={() => setEditing(null)} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
                 </div>

@@ -69,7 +69,7 @@ function SignupStaff() {
           color: '#003366', 
           marginBottom: '10px' 
         }}>
-          Staff / TA / Professor / Event-Office Signup
+          Staff / TA / Professor Signup
         </h2>
         <p style={{ fontSize: '1rem', color: '#6b7280' }}>
           Register now to access your staff portal
@@ -145,7 +145,7 @@ function SignupStaff() {
             <option value="professor">Professor</option>
             <option value="ta">TA</option>
             <option value="staff">Staff</option>
-            <option value="eventoffice">Event Office</option>
+            {/** Event Office removed from public signup */}
           </select>
         </div>
 
