@@ -54,9 +54,32 @@ function StudentDashboard() {
     try {
       const res = await fetch("http://localhost:5001/api/courts");
       const data = await res.json();
-      if (Array.isArray(data)) setCourts(data);
-      else if (Array.isArray(data.courts)) setCourts(data.courts);
-      else setCourts([]);
+      const raw = Array.isArray(data) ? data : (Array.isArray(data.courts) ? data.courts : []);
+      // normalize each court to include availabilityDates and available boolean
+      const now = new Date();
+      const processed = raw.map(court => {
+        const slots = Array.isArray(court.availability) ? court.availability : [];
+        // filter future slots that are not booked
+        const availabilityDates = slots
+          .filter(s => {
+            try {
+              if (s.isBooked) return false;
+              const slotDate = new Date(s.date);
+              // combine with startTime
+              if (!s.startTime) return false;
+              const [h, m] = s.startTime.split(':').map(x=>parseInt(x,10));
+              slotDate.setHours(h||0, m||0, 0, 0);
+              return slotDate >= now;
+            } catch (e) { return false; }
+          })
+          .map(s => ({ date: s.date, startTime: s.startTime, endTime: s.endTime }));
+
+        const available = (court.status === 'available') && availabilityDates.length > 0;
+
+        return { ...court, availabilityDates, available };
+      });
+
+      setCourts(processed);
     } catch (err) {
       console.error(err);
       setCourts([]);

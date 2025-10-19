@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import EventList from "../EventList";
+import EventList from "../AdminEventList";
 
 
 

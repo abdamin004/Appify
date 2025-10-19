@@ -101,3 +101,8 @@ export async function listGymSessions() {
   const res = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
   return res.json();
 }
+
+// Delete an event (Admin/EventOffice only)
+export function deleteEvent(id) {
+  return http('DELETE', `${API_BASE}/events/delete/${id}`);
+}

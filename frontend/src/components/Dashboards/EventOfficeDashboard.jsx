@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import EventsList from "../EventList";
+import EventsList from "../AdminEventList";
 import MyEventsList from "../Functions/MyEventsList";
 import adminService from "../../services/adminService";
 

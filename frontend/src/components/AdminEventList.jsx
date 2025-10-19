@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import EventCard from "./EventCard";
+import EventCard from "./AdminEventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 import { deleteEvent } from '../services/eventService';
@@ -81,6 +81,18 @@ function EventsList({ filterByTypes = null, presetType = null }) {
     });
 
   const handleEventClick = (id) => (window.location.href = `/events/${id}`);
+
+  const handleDeleteEvent = async (id) => {
+    if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    try {
+      await deleteEvent(id);
+      // refresh
+      fetchEvents();
+    } catch (err) {
+      console.error('Failed to delete event', err);
+      alert(err.message || 'Failed to delete event');
+    }
+  };
 
   return (
     <div
@@ -361,9 +373,10 @@ function EventsList({ filterByTypes = null, presetType = null }) {
             >
               {filteredEvents.map((e) => (
                 <EventCard
-                  key={e._id} 
+                  key={e._id}
                   event={e}
                   onClick={() => handleEventClick(e._id)}
+                  onDelete={handleDeleteEvent}
                 />
               ))}
             </div>

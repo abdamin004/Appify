@@ -6,6 +6,7 @@ const Trip = require('../models/Trip');
 const Bazaar = require('../models/Bazaar');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
+const { ObjectId } = require('mongoose').Types;
 
 module.exports = {
     // POST /events/create - Create a new event
@@ -176,11 +177,12 @@ module.exports = {
 
 async registerForEvent(req, res) {
     try {
-        const { eventId } = req.params;
+        const eventId = req.params.eventId;
         const userId = req.user._id;
 
         // Find the event
         const event = await Event.findById(eventId);
+        console.log('Registering user', userId, 'for event', eventId);
         if (!event) {
             return res.status(404).json({ 
                 success: false,

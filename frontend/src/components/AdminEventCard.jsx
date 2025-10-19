@@ -69,7 +69,12 @@ const EventCard = ({ event, onClick, onDelete }) => {
           {event.registrationDeadline && new Date(event.registrationDeadline) > new Date() && (
             <div className="deadline-info">⏰ Register by {formatDate(event.registrationDeadline)}</div>
           )}
-         
+          {/* Delete button for admins: only show if no registrations */}
+          {onDelete && !hasRegistrations && (
+            <div style={{ marginTop: 12 }}>
+              <button onClick={handleDeleteClick} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 6 }}>Delete</button>
+            </div>
+          )}
         </div>
       </div>
 
