@@ -37,7 +37,7 @@ function WorkshopsManager() {
     agenda: '',
     capacity: '',
     professors: [{ name: '', department: '' }],
-    status: 'draft',
+    status: 'published',
   });
 
   const [loading, setLoading] = useState(false);
@@ -81,7 +81,7 @@ function WorkshopsManager() {
         startDate: form.startDate,
         endDate: form.endDate,
         registrationDeadline: form.registrationDeadline,
-        status: 'draft',
+        status: 'published',
         facultyName: form.facultyName,
         requiredBudget: Number(form.requiredBudget || 0),
         fundingSource: form.fundingSource,
@@ -94,11 +94,11 @@ function WorkshopsManager() {
         createdBy,
       };
       await createWorkshop(payload);
-      setSuccess('Workshop created (awaiting Events Office publish)');
+      setSuccess('Workshop created successfully');
       setForm({
         title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
         facultyName: '', requiredBudget: '', fundingSource: 'Grant', extraRequiredResourses: false,
-        agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'draft'
+        agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'published'
       });
       await refresh();
     } catch (err) { setError(err.message || 'Failed to create'); }
