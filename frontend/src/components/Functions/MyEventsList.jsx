@@ -27,14 +27,14 @@ function MyEventsList({ events }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "30px" }}>
       {events.map((event) => (
-        <div key={event._id || event.id} style={{ background: "rgba(255,255,255,0.95)", borderRadius: "20px", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,0.3)", transition: "all 0.3s", cursor: "pointer" }}>
-          <div style={{ height: "200px", background: `linear-gradient(135deg, ${getEventColor(event.type)} 0%, ${getEventColorDark(event.type)} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "4rem" }}>
-            {getEventIcon(event.type)}
+        <div key={event.event?._id || event._id || event.id} style={{ background: "rgba(255,255,255,0.95)", borderRadius: "20px", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,0.3)", transition: "all 0.3s", cursor: "pointer" }}>
+          <div style={{ height: "200px", background: `linear-gradient(135deg, ${getEventColor(event.event?.type || event.type)} 0%, ${getEventColorDark(event.event?.type || event.type)} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "4rem" }}>
+            {getEventIcon(event.event?.type || event.type)}
           </div>
           <div style={{ padding: "25px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
               <span style={{ padding: "6px 12px", background: "rgba(212, 175, 55, 0.15)", color: "#d4af37", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "700" }}>
-                {event.type || "Event"}
+                {(event.event?.type || event.type) || "Event"}
               </span>
               {event.status && (
                 <span style={{ padding: "6px 12px", background: event.status === "approved" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: event.status === "approved" ? "#22c55e" : "#ef4444", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "700" }}>
@@ -43,15 +43,15 @@ function MyEventsList({ events }) {
               )}
             </div>
             <h3 style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#003366", marginBottom: "12px" }}>
-              {event.name || event.title}
+              {event.event?.name || event.event?.title || event.name || event.title}
             </h3>
             <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: "15px", lineHeight: "1.5" }}>
-              {event.description?.substring(0, 100) || "No description available"}...
+              {event.event?.description?.substring(0, 100) || event.description?.substring(0, 100) || "No description available"}...
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", color: "#6b7280" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>📅</span>
-                <span>{new Date(event.date).toLocaleDateString()}</span>
+                <span>{new Date(event.event?.startDate || event.date).toLocaleDateString()}</span>
               </div>
               {event.location && (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

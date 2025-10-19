@@ -4,14 +4,13 @@ import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 
-function EventsList({ presetType = "" }) {
+function EventsList({ filterByTypes = null }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     type: "",
     search: "",
-    professorName: "",
     location: "",
     sortBy: "date",
     startDate: "",
@@ -34,10 +33,9 @@ function EventsList({ presetType = "" }) {
       const queryParams = new URLSearchParams();
 
       if (filters.type) queryParams.append("type", filters.type);
-      if (filters.search) queryParams.append("search", filters.search);
-      if (filters.search || filters.professorName) {
-        const combined = `${filters.search} ${filters.professorName}`.trim();
-        if (combined) queryParams.append("q", combined);
+      if (filters.search) {
+        queryParams.append("search", filters.search);
+        queryParams.append("q", filters.search);
       }
 
       if (filters.location) queryParams.append("location", filters.location);
@@ -45,7 +43,7 @@ function EventsList({ presetType = "" }) {
       if (filters.endDate) queryParams.append("endDate", filters.endDate);
 
       let endpoint = `${API_BASE}/events`;
-      if (filters.search || filters.professorName) {
+      if (filters.search) {
         endpoint = `${API_BASE}/events/search`;
       } else if (filters.location || filters.startDate || filters.endDate) {
         endpoint = `${API_BASE}/events/filter`;
@@ -53,7 +51,8 @@ function EventsList({ presetType = "" }) {
 
       const response = await fetch(`${endpoint}?${queryParams}`);
       const data = await response.json();
-      setEvents(data);
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      setEvents(list);
     } catch (error) {
       console.error("Error fetching events:", error);
     } finally {
@@ -63,16 +62,13 @@ function EventsList({ presetType = "" }) {
 
   const filteredEvents = events
     .filter((event) => {
+      if (filterByTypes && !filterByTypes.includes(event.type)) return false;
       if (filters.type && event.type !== filters.type) return false;
       if (filters.search) {
         const s = filters.search.toLowerCase();
         const title = event.title?.toLowerCase().includes(s);
         const desc = event.description?.toLowerCase().includes(s);
-        const prof =
-          event.professorName?.toLowerCase().includes(s) ||
-          event.createdBy?.firstName?.toLowerCase().includes(s) ||
-          event.createdBy?.lastName?.toLowerCase().includes(s);
-        return title || desc || prof;
+        return title || desc;
       }
       return true;
     })
@@ -138,7 +134,9 @@ function EventsList({ presetType = "" }) {
               Upcoming Events
             </h1>
             <p style={{ fontSize: "1.3rem", color: "rgba(212, 175, 55, 0.95)", lineHeight: "1.6" }}>
-              Discover workshops, trips, conferences, bazaars, and more
+              {filterByTypes && filterByTypes.every(t => ["Bazaar","Booth"].includes(t))
+                ? 'Discover bazaars and booths'
+                : 'Discover workshops, trips, conferences, bazaars, and more'}
             </p>
           </div>
 
@@ -170,15 +168,7 @@ function EventsList({ presetType = "" }) {
                 }
                 style={inputStyle}
               />
-              <input
-                type="text"
-                placeholder="👨‍🏫 Professor name"
-                value={filters.professorName}
-                onChange={(e) =>
-                  setFilters({ ...filters, professorName: e.target.value })
-                }
-                style={inputStyle}
-              />
+              {/* Professor name filter removed */}
             </div>
 
             {/* Filter Row */}
@@ -198,11 +188,23 @@ function EventsList({ presetType = "" }) {
                 style={inputStyle}
               >
                 <option value="">All Types</option>
-                <option value="Workshop">🛠️ Workshop</option>
-                <option value="Trip">🚌 Trip</option>
-                <option value="Bazaar">🏪 Bazaar</option>
-                <option value="Booth">🎪 Booth</option>
-                <option value="Conference">🎤 Conference</option>
+                {
+                  filterByTypes
+                    ? filterByTypes.map((t) => (
+                        <option key={t} value={t}>
+                          {t === 'Bazaar' ? '🏪 Bazaar' : t === 'Booth' ? '🎪 Booth' : t}
+                        </option>
+                      ))
+                    : (
+                        <>
+                          <option value="Workshop">🛠️ Workshop</option>
+                          <option value="Trip">🚌 Trip</option>
+                          <option value="Bazaar">🏪 Bazaar</option>
+                          <option value="Booth">🎪 Booth</option>
+                          <option value="Conference">🎤 Conference</option>
+                        </>
+                      )
+                }
               </select>
 
               <input
@@ -269,7 +271,6 @@ function EventsList({ presetType = "" }) {
                   setFilters({
                     type: "",
                     search: "",
-                    professorName: "",
                     location: "",
                     sortBy: "date",
                     startDate: "",

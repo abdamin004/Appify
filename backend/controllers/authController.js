@@ -11,6 +11,21 @@ const generateToken = (id) => {
   });
 };
 
+// Enforce institutional email for Users (not Vendors)
+function isGucEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const parts = email.trim().toLowerCase().split('@');
+  if (parts.length !== 2) return false;
+  return parts[1] === 'guc.edu.eg';
+}
+
+function isStudentEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const parts = email.trim().toLowerCase().split('@');
+  if (parts.length !== 2) return false;
+  return parts[1] === 'student.guc.edu.eg';
+}
+
 // el route da by handle el POST request eli gaya 3ala /signup/user w by call el signupUser function eli fel authController
 // @desc    Signup lel User (Student / Staff / TA / Professor)
 // @route   POST /api/auth/signup/user
@@ -19,9 +34,29 @@ exports.signupUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role, studentStaffId } = req.body;
 
+    const roleLower = String(role || '').trim().toLowerCase();
+    const roleCanonical =
+      roleLower === 'student' ? 'Student' :
+      roleLower === 'staff' ? 'Staff' :
+      roleLower === 'ta' ? 'TA' :
+      roleLower === 'professor' ? 'Professor' :
+      roleLower === 'admin' ? 'Admin' :
+      roleLower === 'eventoffice' ? 'EventOffice' : (role || '');
+
     // Validation 3ashan n2kd en kol el fields mwgoda
     if (!firstName || !lastName || !email || !password || !role) {
       return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+
+    // Enforce domain by role (case-insensitive)
+    if (roleLower === 'student') {
+      if (!isStudentEmail(email)) {
+        return res.status(400).json({ message: 'Students must use @student.guc.edu.eg email to sign up' });
+      }
+    } else {
+      if (!isGucEmail(email)) {
+        return res.status(400).json({ message: 'Please use your @guc.edu.eg email to sign up' });
+      }
     }
 
     // Check law el user mwgod abl kda
@@ -39,7 +74,7 @@ exports.signupUser = async (req, res) => {
       lastName,
       email,
       password,
-      role,
+      role: roleCanonical,
       studentStaffId,
       verificationToken,
       isVerified: false // el Student byakhod email verification, el ba2y byestanno admin approval
@@ -140,6 +175,20 @@ exports.login = async (req, res) => {
           ? 'Please verify your email before logging in.' 
           : 'Your account is pending admin approval.'
       });
+    }
+
+    // Enforce domain by role for Users (not Vendors)
+    if (!isVendor) {
+      const userRoleLower = String(user.role || '').toLowerCase();
+      if (userRoleLower === 'student') {
+        if (!isStudentEmail(email)) {
+          return res.status(403).json({ message: 'Students must sign in with @student.guc.edu.eg email.' });
+        }
+      } else {
+        if (!isGucEmail(email)) {
+          return res.status(403).json({ message: 'Please use your @guc.edu.eg email to sign in.' });
+        }
+      }
     }
 
     // generate el JWT token

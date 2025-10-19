@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import EventsList from "../EventList";
+import MyEventsList from "../Functions/MyEventsList";
+import adminService from "../../services/adminService";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -28,14 +30,8 @@ function EventOfficeDashboard() {
 
   const fetchVendorRequests = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5001/api/vendor-applications/pending", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      setVendorRequests(Array.isArray(data) ? data : []);
+      const res = await adminService.listPendingVendorApplications();
+      setVendorRequests(res.applications || []);
     } catch (err) {
       console.error("Error fetching vendor requests:", err);
       setVendorRequests([]);
@@ -75,24 +71,13 @@ function EventOfficeDashboard() {
 
   const handleVendorRequestAction = async (requestId, action) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5001/api/vendor-applications/${requestId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: action }),
-      });
-      if (res.ok) {
-        alert(`Vendor request ${action}ed successfully!`);
-        fetchVendorRequests();
-      } else {
-        alert("Failed to update vendor request");
-      }
+      const notes = window.prompt('Optional notes (press Enter to skip)') || undefined;
+      await adminService.reviewVendorApplication(requestId, action, notes);
+      alert(`Vendor request ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      fetchVendorRequests();
     } catch (err) {
       console.error("Error updating vendor request:", err);
-      alert("Error updating vendor request");
+      alert(err?.message || "Error updating vendor request");
     }
   };
 
@@ -515,7 +500,7 @@ function EventOfficeDashboard() {
                       </div>
                       <div style={{ display: "flex", gap: "10px" }}>
                         <button
-                          onClick={() => handleVendorRequestAction(request._id, "approved")}
+                          onClick={() => handleVendorRequestAction(request._id, "approve")}
                           style={{
                             padding: "10px 20px",
                             background: "#10b981",
@@ -529,7 +514,7 @@ function EventOfficeDashboard() {
                           Approve
                         </button>
                         <button
-                          onClick={() => handleVendorRequestAction(request._id, "rejected")}
+                          onClick={() => handleVendorRequestAction(request._id, "reject")}
                           style={{
                             padding: "10px 20px",
                             background: "#ef4444",

@@ -99,7 +99,7 @@ function VendorDashboard() {
       const token = localStorage.getItem("token");
       let endpoint = "";
 
-      // Corrected endpoints
+      // Endpoints + local filtering by status where needed
       switch (type) {
         case "all":
           endpoint = "http://localhost:5001/api/vendor/applications/mine";
@@ -108,10 +108,10 @@ function VendorDashboard() {
           endpoint = "http://localhost:5001/api/vendor/applications/participating/upcoming";
           break;
         case "pending":
-          endpoint = "http://localhost:5001/api/vendor/applications/requests/upcoming"; // Fixed endpoint
+          endpoint = "http://localhost:5001/api/vendor/applications/requests/upcoming";
           break;
-        case "rejected": // Add this if you want rejected applications
-          endpoint = "http://localhost:5001/api/vendor/applications/rejected";
+        case "rejected":
+          endpoint = "http://localhost:5001/api/vendor/applications/requests/upcoming";
           break;
         default:
           endpoint = "http://localhost:5001/api/vendor/applications/mine";
@@ -132,18 +132,25 @@ function VendorDashboard() {
       const data = await res.json();
       console.log(`Applications (${type}) Response:`, data);
       
-      // Handle different response formats
+      // Normalize array from various shapes
       let applicationsData = [];
-      if (data.success) {
+      if (data && data.success) {
         applicationsData = data.applications || data.requests || data.data || [];
       } else if (Array.isArray(data)) {
         applicationsData = data;
-      } else if (Array.isArray(data.applications)) {
+      } else if (data && Array.isArray(data.applications)) {
         applicationsData = data.applications;
-      } else if (Array.isArray(data.requests)) {
+      } else if (data && Array.isArray(data.requests)) {
         applicationsData = data.requests;
       }
-      
+
+      // Local filter by status for pending/rejected
+      if (type === 'pending') {
+        applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'pending');
+      } else if (type === 'rejected') {
+        applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'rejected');
+      }
+
       setApplications(applicationsData);
       
       if (applicationsData.length === 0) {
@@ -455,6 +462,26 @@ function VendorDashboard() {
               >
                 Pending
               </button>
+              <button
+                onClick={() => setActiveApplicationTab("rejected")}
+                style={{
+                  padding: "12px 16px",
+                  background:
+                    activeApplicationTab === "rejected"
+                      ? "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)"
+                      : "transparent",
+                  color: activeApplicationTab === "rejected" ? "white" : "#6b7280",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontSize: "0.9rem",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                  minWidth: "120px",
+                }}
+              >
+                Rejected
+              </button>
             </div>
           )}
 
@@ -463,10 +490,16 @@ function VendorDashboard() {
             <EventsList filterByTypes={["Bazaar", "Booth"]}/>
           )}
           {activeTab === "upcoming" && activeUpcomingTab === "bazaars" && (
-            <MyEventsList events={upcomingBazaars} title="Upcoming Bazaars" />
+            <MyEventsList
+              events={(upcomingBazaars || []).map(e => ({ ...e, date: e.startDate }))}
+              title="Upcoming Bazaars"
+            />
           )}
           {activeTab === "upcoming" && activeUpcomingTab === "booths" && (
-            <MyEventsList events={upcomingBooths} title="Upcoming Booths" />
+            <MyEventsList
+              events={(upcomingBooths || []).map(e => ({ ...e, date: e.startDate }))}
+              title="Upcoming Booths"
+            />
           )}
           {activeTab === "my-applications" && (
             <div>
@@ -484,7 +517,7 @@ function VendorDashboard() {
                 </div>
               ) : (
                 <MyEventsList 
-                  events={applications} 
+                  events={(applications || []).map(a => ({ ...(a?.event || {}), date: a?.event?.startDate, status: a?.status }))} 
                   title={`${activeApplicationTab.charAt(0).toUpperCase() + activeApplicationTab.slice(1)} Applications`}
                   emptyMessage={`No ${activeApplicationTab} applications found.`}
                 />

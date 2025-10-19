@@ -134,7 +134,15 @@ exports.createAdminAccount = async (req, res) => {
             });
         }
 
-        const existingUser = await User.findOne({ email });
+        // Enforce GUC email for these roles
+        const emailLower = (email || '').toLowerCase();
+        if (!emailLower.endsWith('@guc.edu.eg')) {
+            return res.status(400).json({
+                message: 'Please use a GUC email when creating Admin/EventOffice accounts.'
+            });
+        }
+
+        const existingUser = await User.findOne({ email: emailLower });
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists with this email.' });
         }
@@ -143,7 +151,7 @@ exports.createAdminAccount = async (req, res) => {
         const newUser = await User.create({
             firstName,
             lastName,
-            email,
+            email: emailLower,
             password,  // Plain text - will be hashed by pre-save hook
             role,
             isVerified: true,
