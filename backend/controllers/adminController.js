@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const sendEmail = require('../utils/sendEmail');
+const { sendVerificationEmail } = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
@@ -73,34 +73,42 @@ exports.assignUserRole = async (req, res) => {
         }
 
         user.role = role;
-        user.isVerified = true;
-        //user.verificationToken = crypto.randomBytes(32).toString('hex');
-        await user.save();
-/*
-        const verifyUrl = `${process.env.FRONTEND_URL}/verify/${user.verificationToken}`;
+        
+        // For Staff, TA, and Professor: generate verification token and send email after admin approval
+        // Students get email on signup, so no need to send again
+        // Admin and EventOffice don't need email verification
+        const rolesRequiringEmailVerification = ['Staff', 'TA', 'Professor'];
+        if (rolesRequiringEmailVerification.includes(role)) {
+            // Generate verification token 3ashan el email verification
+            const verificationToken = crypto.randomBytes(32).toString('hex');
+            user.verificationToken = verificationToken;
+            // Don't set isVerified to true yet - user needs to verify email first
+            user.isVerified = false;
+            
+            await user.save();
+            
+            // Send verification email
+            try {
+                await sendVerificationEmail(user, verificationToken);
+            } catch (emailError) {
+                console.error('Error sending verification email:', emailError);
+                // Continue even if email fails
+            }
+        } else if (role === 'Student') {
+            // For Students: they already got email on signup, just keep their current verification status
+            // Don't change isVerified or verificationToken - let them verify via email they already received
+            await user.save();
+        } else {
+            // For Admin and EventOffice, verify immediately without email
+            user.isVerified = true;
+            user.verificationToken = undefined;
+            await user.save();
+        }
 
-        const subject = 'Verify Your Account';
-        const message = `
-      <p>Hello ${user.firstName || ''} ${user.lastName || ''},</p>
-
-      <p>Your registration request has been approved, and your role has been set to <strong>${role}</strong>.</p>
-
-      <p>Please verify your account by clicking the link below:</p>
-      <p><a href="${verifyUrl}" target="_blank">Verify My Account</a></p>
-
-      <p>Once verified, you will be redirected to the login page.</p>
-
-      <p>Best regards,<br>University Events Management Team</p>
-    `;
-
-        await sendEmail({
-            email: user.email,
-            subject,
-            message
-        });
-*/
         return res.status(200).json({
-            message: `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`,
+            message: rolesRequiringEmailVerification.includes(role)
+                ? `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`
+                : `Role '${role}' assigned successfully.`,
             user: {
                 id: user._id,
                 email: user.email,

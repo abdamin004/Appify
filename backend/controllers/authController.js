@@ -2,7 +2,7 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const jwt = require('jsonwebtoken'); // da el JSON Web Token library eli byet3mel beha el authentication
 const crypto = require('crypto'); // da el crypto library eli byestakhdem fe hashing w encryption
-const sendEmail = require('../utils/sendEmail');
+const { sendVerificationEmail } = require("../utils/sendEmail");
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -70,8 +70,12 @@ exports.signupUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // generate random verification token 3ashan el email verification
-    const verificationToken = crypto.randomBytes(32).toString('hex');
+    // For Students: generate verification token and send email immediately
+    // For Staff/TA/Professor: wait for admin approval before sending email
+    let verificationToken;
+    if (roleLower === 'student') {
+      verificationToken = crypto.randomBytes(32).toString('hex');
+    }
 
     // Create el user fe el database
     const user = await User.create({
@@ -82,15 +86,23 @@ exports.signupUser = async (req, res) => {
       role: roleCanonical,
       studentStaffId,
       verificationToken,
-      isVerified: false // el Student byakhod email verification, el ba2y byestanno admin approval
+      isVerified: false
     });
 
-    
-
+    // Send verification email immediately for Students only
+    if (roleLower === 'student') {
+      await sendVerificationEmail(user, verificationToken);
       res.status(201).json({
         success: true,
         message: 'User registered successfully. Please check your email for verification.'
       });
+    } else {
+      // Staff/TA/Professor need to wait for admin approval
+      res.status(201).json({
+        success: true,
+        message: 'User registered successfully. Your account is pending admin approval. You will receive a verification email once approved.'
+      });
+    }
     
   } catch (error) {
     console.error(error);
@@ -176,9 +188,7 @@ exports.login = async (req, res) => {
     // check law el user verified (for users bs, msh vendors)
     if (!isVendor && !user.isVerified) {
       return res.status(403).json({ 
-        message: user.role === 'Student' 
-          ? 'Please verify your email before logging in.' 
-          : 'Your account is pending admin approval.'
+        message: 'Please verify your email before logging in. Check your email for the verification link.'
       });
     }
 
@@ -260,6 +270,7 @@ exports.verifyEmail = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // @desc    Logout el user
 // @route   POST /api/auth/logout
