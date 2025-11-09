@@ -77,5 +77,13 @@ router.post(
     vendorCtrl.applyToLoyaltyProgram
 );
 
+// Cancel loyalty application (only vendor who created it)
+router.post(
+    '/loyalty/:id/cancel',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.cancelLoyaltyApplication
+);
+
 
 module.exports = router;
