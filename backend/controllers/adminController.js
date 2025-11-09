@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const sendEmail = require('../utils/sendEmail');
+const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEmail, sendVendorApplicationRejectionEmail } = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
@@ -73,34 +73,42 @@ exports.assignUserRole = async (req, res) => {
         }
 
         user.role = role;
-        user.isVerified = true;
-        //user.verificationToken = crypto.randomBytes(32).toString('hex');
-        await user.save();
-/*
-        const verifyUrl = `${process.env.FRONTEND_URL}/verify/${user.verificationToken}`;
+        
+        // For Staff, TA, and Professor: generate verification token and send email after admin approval
+        // Students get email on signup, so no need to send again
+        // Admin and EventOffice don't need email verification
+        const rolesRequiringEmailVerification = ['Staff', 'TA', 'Professor'];
+        if (rolesRequiringEmailVerification.includes(role)) {
+            // Generate verification token 3ashan el email verification
+            const verificationToken = crypto.randomBytes(32).toString('hex');
+            user.verificationToken = verificationToken;
+            // Don't set isVerified to true yet - user needs to verify email first
+            user.isVerified = false;
+            
+            await user.save();
+            
+            // Send verification email
+            try {
+                await sendVerificationEmail(user, verificationToken);
+            } catch (emailError) {
+                console.error('Error sending verification email:', emailError);
+                // Continue even if email fails
+            }
+        } else if (role === 'Student') {
+            // For Students: they already got email on signup, just keep their current verification status
+            // Don't change isVerified or verificationToken - let them verify via email they already received
+            await user.save();
+        } else {
+            // For Admin and EventOffice, verify immediately without email
+            user.isVerified = true;
+            user.verificationToken = undefined;
+            await user.save();
+        }
 
-        const subject = 'Verify Your Account';
-        const message = `
-      <p>Hello ${user.firstName || ''} ${user.lastName || ''},</p>
-
-      <p>Your registration request has been approved, and your role has been set to <strong>${role}</strong>.</p>
-
-      <p>Please verify your account by clicking the link below:</p>
-      <p><a href="${verifyUrl}" target="_blank">Verify My Account</a></p>
-
-      <p>Once verified, you will be redirected to the login page.</p>
-
-      <p>Best regards,<br>University Events Management Team</p>
-    `;
-
-        await sendEmail({
-            email: user.email,
-            subject,
-            message
-        });
-*/
         return res.status(200).json({
-            message: `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`,
+            message: rolesRequiringEmailVerification.includes(role)
+                ? `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`
+                : `Role '${role}' assigned successfully.`,
             user: {
                 id: user._id,
                 email: user.email,
@@ -193,7 +201,6 @@ exports.deleteAdminAccount = async (req, res) => {
         }
 
         await User.findByIdAndDelete(id);
-
         res.status(200).json({
             success: true,
             message: `${user.role} account (${user.email}) deleted successfully.`,
@@ -248,13 +255,30 @@ exports.blockUser = async (req, res) => {
 exports.deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const comment = await Comment.findById(id);
+    const comment = await Comment.findById(id).populate('user', 'email firstName lastName');
+    
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found.' });
     }
 
+    // Store user and content before deletion
+    const user = comment.user;
+    const commentContent = comment.content;
+
+    // Delete the comment
     await Comment.findByIdAndDelete(id);
+    
+    // Send warning email with the populated user (don't fail if email fails)
+    if (user && user.email) {
+      try {
+        await sendWarningEmail(user, commentContent);
+      } catch (emailError) {
+        console.error('Failed to send warning email:', emailError);
+        // Continue even if email fails - comment is already deleted
+      }
+    } else {
+      console.warn('Could not send warning email: user not found or missing email');
+    }
 
     res.status(200).json({
       success: true,
@@ -295,7 +319,11 @@ exports.reviewVendorApplication = async (req, res) => {
       return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
     }
 
-    const app = await VendorApplication.findById(id).populate('event', 'title type').populate('organization', 'name');
+    // Populate vendorUser to get email and companyName, and event to get full details
+    const app = await VendorApplication.findById(id)
+      .populate('event', 'title type startDate endDate location')
+      .populate('vendorUser', 'email companyName');
+    
     if (!app) return res.status(404).json({ message: 'Application not found' });
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
@@ -310,6 +338,7 @@ exports.reviewVendorApplication = async (req, res) => {
       ? `Your application for ${app.event.type} '${app.event.title}' has been approved.`
       : `Your application for ${app.event.type} '${app.event.title}' has been rejected.`;
 
+    // Create notification
     try {
       await Notification.create({
         type: notifType,
@@ -319,10 +348,26 @@ exports.reviewVendorApplication = async (req, res) => {
         recipientModel: 'Vendor',
         application: app._id,
         event: app.event._id,
-        organization: app.organization._id,
+        // organization is a String in VendorApplication, but Notification expects ObjectId, so we omit it
       });
     } catch (notifyErr) {
       console.error('Failed to create vendor notification:', notifyErr?.message || notifyErr);
+    }
+
+    // Send email notification to vendor
+    if (app.vendorUser && app.vendorUser.email) {
+      try {
+        if (action === 'approve') {
+          await sendVendorApplicationApprovalEmail(app.vendorUser, app, app.event);
+        } else {
+          await sendVendorApplicationRejectionEmail(app.vendorUser, app, app.event);
+        }
+      } catch (emailError) {
+        console.error('Failed to send vendor application email:', emailError);
+        // Don't fail the whole operation if email fails
+      }
+    } else {
+      console.warn('Vendor user or email not found for application:', id);
     }
 
     res.status(200).json({ success: true, message: `Application ${newStatus}.`, application: app });

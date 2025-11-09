@@ -7,7 +7,9 @@ const Trip = require('../models/Trip');
 const Bazaar = require('../models/Bazaar');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
+const Comment = require('../models/Comment');
 const { ObjectId } = require('mongoose').Types;
+const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -421,13 +423,24 @@ async unregisterFromEvent(req, res) {
     async updateEvent(req, res) {
         try {
             const {id} = req.params;
-            const event = await Event.findById(id);
+            const event = await Event.findById(id).populate('registeredUsers', 'email firstName lastName');
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
             if (event.startDate <= new Date()) {
                 return res.status(400).json({ error: 'Cannot update an event that has already started' });
             }
+            
+            // Store original values for comparison (especially for gym sessions)
+            const originalEvent = {
+                status: event.status,
+                startDate: event.startDate,
+                endDate: event.endDate,
+                location: event.location,
+                sessionType: event.sessionType,
+                instructor: event.instructor,
+                capacity: event.capacity
+            };
             
             const {
                 title, shortDescription, description, category, tags, startDate, endDate, 
@@ -483,6 +496,78 @@ async unregisterFromEvent(req, res) {
 
             const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true })
                 .populate({ path: 'vendors', options: { strictPopulate: false } });
+            
+            // Send email notifications for gym sessions
+            if (event.type === 'GymSession' && event.registeredUsers && event.registeredUsers.length > 0) {
+                // Check if session was cancelled
+                if (status === 'cancelled' && originalEvent.status !== 'cancelled') {
+                    // Send cancellation emails to all registered users
+                    const emailPromises = event.registeredUsers
+                        .filter(user => user && user.email)
+                        .map(user => {
+                            try {
+                                return sendGymSessionCancellationEmail(user, updatedEvent || event);
+                            } catch (emailError) {
+                                console.error(`Failed to send cancellation email to ${user.email}:`, emailError);
+                                return Promise.resolve(); // Don't fail the whole operation
+                            }
+                        });
+                    await Promise.allSettled(emailPromises);
+                } 
+                // Check if session was edited (not cancelled)
+                else if (status !== 'cancelled' && originalEvent.status !== 'cancelled') {
+                    // Detect changes - only check fields that were actually provided in the request
+                    const changes = [];
+                    
+                    if (startDate !== undefined) {
+                        const newStart = new Date(startDate).getTime();
+                        const oldStart = new Date(originalEvent.startDate).getTime();
+                        if (newStart !== oldStart) {
+                            changes.push(`Start date changed to ${new Date(startDate).toLocaleString()}`);
+                        }
+                    }
+                    
+                    if (endDate !== undefined) {
+                        const newEnd = new Date(endDate).getTime();
+                        const oldEnd = originalEvent.endDate ? new Date(originalEvent.endDate).getTime() : null;
+                        if (newEnd !== oldEnd) {
+                            changes.push(`End date changed to ${new Date(endDate).toLocaleString()}`);
+                        }
+                    }
+                    
+                    if (location !== undefined && location !== originalEvent.location) {
+                        changes.push(`Location changed to ${location}`);
+                    }
+                    
+                    if (sessionType !== undefined && sessionType !== originalEvent.sessionType) {
+                        changes.push(`Session type changed to ${sessionType}`);
+                    }
+                    
+                    if (instructor !== undefined && instructor !== originalEvent.instructor) {
+                        changes.push(`Instructor changed to ${instructor}`);
+                    }
+                    
+                    if (capacity !== undefined && capacity !== originalEvent.capacity) {
+                        changes.push(`Capacity changed to ${capacity}`);
+                    }
+                    
+                    // Only send update email if there are actual changes
+                    if (changes.length > 0) {
+                        const emailPromises = event.registeredUsers
+                            .filter(user => user && user.email)
+                            .map(user => {
+                                try {
+                                    return sendGymSessionUpdateEmail(user, updatedEvent || event, changes);
+                                } catch (emailError) {
+                                    console.error(`Failed to send update email to ${user.email}:`, emailError);
+                                    return Promise.resolve(); // Don't fail the whole operation
+                                }
+                            });
+                        await Promise.allSettled(emailPromises);
+                    }
+                }
+            }
+            
             res.status(200).json({
                 success: true,
                 message: 'Event updated successfully',
@@ -547,5 +632,39 @@ async unregisterFromEvent(req, res) {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
-}
+    },
+    async addComment(req, res) {
+        try {
+            const { eventId } = req.params;
+            const { content } = req.body;
+            const userId = req.user._id;
+            
+            // First check if the event exists
+            const eventObj = await Event.findById(eventId);
+            if (!eventObj) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
+            
+            // Check if the user is registered/attending this event before creating comment
+            // Assuming event has a registeredUsers array of user IDs
+            if (!eventObj.registeredUsers || !eventObj.registeredUsers.some(u => u.toString() === userId.toString())) {
+                return res.status(403).json({ success: false, message: 'You must be registered for this event to comment.' });
+            }
+            
+            // Only create comment if validation passes
+            const comment = await Comment.create({ content, event: eventId, user: userId });
+            res.status(201).json({ success: true, message: 'Comment added successfully', comment });
+        } catch (err) {
+            res.status(500).json({ success: false, message: err.message });
+        }
+    },
+    async deleteComment(req, res) {
+        try {
+            const { commentId } = req.params;
+            const comment = await Comment.findByIdAndDelete(commentId);
+            res.status(200).json({ success: true, message: 'Comment deleted successfully', comment });
+        } catch (err) {
+            res.status(500).json({ success: false, message: err.message });
+        }
+    }
 };
