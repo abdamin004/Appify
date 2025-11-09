@@ -61,4 +61,21 @@ router.get(
   vendorCtrl.listUpcomingRequests
 );
 
+// Cancel a vendor application (only if not paid)
+router.post(
+    '/vendor-applications/:id/cancel',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.cancelVendorApplication
+);
+
+// Vendor applies to GUC loyalty program
+router.post(
+    '/loyalty/apply',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.applyToLoyaltyProgram
+);
+
+
 module.exports = router;

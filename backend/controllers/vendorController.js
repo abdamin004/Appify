@@ -3,6 +3,7 @@ const Event = require('../models/Event');       // base model with discriminator
 const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
+const LoyaltyApplication = require('../models/LoyaltyApplication');
 
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
@@ -242,4 +243,87 @@ exports.listUpcomingRequests = async (req, res, next) => {
   } catch (e) {
     next(e);
   }
+};
+
+
+exports.cancelVendorApplication = async (req, res) => {
+    try {
+        const applicationId = req.params.id;
+        const vendorId = req.user._id; // from auth
+
+        // 1) find the application
+        const application = await VendorApplication.findById(applicationId);
+        if (!application) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+
+        // 2) ensure this is the vendor who created it
+        if (application.vendorUser.toString() !== vendorId.toString()) {
+            return res.status(403).json({ message: 'You cannot cancel someone else’s application' });
+        }
+
+        // 3) block if paid
+        if (application.paid) {
+            return res.status(400).json({ message: 'Cannot cancel: payment already completed.' });
+        }
+
+        // 4) mark as cancelled
+        application.status = 'cancelled';
+        await application.save();
+
+        return res.json({ message: 'Application cancelled successfully.', application });
+    } catch (err) {
+        console.error('cancelVendorApplication error:', err);
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+// Vendor applies to GUC loyalty program
+//reads the form fields you said: discount rate, promo code, terms and conditions ties it to the logged -in vendor(req.user._id),saves it as pending for review
+
+exports.applyToLoyaltyProgram = async (req, res, next) => {
+    try {
+        const vendorId = req.user._id;
+        const {
+            organization,
+            discountRate,
+            promoCode,
+            termsAndConditions
+        } = req.body;
+
+        // basic validation
+        if (!organization) {
+            return res.status(400).json({ success: false, message: 'Organization is required' });
+        }
+        if (discountRate == null || isNaN(discountRate) || discountRate < 0 || discountRate > 100) {
+            return res.status(400).json({ success: false, message: 'Discount rate must be between 0 and 100' });
+        }
+        if (!promoCode) {
+            return res.status(400).json({ success: false, message: 'Promo code is required' });
+        }
+        if (!termsAndConditions) {
+            return res.status(400).json({ success: false, message: 'Terms and conditions are required' });
+        }
+
+        // extra: prevent duplicate applications by same vendor
+        const existing = await LoyaltyApplication.findOne({ vendorUser: vendorId, promoCode });
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'You already applied with this promo code' });
+        }
+
+        const app = await LoyaltyApplication.create({
+            vendorUser: vendorId,
+            organization,
+            discountRate,
+            promoCode,
+            termsAndConditions
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Loyalty program application submitted',
+            application: app
+        });
+    } catch (err) {
+        next(err);
+    }
 };
