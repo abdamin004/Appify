@@ -38,3 +38,5 @@ logs/
 # Testing
 coverage/
 .nyc_output/
+
+.vs/
