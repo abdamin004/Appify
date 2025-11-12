@@ -9,18 +9,31 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (user, token) => {
-  // Construct backend URL - use BACKEND_URL if set, otherwise construct from PORT
-  const backendUrl = `http://localhost:5001`;
-  const verifyURL = `${backendUrl}/api/auth/verify/${token}`;
+  const frontendUrl =
+    (process.env.FRONTEND_URL && process.env.FRONTEND_URL.replace(/\/$/, '')) ||
+    'http://localhost:3000';
+  const verifyFrontendURL = `${frontendUrl}/verify/${token}`;
 
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: user.email,
     subject: "Verify your email",
     html: `
-      <h3>Welcome ${user.firstName}!</h3>
-      <p>Please verify your email by clicking the link below:</p>
-      <a href="${verifyURL}">${verifyURL}</a>
+      <h2 style="font-family: Arial, sans-serif; color: #0f172a;">Welcome ${user.firstName}!</h2>
+      <p style="font-family: Arial, sans-serif; color: #475569;">
+        Please confirm your email address to activate your Appify Events account.
+      </p>
+      <p style="text-align: center; margin: 32px 0;">
+        <a href="${verifyFrontendURL}"
+           style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff;
+                  text-decoration: none; border-radius: 6px; font-weight: 600; font-family: Arial, sans-serif;">
+          Verify Email
+        </a>
+      </p>
+      <p style="font-family: Arial, sans-serif; color: #475569;">
+        Or open this link in your browser:<br />
+        <a href="${verifyFrontendURL}" style="color: #2563eb;">${verifyFrontendURL}</a>
+      </p>
     `,
   });
 };
