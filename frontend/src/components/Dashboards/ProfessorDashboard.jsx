@@ -9,6 +9,7 @@ function ProfessorDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
   const [myWorkshops, setMyWorkshops] = useState([]);
+  const [registeredEvents, setRegisteredEvents] = useState([]);
   const [user, setUser] = useState({ firstName: "Professor", lastName: "" });
 
   useEffect(() => {
@@ -25,11 +26,14 @@ function ProfessorDashboard() {
     };
     loadUser();
     fetchMyWorkshops();
+    fetchRegisteredEvents();
   }, []);
 
   useEffect(() => {
     if (activeTab === "my-workshops" && myWorkshops.length === 0) {
       fetchMyWorkshops();
+    } else if (activeTab === "registered" && registeredEvents.length === 0) {
+      fetchRegisteredEvents();
     }
   }, [activeTab]);
 
@@ -53,6 +57,25 @@ function ProfessorDashboard() {
     } catch (err) {
       console.error("Error fetching my workshops:", err);
       setMyWorkshops([]);
+    }
+  };
+
+  const fetchRegisteredEvents = async () => {
+    try {
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        setRegisteredEvents([]);
+        return;
+      }
+      const data = await res.json();
+      setRegisteredEvents(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setRegisteredEvents([]);
     }
   };
 
@@ -257,6 +280,26 @@ function ProfessorDashboard() {
               🏋️ Gym Sessions
             </button>
             <button
+              onClick={() => setActiveTab("registered")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "registered"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "registered" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ✓ My Registered Events
+            </button>
+            <button
               onClick={() => setActiveTab("my-workshops")}
               style={{
                 flex: 1,
@@ -280,6 +323,7 @@ function ProfessorDashboard() {
 
           {/* Content */}
           {activeTab === "browse" && <EventsList />}
+          {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
           {activeTab === "my-workshops" && <MyEventsList events={myWorkshops} />}
         </div>
       </div>
