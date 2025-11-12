@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { useState } from "react";
 import ChooseRole from "./components/ChooseRole"; // make sure path is correct
 import Login from "./components/Auth/Login";
+import VerifyEmail from "./components/Auth/VerifyEmail";
 import VendorDashboard from "./components/Dashboards/VendorDashboard";
 import StudentDashboard from "./components/Dashboards/StudentDashboard";
 import Navbar from "./components/Navbar";
@@ -55,6 +56,7 @@ function App() {
             path="/Login" 
             element={<Login onLogin={handleLogin} />} 
           />
+          <Route path="/verify/:token" element={<VerifyEmail />} />
           
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
