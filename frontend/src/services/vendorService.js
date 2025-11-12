@@ -1,4 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 async function fetchJson(url, opts = {}) {
   const token = localStorage.getItem('token') || '';
@@ -15,6 +15,18 @@ export const applyToEvent = (eventId, payload) => fetchJson(`${API_BASE}/vendor/
 export const listOrganizations = () => fetchJson(`${API_BASE}/vendor/organizations`);
 export const listUpcomingBazaars = () => fetchJson(`${API_BASE}/vendor/bazaars/upcoming`);
 export const listUpcomingBooths = () => fetchJson(`${API_BASE}/vendor/booths/upcoming`);
+export const cancelVendorApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/vendor-applications/${applicationId}/cancel`, { method: 'POST' });
+export const applyToLoyaltyProgram = (payload) => fetchJson(`${API_BASE}/vendor/loyalty/apply`, { method: 'POST', body: JSON.stringify(payload) });
+export const cancelLoyaltyApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/loyalty/${applicationId}/cancel`, { method: 'POST' });
 
-const vendorService = { requestBooth, applyToEvent, listOrganizations, listUpcomingBazaars, listUpcomingBooths };
+const vendorService = { 
+  requestBooth, 
+  applyToEvent, 
+  listOrganizations, 
+  listUpcomingBazaars, 
+  listUpcomingBooths,
+  cancelVendorApplication,
+  applyToLoyaltyProgram,
+  cancelLoyaltyApplication
+};
 export default vendorService;

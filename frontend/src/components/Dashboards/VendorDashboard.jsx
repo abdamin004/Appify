@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import vendorService from "../../services/vendorService";
+import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
+import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
 
 function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
@@ -10,6 +13,7 @@ function VendorDashboard() {
   const [upcomingBooths, setUpcomingBooths] = useState([]);
   const [applications, setApplications] = useState([]);
   const [loadingApplications, setLoadingApplications] = useState(false);
+  const [showLoyaltyForm, setShowLoyaltyForm] = useState(false);
   const [user, setUser] = useState({ 
     companyName: "", 
     firstName: "Vendor",
@@ -97,24 +101,25 @@ function VendorDashboard() {
     setLoadingApplications(true);
     try {
       const token = localStorage.getItem("token");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       let endpoint = "";
 
       // Endpoints + local filtering by status where needed
       switch (type) {
         case "all":
-          endpoint = "http://localhost:5001/api/vendor/applications/mine";
+          endpoint = `${API_BASE}/vendor/applications/mine`;
           break;
         case "approved":
-          endpoint = "http://localhost:5001/api/vendor/applications/participating/upcoming";
+          endpoint = `${API_BASE}/vendor/applications/participating/upcoming`;
           break;
         case "pending":
-          endpoint = "http://localhost:5001/api/vendor/applications/requests/upcoming";
+          endpoint = `${API_BASE}/vendor/applications/requests/upcoming`;
           break;
         case "rejected":
-          endpoint = "http://localhost:5001/api/vendor/applications/requests/upcoming";
+          endpoint = `${API_BASE}/vendor/applications/requests/upcoming`;
           break;
         default:
-          endpoint = "http://localhost:5001/api/vendor/applications/mine";
+          endpoint = `${API_BASE}/vendor/applications/mine`;
       }
 
       console.log(`Fetching ${type} applications from:`, endpoint);
@@ -161,6 +166,20 @@ function VendorDashboard() {
       setApplications([]);
     } finally {
       setLoadingApplications(false);
+    }
+  };
+
+  const handleCancelApplication = async (applicationId) => {
+    if (!window.confirm('Are you sure you want to cancel this application? This action cannot be undone if payment has been completed.')) {
+      return;
+    }
+
+    try {
+      await vendorService.cancelVendorApplication(applicationId);
+      alert('Application cancelled successfully');
+      fetchApplications(activeApplicationTab);
+    } catch (err) {
+      alert(err.message || 'Failed to cancel application. Make sure payment has not been completed.');
     }
   };
 
@@ -328,6 +347,27 @@ function VendorDashboard() {
               }}
             >
               📋 My Applications
+            </button>
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                padding: "15px 20px",
+                background:
+                  activeTab === "loyalty"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                minWidth: "180px",
+              }}
+            >
+              ⭐ Loyalty Program
             </button>
           </div>
 
@@ -516,11 +556,147 @@ function VendorDashboard() {
                   <p style={{ color: "#6b7280" }}>Please wait while we fetch your {activeApplicationTab} applications.</p>
                 </div>
               ) : (
-                <MyEventsList 
-                  events={(applications || []).map(a => ({ ...(a?.event || {}), date: a?.event?.startDate, status: a?.status }))} 
-                  title={`${activeApplicationTab.charAt(0).toUpperCase() + activeApplicationTab.slice(1)} Applications`}
-                  emptyMessage={`No ${activeApplicationTab} applications found.`}
+                <div>
+                  <div style={{ 
+                    background: "rgba(255,255,255,0.95)", 
+                    padding: "30px", 
+                    borderRadius: "20px", 
+                    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                    marginBottom: "30px"
+                  }}>
+                    {applications.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "40px" }}>
+                        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>📭</div>
+                        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>No Applications</h3>
+                        <p style={{ color: "#6b7280" }}>You don't have any {activeApplicationTab} applications yet.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "30px" }}>
+                        {applications.map((app) => (
+                          <div key={app._id} style={{ 
+                            background: "#f9fafb", 
+                            borderRadius: "15px", 
+                            padding: "20px",
+                            border: "2px solid #e5e7eb"
+                          }}>
+                            <div style={{ marginBottom: "15px" }}>
+                              <h4 style={{ fontSize: "1.2rem", color: "#003366", marginBottom: "10px" }}>
+                                {app.event?.title || "Event"}
+                              </h4>
+                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+                                <span style={{
+                                  padding: "6px 12px",
+                                  background: app.status === "approved" ? "rgba(34, 197, 94, 0.15)" : 
+                                             app.status === "pending" ? "rgba(251, 191, 36, 0.15)" :
+                                             "rgba(239, 68, 68, 0.15)",
+                                  color: app.status === "approved" ? "#22c55e" : 
+                                         app.status === "pending" ? "#fbbf24" : "#ef4444",
+                                  borderRadius: "6px",
+                                  fontSize: "0.85rem",
+                                  fontWeight: "600",
+                                  textTransform: "capitalize"
+                                }}>
+                                  {app.status}
+                                </span>
+                                {app.paid && (
+                                  <span style={{
+                                    padding: "6px 12px",
+                                    background: "rgba(59, 130, 246, 0.15)",
+                                    color: "#3b82f6",
+                                    borderRadius: "6px",
+                                    fontSize: "0.85rem",
+                                    fontWeight: "600"
+                                  }}>
+                                    Paid
+                                  </span>
+                                )}
+                              </div>
+                              {app.event?.startDate && (
+                                <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+                                  📅 {new Date(app.event.startDate).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                            {app.status === "pending" && !app.paid && (
+                              <button
+                                onClick={() => handleCancelApplication(app._id)}
+                                style={{
+                                  width: "100%",
+                                  padding: "10px",
+                                  background: "#fee2e2",
+                                  color: "#dc2626",
+                                  border: "1px solid #fecaca",
+                                  borderRadius: "8px",
+                                  fontSize: "0.9rem",
+                                  fontWeight: "600",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                Cancel Application
+                              </button>
+                            )}
+                            {app.paid && (
+                              <p style={{ color: "#6b7280", fontSize: "0.85rem", fontStyle: "italic" }}>
+                                Cannot cancel: Payment completed
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {activeTab === "loyalty" && (
+            <div>
+              {showLoyaltyForm ? (
+                <LoyaltyProgramForm
+                  onSuccess={() => {
+                    setShowLoyaltyForm(false);
+                    alert('Loyalty program application submitted successfully!');
+                  }}
+                  onCancel={() => setShowLoyaltyForm(false)}
                 />
+              ) : (
+                <div>
+                  <div style={{
+                    background: "rgba(255,255,255,0.95)",
+                    padding: "30px",
+                    borderRadius: "20px",
+                    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                    marginBottom: "30px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <div>
+                      <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "8px" }}>
+                        GUC Loyalty Program
+                      </h3>
+                      <p style={{ color: "#6b7280" }}>
+                        Apply to join the GUC loyalty program and offer discounts to students
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowLoyaltyForm(true)}
+                      style={{
+                        padding: "14px 28px",
+                        background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                        color: "#003366",
+                        border: "none",
+                        borderRadius: "12px",
+                        fontSize: "1rem",
+                        fontWeight: "700",
+                        cursor: "pointer"
+                      }}
+                    >
+                      + Apply to Loyalty Program
+                    </button>
+                  </div>
+                  <LoyaltyApplicationsList onRefresh={() => {}} />
+                </div>
               )}
             </div>
           )}
