@@ -327,3 +327,41 @@ exports.applyToLoyaltyProgram = async (req, res, next) => {
         next(err);
     }
 };
+
+
+// Cancel a vendor's loyalty program application
+exports.cancelLoyaltyApplication = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const vendorId = req.user._id; // from auth middleware
+
+        // Find the loyalty application
+        const application = await LoyaltyApplication.findById(id);
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Loyalty application not found' });
+        }
+
+        // Ensure this vendor owns the application
+        if (application.vendorUser.toString() !== vendorId.toString()) {
+            return res.status(403).json({ success: false, message: 'You cannot cancel another vendor’s application' });
+        }
+
+        // Only pending applications can be cancelled
+        if (application.status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Only pending applications can be cancelled' });
+        }
+
+        // Mark as cancelled
+        application.status = 'cancelled';
+        await application.save();
+
+        return res.json({
+            success: true,
+            message: 'Loyalty application cancelled successfully',
+            application
+        });
+    } catch (error) {
+        console.error('Error cancelling loyalty application:', error);
+        return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
