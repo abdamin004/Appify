@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const { sendVerificationEmail } = require('../utils/sendEmail');
+const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEmail, sendVendorApplicationRejectionEmail } = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
@@ -201,7 +201,6 @@ exports.deleteAdminAccount = async (req, res) => {
         }
 
         await User.findByIdAndDelete(id);
-
         res.status(200).json({
             success: true,
             message: `${user.role} account (${user.email}) deleted successfully.`,
@@ -256,13 +255,30 @@ exports.blockUser = async (req, res) => {
 exports.deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const comment = await Comment.findById(id);
+    const comment = await Comment.findById(id).populate('user', 'email firstName lastName');
+    
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found.' });
     }
 
+    // Store user and content before deletion
+    const user = comment.user;
+    const commentContent = comment.content;
+
+    // Delete the comment
     await Comment.findByIdAndDelete(id);
+    
+    // Send warning email with the populated user (don't fail if email fails)
+    if (user && user.email) {
+      try {
+        await sendWarningEmail(user, commentContent);
+      } catch (emailError) {
+        console.error('Failed to send warning email:', emailError);
+        // Continue even if email fails - comment is already deleted
+      }
+    } else {
+      console.warn('Could not send warning email: user not found or missing email');
+    }
 
     res.status(200).json({
       success: true,
@@ -303,7 +319,11 @@ exports.reviewVendorApplication = async (req, res) => {
       return res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
     }
 
-    const app = await VendorApplication.findById(id).populate('event', 'title type').populate('organization', 'name');
+    // Populate vendorUser to get email and companyName, and event to get full details
+    const app = await VendorApplication.findById(id)
+      .populate('event', 'title type startDate endDate location')
+      .populate('vendorUser', 'email companyName');
+    
     if (!app) return res.status(404).json({ message: 'Application not found' });
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
@@ -318,6 +338,7 @@ exports.reviewVendorApplication = async (req, res) => {
       ? `Your application for ${app.event.type} '${app.event.title}' has been approved.`
       : `Your application for ${app.event.type} '${app.event.title}' has been rejected.`;
 
+    // Create notification
     try {
       await Notification.create({
         type: notifType,
@@ -327,10 +348,26 @@ exports.reviewVendorApplication = async (req, res) => {
         recipientModel: 'Vendor',
         application: app._id,
         event: app.event._id,
-        organization: app.organization._id,
+        // organization is a String in VendorApplication, but Notification expects ObjectId, so we omit it
       });
     } catch (notifyErr) {
       console.error('Failed to create vendor notification:', notifyErr?.message || notifyErr);
+    }
+
+    // Send email notification to vendor
+    if (app.vendorUser && app.vendorUser.email) {
+      try {
+        if (action === 'approve') {
+          await sendVendorApplicationApprovalEmail(app.vendorUser, app, app.event);
+        } else {
+          await sendVendorApplicationRejectionEmail(app.vendorUser, app, app.event);
+        }
+      } catch (emailError) {
+        console.error('Failed to send vendor application email:', emailError);
+        // Don't fail the whole operation if email fails
+      }
+    } else {
+      console.warn('Vendor user or email not found for application:', id);
     }
 
     res.status(200).json({ success: true, message: `Application ${newStatus}.`, application: app });

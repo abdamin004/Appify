@@ -16,6 +16,10 @@ router.delete('/delete/:id', auth, roleCheck('Admin', 'EventOffice'), eventContr
 // Get my workshops
 router.get('/workshops/mine', auth, roleCheck('Professor'), eventController.getMyWorkshops);
 
+// Comment routes
+router.post('/comment/:eventId', auth, eventController.addComment);
+router.delete('/comment/:commentId', auth, eventController.deleteComment);
+
 // Get all events
 router.get('/', eventController.getAllEvents);
 
@@ -39,6 +43,7 @@ router.post('/unregister/:eventId', auth, eventController.unregisterFromEvent);
 
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
+
 
 
 module.exports = router;
