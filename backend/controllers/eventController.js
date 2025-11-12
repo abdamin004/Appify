@@ -9,6 +9,7 @@ const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
 const { ObjectId } = require('mongoose').Types;
+const Rating = require('../models/Rating');
 const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
@@ -49,6 +50,18 @@ async function attachApprovedParticipants(events) {
 }
 
 module.exports = {
+    // GET /events/:id - Get a single event by id
+    async getEventById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
+            const event = await Event.findById(id).populate({ path: 'vendors', options: { strictPopulate: false } });
+            if (!event) return res.status(404).json({ message: 'Event not found' });
+            res.json(event);
+        } catch (err) {
+            res.status(500).json({ message: err.message });
+        }
+    },
     // POST /events/create - Create a new event
     async createEvent(req, res) {
         try {
@@ -132,24 +145,13 @@ module.exports = {
 
     async getAllEvents(req, res) {
         try {
-            const now = new Date();
-            let events;
-            try {
-                events = await Event.find({
-                    status: 'published',
-                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                })
+            // Show all published events (past and future)
+            const events = await Event.find({ status: 'published' })
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .sort({ startDate: 1 })
                 .exec();
-            } catch (e) {
-                // Fallback if $toDate not supported
-                events = await Event.find({ status: 'published', startDate: { $gte: now } })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } })
-                  .exec();
-            }
-
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -159,7 +161,6 @@ module.exports = {
         try {
             const { q } = req.query;
             const regex = new RegExp(q || '', 'i');
-            const now = new Date();
             const baseMatch = {
                 status: 'published',
                 $or: [
@@ -169,19 +170,12 @@ module.exports = {
                     { category: regex }
                 ]
             };
-            let events;
-            try {
-                events = await Event.find({
-                    ...baseMatch,
-                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } });
-            } catch (e) {
-                events = await Event.find({ ...baseMatch, startDate: { $gte: now } })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } });
-            }
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const events = await Event.find(baseMatch)
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .sort({ startDate: 1 })
+                .exec();
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -203,25 +197,15 @@ module.exports = {
                   .sort({ startDate: 1 })
                   .exec();
             } else {
-                const now = new Date();
-                try {
-                    events = await Event.find({
-                        ...base,
-                        $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                    })
-                      .populate({ path: 'vendors', options: { strictPopulate: false } })
-                      .sort({ startDate: 1 })
-                      .exec();
-                } catch (e) {
-                    events = await Event.find({ ...base, startDate: { $gte: now } })
-                      .populate({ path: 'vendors', options: { strictPopulate: false } })
-                      .sort({ startDate: 1 })
-                      .exec();
-                }
+                // No startDate filter provided: include all published events (past and future)
+                events = await Event.find(base)
+                  .populate({ path: 'vendors', options: { strictPopulate: false } })
+                  .sort({ startDate: 1 })
+                  .exec();
             }
 
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -665,6 +649,55 @@ async unregisterFromEvent(req, res) {
             res.status(200).json({ success: true, message: 'Comment deleted successfully', comment });
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
+        }
+    }
+    ,
+    // GET /events/:id/comments - list comments for event
+    async getEventComments(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
+            const comments = await Comment.find({ event: id })
+                .populate('user', 'firstName lastName email role')
+                .sort({ createdAt: -1 });
+            res.json(comments);
+        } catch (err) {
+            res.status(500).json({ message: err.message });
+        }
+    },
+    // GET /events/:id/ratings - aggregate ratings for event
+    async getEventRatings(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
+            const ratings = await Rating.find({ event: id }).populate('user', 'firstName lastName role');
+            const count = ratings.length;
+            const total = ratings.reduce((sum, r) => sum + (r.value || 0), 0);
+            const average = count > 0 ? (total / count) : 0;
+            const histogram = [1,2,3,4,5].reduce((acc,v)=>{ acc[v]=ratings.filter(r=>r.value===v).length; return acc; },{});
+            res.json({ average, count, histogram, ratings });
+        } catch (err) {
+            res.status(500).json({ message: err.message });
+        }
+    },
+    // POST /events/:id/rate - set or update current user's rating
+    async setRating(req, res) {
+        try {
+            const { id } = req.params;
+            const { value } = req.body;
+            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
+            const v = Number(value);
+            if (!v || v < 1 || v > 5) return res.status(400).json({ message: 'Rating value must be 1-5' });
+            const userId = req.user && req.user._id;
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+            const doc = await Rating.findOneAndUpdate(
+                { event: id, user: userId },
+                { $set: { value: v } },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+            res.json({ success: true, rating: doc });
+        } catch (err) {
+            res.status(500).json({ message: err.message });
         }
     }
 };

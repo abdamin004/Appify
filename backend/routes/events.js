@@ -44,6 +44,15 @@ router.post('/unregister/:eventId', auth, eventController.unregisterFromEvent);
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
 
+// Set or update rating by current user
+router.post('/:id/rate', auth, eventController.setRating);
+
+// Public: get comments and ratings for an event
+router.get('/:id/comments', eventController.getEventComments);
+router.get('/:id/ratings', eventController.getEventRatings);
+// Get one event by id (keep generic route last)
+router.get('/:id', eventController.getEventById);
+
 
 
 module.exports = router;

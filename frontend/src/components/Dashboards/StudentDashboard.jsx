@@ -4,12 +4,14 @@ import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsList from "../Functions/CourtsList";
 import { API_BASE } from "../../services/eventService";
+import { getFavouriteIds } from "../../services/favoritesService";
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [courts, setCourts] = useState([]);
   const [presetType, setPresetType] = useState("");
+  const [favouriteEvents, setFavouriteEvents] = useState([]);
 
   const storedUser = localStorage.getItem("user");
   const user = storedUser
@@ -27,6 +29,8 @@ function StudentDashboard() {
       fetchRegisteredEvents();
     } else if (activeTab === "courts" && courts.length === 0) {
       fetchCourts();
+    } else if (activeTab === "favourites") {
+      fetchFavourites();
     }
   }, [activeTab]);
 
@@ -83,6 +87,20 @@ function StudentDashboard() {
     } catch (err) {
       console.error(err);
       setCourts([]);
+    }
+  };
+
+  const fetchFavourites = async () => {
+    try {
+      const ids = getFavouriteIds().map(String);
+      if (!ids.length) { setFavouriteEvents([]); return; }
+      const res = await fetch(`${API_BASE}/events`);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      const filtered = list.filter(ev => ids.includes(String(ev._id || ev.id)));
+      setFavouriteEvents(filtered);
+    } catch (e) {
+      setFavouriteEvents([]);
     }
   };
 
@@ -301,6 +319,27 @@ function StudentDashboard() {
             </button>
 
             <button
+              onClick={() => setActiveTab("favourites")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "favourites"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "favourites" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ♥ Favourites
+            </button>
+
+            <button
               onClick={() => setActiveTab("courts")}
               style={{
                 flex: 1,
@@ -324,8 +363,9 @@ function StudentDashboard() {
           </div>
 
           {/* Content */}
-          {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} />}
+          {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />}
           {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
+          {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
           {activeTab === "courts" && <CourtsList courts={courts} />}
         </div>
       </div>

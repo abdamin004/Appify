@@ -122,3 +122,28 @@ export async function listGymSessions() {
 export function deleteEvent(id) {
   return http('DELETE', `${API_BASE}/events/delete/${id}`);
 }
+
+// Event details + comments/ratings
+export async function getEventById(id) {
+  const res = await fetch(`${API_BASE}/events/${id}`);
+  return res.json();
+}
+export async function getEventComments(id) {
+  const res = await fetch(`${API_BASE}/events/${id}/comments`);
+  return res.json();
+}
+export async function getEventRatings(id) {
+  const res = await fetch(`${API_BASE}/events/${id}/ratings`);
+  return res.json();
+}
+export function rateEvent(id, value) {
+  return http('POST', `${API_BASE}/events/${id}/rate`, { value });
+}
+
+// Comments (auth required to add/delete)
+export function addEventComment(eventId, content) {
+  return http('POST', `${API_BASE}/events/comment/${eventId}`, { content });
+}
+export function deleteEventComment(commentId) {
+  return http('DELETE', `${API_BASE}/events/comment/${commentId}`);
+}

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import EventList from "../EventList"; // Import the EventList component
+import MyEventsList from "../Functions/MyEventsList";
+import { API_BASE } from "../../services/eventService";
+import { getFavouriteIds } from "../../services/favoritesService";
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, upcoming, allevents
+  const [filter, setFilter] = useState("all"); // all, upcoming, allevents, favourites
+  const [favouriteEvents, setFavouriteEvents] = useState([]);
 
   // Mock user data - in production this would come from auth context/props
   const user = { 
@@ -19,11 +23,23 @@ function TADashboard() {
     fetchRegisteredEvents();
   }, []);
 
+  useEffect(() => {
+    if (filter === 'favourites') fetchFavourites();
+  }, [filter]);
+
   const fetchRegisteredEvents = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5001/api/events/registered");
-      const data = await response.json();
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        setRegisteredEvents([]);
+        return;
+      }
+      const data = await res.json();
       setRegisteredEvents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching registered events:", err);
@@ -64,6 +80,20 @@ function TADashboard() {
   });
 
   const upcomingCount = registeredEvents.filter(isUpcoming).length;
+
+  const fetchFavourites = async () => {
+    try {
+      const ids = getFavouriteIds().map(String);
+      if (!ids.length) { setFavouriteEvents([]); return; }
+      const res = await fetch(`${API_BASE}/events`);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      const filtered = list.filter(ev => ids.includes(String(ev._id || ev.id)));
+      setFavouriteEvents(filtered);
+    } catch (_) {
+      setFavouriteEvents([]);
+    }
+  };
 
   const EventCard = ({ event }) => {
     const upcoming = isUpcoming(event);
@@ -292,6 +322,24 @@ function TADashboard() {
             ))}
 
             <button
+              onClick={() => setFilter('favourites')}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: filter === 'favourites' ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
+                color: filter === 'favourites' ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ♥ Favourites
+            </button>
+
+            <button
               onClick={() => (window.location.href = "/register-events")}
               style={{
                 flex: 1,
@@ -332,7 +380,9 @@ function TADashboard() {
 
           {/* Events List */}
           {filter === "allevents" ? (
-            <EventList />
+            <EventList enableFavorites={true} />
+          ) : filter === 'favourites' ? (
+            <MyEventsList events={favouriteEvents} />
           ) : loading ? (
             <div
               style={{
@@ -353,37 +403,8 @@ function TADashboard() {
                 Loading your registered events...
               </div>
             </div>
-          ) : filteredEvents.length > 0 ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
-                gap: "24px",
-              }}
-            >
-              {filteredEvents.map((event) => (
-                <EventCard key={event._id || event.id} event={event} />
-              ))}
-            </div>
           ) : (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "80px 20px",
-                background: "rgba(255,255,255,0.95)",
-                borderRadius: "16px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              }}
-            >
-              <div style={{ fontSize: "4rem", marginBottom: "20px" }}>📅</div>
-              <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "8px", fontWeight: "600" }}>
-                {filter === "upcoming" && "No upcoming events"}
-                {filter === "all" && "No registered events"}
-              </h3>
-              <p style={{ fontSize: "1.1rem", color: "#6b7280", margin: 0 }}>
-                {filter === "all" ? "You haven't registered for any workshops or trips yet" : ""}
-              </p>
-            </div>
+            <MyEventsList events={filteredEvents} />
           )}
         </div>
       </div>

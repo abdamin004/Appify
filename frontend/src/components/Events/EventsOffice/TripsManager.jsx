@@ -47,17 +47,58 @@ function TripsManager() {
   const [editData, setEditData] = useState({});
 
   async function refresh() { const rows = await listTrips(); setTrips(rows); }
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { 
+    refresh(); 
+    // Debug: Check authentication status
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      try {
+        const userObj = JSON.parse(user);
+        console.log('🔐 Current user:', userObj.email, 'Role:', userObj.role);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    } else {
+      console.warn('⚠️ No authentication token or user data found');
+    }
+  }, []);
 
   const onCreate = async (e) => {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
+      // Check if user is logged in
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      if (!token || !user) {
+        setError('You must be logged in to create a trip. Please log in and try again.');
+        setLoading(false);
+        return;
+      }
+      
+      // Log user info for debugging
+      try {
+        const userObj = JSON.parse(user);
+        console.log('Creating trip as user:', userObj.email, 'Role:', userObj.role);
+      } catch (e) {}
+      
       await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
       setSuccess('Trip created');
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
       await refresh();
-    } catch (err) { setError(err.message || 'Failed to create'); }
+    } catch (err) { 
+      console.error('Error creating trip:', err);
+      const errorMsg = err.message || 'Failed to create trip';
+      if (errorMsg.includes('Forbidden') || errorMsg.includes('403')) {
+        setError('Access denied. Please ensure you are logged in as an Event Office, Admin, or Professor account.');
+      } else if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
+        setError('Session expired. Please log in again.');
+      } else {
+        setError(errorMsg);
+      }
+    }
     finally { setLoading(false); }
   };
 
