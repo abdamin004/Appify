@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
 
-const LoyaltyApplicationsList = ({ onRefresh }) => {
+const LoyaltyApplicationsList = () => {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,10 +14,8 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
     setLoading(true);
     setError('');
     try {
-      // Note: Backend doesn't have a list endpoint, so we'll need to add one
-      // For now, we'll show a message that this feature needs backend support
-      setError('Backend endpoint for listing loyalty applications is not yet implemented. Please contact admin.');
-      setApplications([]);
+      const data = await vendorService.listMyLoyaltyApplications();
+      setApplications(data.applications || []);
     } catch (err) {
       setError(err.message || 'Failed to fetch loyalty applications');
       setApplications([]);
@@ -33,10 +31,24 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
 
     try {
       await vendorService.cancelLoyaltyApplication(applicationId);
-      if (onRefresh) onRefresh();
+      alert('Loyalty application cancelled successfully');
       fetchApplications();
     } catch (err) {
       alert(err.message || 'Failed to cancel application');
+    }
+  };
+
+  const handleDelete = async (applicationId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this cancelled loyalty application? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await vendorService.deleteLoyaltyApplication(applicationId);
+      alert('Loyalty application deleted successfully');
+      fetchApplications();
+    } catch (err) {
+      alert(err.message || 'Failed to delete application. Only cancelled applications can be deleted.');
     }
   };
 
@@ -71,7 +83,7 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
     );
   }
 
-  if (error && !applications.length) {
+  if (error && applications.length === 0) {
     return (
       <div style={{
         background: 'rgba(255,255,255,0.95)',
@@ -142,7 +154,7 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h4 style={{ fontSize: '1.2rem', color: '#003366', marginBottom: '8px' }}>
                     {app.organization}
                   </h4>
@@ -180,23 +192,42 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
                     </span>
                   </div>
                 </div>
-                {app.status === 'pending' && (
-                  <button
-                    onClick={() => handleCancel(app._id)}
-                    style={{
-                      padding: '8px 16px',
-                      background: '#fee2e2',
-                      color: '#dc2626',
-                      border: '1px solid #fecaca',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {app.status === 'pending' && (
+                    <button
+                      onClick={() => handleCancel(app._id)}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  {app.status === 'cancelled' && (
+                    <button
+                      onClick={() => handleDelete(app._id)}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ marginTop: '15px' }}>
                 <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '8px', fontWeight: '600' }}>
@@ -220,4 +251,3 @@ const LoyaltyApplicationsList = ({ onRefresh }) => {
 };
 
 export default LoyaltyApplicationsList;
-

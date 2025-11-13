@@ -53,7 +53,11 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         endpoint = `${API_BASE}/events/filter`;
       }
 
-      const response = await fetch(`${endpoint}?${queryParams}`);
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const response = await fetch(`${endpoint}?${queryParams}`, { headers });
       const data = await response.json();
       const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       setEvents(list);

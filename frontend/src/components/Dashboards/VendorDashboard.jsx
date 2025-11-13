@@ -14,6 +14,7 @@ function VendorDashboard() {
   const [applications, setApplications] = useState([]);
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [showLoyaltyForm, setShowLoyaltyForm] = useState(false);
+  const [loyaltyRefreshKey, setLoyaltyRefreshKey] = useState(0);
   const [user, setUser] = useState({ 
     companyName: "", 
     firstName: "Vendor",
@@ -50,7 +51,8 @@ function VendorDashboard() {
   const fetchUpcomingBazaars = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5001/api/vendor/bazaars/upcoming", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE}/vendor/bazaars/upcoming`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -75,7 +77,8 @@ function VendorDashboard() {
   const fetchUpcomingBooths = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5001/api/vendor/booths/upcoming", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE}/vendor/booths/upcoming`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -118,6 +121,10 @@ function VendorDashboard() {
         case "rejected":
           endpoint = `${API_BASE}/vendor/applications/requests/upcoming`;
           break;
+        case "cancelled":
+          // No dedicated endpoint; fetch all and filter locally
+          endpoint = `${API_BASE}/vendor/applications/mine`;
+          break;
         default:
           endpoint = `${API_BASE}/vendor/applications/mine`;
       }
@@ -149,11 +156,13 @@ function VendorDashboard() {
         applicationsData = data.requests;
       }
 
-      // Local filter by status for pending/rejected
+      // Local filter by status for pending/rejected/cancelled
       if (type === 'pending') {
         applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'pending');
       } else if (type === 'rejected') {
         applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'rejected');
+      } else if (type === 'cancelled') {
+        applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'cancelled');
       }
 
       setApplications(applicationsData);
@@ -170,7 +179,7 @@ function VendorDashboard() {
   };
 
   const handleCancelApplication = async (applicationId) => {
-    if (!window.confirm('Are you sure you want to cancel this application? This action cannot be undone if payment has been completed.')) {
+    if (!window.confirm('Are you sure you want to cancel this application? You will be able to apply again to this event if needed.')) {
       return;
     }
 
@@ -185,6 +194,19 @@ function VendorDashboard() {
 
   const handleRequestBooth = () => {
     window.location.href = "/vendor/request-booth";
+  };
+
+  const handleDeleteApplication = async (applicationId) => {
+    if (!window.confirm('Delete this cancelled application permanently? This cannot be undone.')) {
+      return;
+    }
+    try {
+      await vendorService.deleteVendorApplication(applicationId);
+      alert('Application deleted');
+      fetchApplications(activeApplicationTab);
+    } catch (err) {
+      alert(err.message || 'Failed to delete application');
+    }
   };
 
   const displayName = user.companyName || user.firstName || "Vendor";
@@ -522,6 +544,26 @@ function VendorDashboard() {
               >
                 Rejected
               </button>
+              <button
+                onClick={() => setActiveApplicationTab("cancelled")}
+                style={{
+                  padding: "12px 16px",
+                  background:
+                    activeApplicationTab === "cancelled"
+                      ? "linear-gradient(135deg, #6b7280 0%, #374151 100%)"
+                      : "transparent",
+                  color: activeApplicationTab === "cancelled" ? "white" : "#6b7280",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontSize: "0.9rem",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.3s",
+                  minWidth: "120px",
+                }}
+              >
+                Cancelled
+              </button>
             </div>
           )}
 
@@ -588,9 +630,12 @@ function VendorDashboard() {
                                   padding: "6px 12px",
                                   background: app.status === "approved" ? "rgba(34, 197, 94, 0.15)" : 
                                              app.status === "pending" ? "rgba(251, 191, 36, 0.15)" :
+                                             app.status === "cancelled" ? "rgba(107, 114, 128, 0.15)" :
                                              "rgba(239, 68, 68, 0.15)",
                                   color: app.status === "approved" ? "#22c55e" : 
-                                         app.status === "pending" ? "#fbbf24" : "#ef4444",
+                                         app.status === "pending" ? "#fbbf24" :
+                                         app.status === "cancelled" ? "#6b7280" :
+                                         "#ef4444",
                                   borderRadius: "6px",
                                   fontSize: "0.85rem",
                                   fontWeight: "600",
@@ -640,6 +685,25 @@ function VendorDashboard() {
                                 Cannot cancel: Payment completed
                               </p>
                             )}
+                            {app.status === "cancelled" && (
+                              <button
+                                onClick={() => handleDeleteApplication(app._id)}
+                                style={{
+                                  width: "100%",
+                                  padding: "10px",
+                                  background: "#f3f4f6",
+                                  color: "#374151",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "8px",
+                                  fontSize: "0.9rem",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                  marginTop: "8px"
+                                }}
+                              >
+                                Delete Application
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -655,6 +719,7 @@ function VendorDashboard() {
                 <LoyaltyProgramForm
                   onSuccess={() => {
                     setShowLoyaltyForm(false);
+                    setLoyaltyRefreshKey(prev => prev + 1); // Trigger refresh
                     alert('Loyalty program application submitted successfully!');
                   }}
                   onCancel={() => setShowLoyaltyForm(false)}
@@ -695,7 +760,7 @@ function VendorDashboard() {
                       + Apply to Loyalty Program
                     </button>
                   </div>
-                  <LoyaltyApplicationsList onRefresh={() => {}} />
+                  <LoyaltyApplicationsList key={loyaltyRefreshKey} />
                 </div>
               )}
             </div>

@@ -69,6 +69,14 @@ router.post(
     vendorCtrl.cancelVendorApplication
 );
 
+// Delete a cancelled vendor application
+router.delete(
+  '/vendor-applications/:id',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.deleteVendorApplication
+);
+
 // Vendor applies to GUC loyalty program
 router.post(
     '/loyalty/apply',
@@ -77,12 +85,28 @@ router.post(
     vendorCtrl.applyToLoyaltyProgram
 );
 
+// List my loyalty applications
+router.get(
+    '/loyalty/mine',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.listMyLoyaltyApplications
+);
+
 // Cancel loyalty application (only vendor who created it)
 router.post(
     '/loyalty/:id/cancel',
     auth,
     roleCheck('Vendor'),
     vendorCtrl.cancelLoyaltyApplication
+);
+
+// Delete a cancelled loyalty application
+router.delete(
+    '/loyalty/:id',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.deleteLoyaltyApplication
 );
 
 
