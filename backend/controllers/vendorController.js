@@ -4,7 +4,8 @@ const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
 const LoyaltyApplication = require('../models/LoyaltyApplication');
-
+const Vendor = require('../models/Vendor');
+const path = require('path');
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
@@ -129,9 +130,19 @@ exports.applyToEvent = async (req, res, next) => {
     if (!['2x2', '4x4'].includes(boothSize)) {
       return badReq(res, 'Invalid booth size (allowed: 2x2, 4x4)');
     }
-    if (attendees.length > 5) {
-      return badReq(res, 'Maximum 5 attendees allowed');
-    }
+      // Validate attendees (max 5, and must include ID number)
+      if (attendees.length > 5) {
+          return badReq(res, 'Maximum 5 attendees allowed');
+      }
+
+      for (const a of attendees) {
+          if (!a.name || !a.email || !a.idNumber) {
+              return badReq(res,
+                  'Each attendee must have name, email, and idNumber'
+              );
+          }
+      }
+
 
     // Booth-only rules
     if (ev.type === 'Booth') {
@@ -450,4 +461,42 @@ exports.deleteVendorApplication = async (req, res, next) => {
     console.error('Error deleting vendor application:', err);
     return res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
+};
+
+exports.uploadVendorDocuments = async (req, res, next) => {
+    try {
+        const vendorId = req.user._id;
+
+        const vendor = await Vendor.findById(vendorId);
+        if (!vendor) {
+            return res.status(404).json({ success: false, message: 'Vendor not found' });
+        }
+
+        // req.files is populated by multer.fields(...)
+        if (req.files && req.files.taxCard && req.files.taxCard[0]) {
+            const file = req.files.taxCard[0];
+            vendor.taxCardUrl = `/uploads/vendors/${file.filename}`;
+        }
+
+        if (req.files && req.files.logo && req.files.logo[0]) {
+            const file = req.files.logo[0];
+            vendor.logoUrl = `/uploads/vendors/${file.filename}`;
+        }
+
+        await vendor.save();
+
+        return res.json({
+            success: true,
+            message: 'Vendor documents uploaded successfully',
+            vendor: {
+                _id: vendor._id,
+                companyName: vendor.companyName,
+                taxCardUrl: vendor.taxCardUrl,
+                logoUrl: vendor.logoUrl
+            }
+        });
+    } catch (err) {
+        console.error('uploadVendorDocuments error:', err);
+        return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
 };

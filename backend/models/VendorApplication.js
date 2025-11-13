@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const attendeeSchema = new mongoose.Schema({
   name:  { type: String, required: true },
-  email: { type: String, required: true, lowercase: true }
+    email: { type: String, required: true, lowercase: true },
+    idNumber: { type: String, required: true } //new field for id number
 }, { _id: false });
 
 const vendorApplicationSchema = new mongoose.Schema({
