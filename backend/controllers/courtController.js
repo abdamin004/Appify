@@ -79,23 +79,30 @@ const reserveCourt = async (req, res) => {
       return res.status(400).json({ message: 'Cannot book a time slot in the past' });
     }
     
+    // Compose student display name
+    const studentName = [req.user && req.user.firstName, req.user && req.user.lastName]
+      .filter(Boolean)
+      .join(' ') || (req.user && req.user.email) || 'Student';
+
     // Book the slot
     slot.isBooked = true;
     slot.bookedBy = userId;
     slot.bookingRef = `BK-${Date.now()}-${userId.toString().slice(-6)}`;
+    slot.bookingName = studentName;
     
     await court.save();
     
     res.status(200).json({ 
       success: true, 
-      message: 'Court reserved successfully', 
+      message: `Court reserved successfully. Reserved by ${studentName}.`, 
       booking: {
         courtName: court.name,
         courtType: court.type,
         date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        bookingRef: slot.bookingRef
+        bookingRef: slot.bookingRef,
+        studentName: studentName
       }
     });
   } catch (error) {

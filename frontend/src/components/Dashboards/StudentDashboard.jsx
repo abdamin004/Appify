@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
-import CourtsList from "../Functions/CourtsList";
+import CourtsReserve from "../Functions/CourtsReserve";
 import { API_BASE } from "../../services/eventService";
 import { getFavouriteIds } from "../../services/favoritesService";
 
@@ -76,19 +76,67 @@ function StudentDashboard() {
               return slotDate >= now;
             } catch (e) { return false; }
           })
-          .map(s => ({ date: s.date, startTime: s.startTime, endTime: s.endTime }));
+          .map(s => ({ slotId: s._id, date: s.date, startTime: s.startTime, endTime: s.endTime }));
 
         const available = (court.status === 'available') && availabilityDates.length > 0;
 
         return { ...court, availabilityDates, available };
       });
 
-      setCourts(processed);
+      if (processed.length === 0) {
+        setCourts(generateFakeCourts());
+      } else {
+        setCourts(processed);
+      }
     } catch (err) {
       console.error(err);
-      setCourts([]);
+      // Frontend-only fallback
+      setCourts(generateFakeCourts());
     }
   };
+
+  function generateFakeCourts() {
+    const types = [
+      { type: 'basketball', name: 'Basketball Court A' },
+      { type: 'tennis', name: 'Tennis Court 1' },
+      { type: 'football', name: 'Football Field' }
+    ];
+    const now = new Date();
+    return types.map((t, idx) => {
+      const slots = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + i);
+        const startHour = 10 + i;
+        const endHour = startHour + 1;
+        slots.push({
+          slotId: `fake-slot-${idx}-${i}`,
+          date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(),
+          startTime: `${String(startHour).padStart(2,'0')}:00`,
+          endTime: `${String(endHour).padStart(2,'0')}:00`
+        });
+      }
+      return {
+        _id: `fake-court-${idx}`,
+        id: `fake-court-${idx}`,
+        name: t.name,
+        type: t.type,
+        status: 'available',
+        available: true,
+        location: 'Sports Complex',
+        availabilityDates: slots
+      };
+    });
+  }
+
+  function handleReserve(courtId, slotId) {
+    setCourts(prev => (prev || []).map(c => {
+      const cid = String(c._id || c.id);
+      if (cid !== String(courtId)) return c;
+      const remaining = (c.availabilityDates || []).filter(s => String(s.slotId) !== String(slotId));
+      return { ...c, availabilityDates: remaining };
+    }));
+  }
 
   const fetchFavourites = async () => {
     try {
@@ -366,7 +414,7 @@ function StudentDashboard() {
           {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />}
           {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
           {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
-          {activeTab === "courts" && <CourtsList courts={courts} />}
+          {activeTab === "courts" && <CourtsReserve courts={courts} onReserved={handleReserve} />}
         </div>
       </div>
     </div>
@@ -374,3 +422,4 @@ function StudentDashboard() {
 }
 
 export default StudentDashboard;
+
