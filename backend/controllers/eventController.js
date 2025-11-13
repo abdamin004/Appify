@@ -10,6 +10,7 @@ const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
 const { ObjectId } = require('mongoose').Types;
 const Rating = require('../models/Rating');
+const Payment = require('../models/Payment');
 const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
@@ -227,7 +228,23 @@ module.exports = {
                 path: 'registeredEvents',
                 populate: { path: 'vendors', options: { strictPopulate: false } }
             });
-            res.json(user.registeredEvents || []);
+            const events = Array.isArray(user?.registeredEvents) ? user.registeredEvents : [];
+            if (events.length === 0) return res.json([]);
+
+            const ids = events.map(e => e && e._id).filter(Boolean);
+            let paidSet = new Set();
+            try {
+                const payments = await Payment.find({ user: userId, event: { $in: ids }, status: 'paid' }).select('event');
+                paidSet = new Set(payments.map(p => String(p.event)));
+            } catch (_) { /* ignore payment lookup errors */ }
+
+            const enriched = events.map(e => {
+                if (!e) return e;
+                const obj = typeof e.toObject === 'function' ? e.toObject() : { ...e };
+                obj.paid = paidSet.has(String(e._id));
+                return obj;
+            });
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

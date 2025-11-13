@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { getEventComments, addEventComment } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
 import { FaStar } from "react-icons/fa";
+import PayDialog from "../Payments/PayDialog";
+import { refundAndCancel } from "../../services/paymentService";
 
 // Per-user ratings storage key (frontend-only persistence)
 const ratingsStorageKeyForUser = () => {
@@ -77,7 +79,7 @@ function RatingStars({ value = 0, onChange, disabled = false }) {
   );
 }
 
-function MyEventsList({ events }) {
+function MyEventsList({ events, showRefundButton = false }) {
   const [ratings, setRatings] = useState({});
   const [attendedSet, setAttendedSet] = useState(new Set(getAttendedIds().map(String)));
   const [openComments, setOpenComments] = useState({}); // { [eventId]: true }
@@ -85,6 +87,9 @@ function MyEventsList({ events }) {
   const [commentsLoading, setCommentsLoading] = useState({}); // { [eventId]: boolean }
   const [commentsError, setCommentsError] = useState({}); // { [eventId]: string }
   const [newCommentByEvent, setNewCommentByEvent] = useState({}); // { [eventId]: string }
+  const [payEvent, setPayEvent] = useState(null); // payment modal state
+  const [paidLocal, setPaidLocal] = useState(new Set());
+  const [refundedSet, setRefundedSet] = useState(new Set());
 
   useEffect(() => {
     setRatings(loadRatings());
@@ -100,6 +105,33 @@ function MyEventsList({ events }) {
   const getEnd = (evt) => evt?.event?.endDate || evt?.endDate;
   const getLocation = (evt) => evt?.location || evt?.event?.location;
   const getCapacity = (evt) => evt?.capacity || evt?.event?.capacity;
+  const getPrice = (evt) => {
+    const p = (evt?.event && (evt.event.price ?? evt.event.amount ?? evt.event.requiredBudget))
+      ?? (evt?.price ?? evt?.amount ?? evt?.requiredBudget)
+      ?? 0;
+    return Number(p) || 0;
+  };
+
+  async function handleRefundAndCancel(eventId) {
+    try {
+      const ok = window.confirm('Cancel your registration and refund to wallet?');
+      if (!ok) return;
+      const res = await refundAndCancel(eventId);
+      const msg = (res && (res.message || (`Refunded ${res.refunded ?? ''} to wallet. New balance: ${res.balance ?? ''}`))) || 'Registration cancelled and refunded to wallet.';
+      try {
+        const detail = { reason: 'refund', eventId, balance: res?.balance, amount: res?.refunded };
+        window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
+      } catch (_) {}
+      alert(msg);
+      // Locally mark refunded so Pay Now appears again immediately
+      try {
+        setRefundedSet(prev => new Set(prev).add(String(eventId)));
+        setPaidLocal(prev => { const next = new Set(prev); next.delete(String(eventId)); return next; });
+      } catch (_) {}
+    } catch (e) {
+      alert(e?.message || 'Refund failed');
+    }
+  }
 
   const setEventRating = (eventId, value) => {
     setRatings((prev) => {
@@ -229,6 +261,11 @@ function MyEventsList({ events }) {
         const capacity = getCapacity(evt);
         const allowed = canRate(evt);
         const current = ratings[id] || 0;
+        const price = getPrice(evt);
+        const serverPaid = Boolean(evt?.paymentStatus || evt?.paid || evt?.event?.paymentStatus || evt?.event?.paid);
+        const isPaid = (serverPaid && !refundedSet.has(String(id))) || paidLocal.has(String(id));
+        // Show payment for any registered event that is not paid and not past
+        const isPayable = !isPaid && !hasEventEnded(evt);
 
         return (
           <div
@@ -274,6 +311,21 @@ function MyEventsList({ events }) {
                 >
                   {type}
                 </span>
+                {isPayable && price > 0 && (
+                  <span
+                    title="Payment required"
+                    style={{
+                      padding: "6px 12px",
+                      background: "rgba(239,68,68,0.12)",
+                      color: "#ef4444",
+                      borderRadius: 8,
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Due: {price}
+                  </span>
+                )}
               </div>
               <h3
                 style={{
@@ -363,6 +415,24 @@ function MyEventsList({ events }) {
                 >
                   {attendedSet.has(String(id)) ? 'Attended' : 'Mark Attended'}
                 </button>
+                {isPayable && (
+                  <button
+                    type="button"
+                    onClick={() => setPayEvent(evt)}
+                    style={{
+                      marginLeft: 'auto',
+                      padding: '8px 12px',
+                      background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+                      color: '#003366',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Pay Now
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleComments(id)}
@@ -379,6 +449,23 @@ function MyEventsList({ events }) {
                 >
                   {openComments[id] ? 'Hide Comments' : 'Show Comments'}
                 </button>
+                {showRefundButton && isPaid && (
+                  <button
+                    type="button"
+                    onClick={() => handleRefundAndCancel(id)}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(239,68,68,0.12)',
+                      color: '#b91c1c',
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      borderRadius: 8,
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel & Refund
+                  </button>
+                )}
               </div>
 
               {openComments[id] && (
@@ -441,6 +528,16 @@ function MyEventsList({ events }) {
           </div>
         );
       })}
+      {payEvent && (
+        <PayDialog
+          open={!!payEvent}
+          event={payEvent}
+          onClose={() => setPayEvent(null)}
+          onSuccess={({ eventId }) => {
+            setPaidLocal(prev => new Set(prev).add(String(eventId)));
+          }}
+        />
+      )}
     </div>
   );
 }

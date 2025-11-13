@@ -4,6 +4,9 @@ import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
 import { API_BASE } from "../../services/eventService";
+import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
+import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
+import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 
 function StudentDashboard() {
@@ -12,6 +15,9 @@ function StudentDashboard() {
   const [courts, setCourts] = useState([]);
   const [presetType, setPresetType] = useState("");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [walletBalance, setWalletBalance] = useState(undefined);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
 
   const storedUser = localStorage.getItem("user");
   const user = storedUser
@@ -21,6 +27,71 @@ function StudentDashboard() {
   useEffect(() => {
     fetchRegisteredEvents();
     fetchCourts();
+    fetchWallet();
+  }, []);
+
+  // Listen to wallet updates from child dialogs (wallet pay/refund/top-up)
+  useEffect(() => {
+    const handler = () => { fetchWallet(); };
+    const onPaymentSuccess = (e) => {
+      try {
+        const amt = e?.detail?.amount;
+        const method = e?.detail?.method;
+        const raw = localStorage.getItem('user');
+        const u = raw ? JSON.parse(raw) : {};
+        const email = u?.email ? ` Receipt emailed to ${u.email}.` : '';
+        const m1 = method ? `${method} payment successful` : 'Payment successful';
+        const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
+        setBannerMsg(`${m1}${amtTxt}.${email}`);
+        setTimeout(() => setBannerMsg(''), 6000);
+      } catch (_) {}
+    };
+    window.addEventListener('wallet:updated', handler);
+    window.addEventListener('payment:success', onPaymentSuccess);
+    return () => {
+      window.removeEventListener('wallet:updated', handler);
+      window.removeEventListener('payment:success', onPaymentSuccess);
+    };
+  }, []);
+
+  // After Stripe redirect: if session_id or status=success present, confirm/send receipt and show banner
+  useEffect(() => {
+    (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        const sessionId = params.get('session_id');
+        const status = params.get('status');
+        const eventId = params.get('eventId');
+        if (sessionId) {
+          try { await confirmStripeReceipt(sessionId); } catch (_) {}
+          // Refresh registered events to reflect paid flag
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          // Banner message
+          try {
+            const raw = localStorage.getItem('user');
+            const u = raw ? JSON.parse(raw) : {};
+            const email = u?.email ? ` Receipt emailed to ${u.email}.` : '';
+            setBannerMsg(`Payment successful.${email}`);
+            setTimeout(() => setBannerMsg(''), 6000);
+          } catch (_) {}
+          // Clean the URL to avoid repeat calls on navigation
+          const url = new URL(window.location.href);
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, document.title, url.toString());
+        } else if (status === 'success') {
+          try {
+            if (eventId) { await sendManualReceipt(eventId); }
+          } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          setBannerMsg('Payment successful.');
+          setTimeout(() => setBannerMsg(''), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('status');
+          url.searchParams.delete('eventId');
+          window.history.replaceState({}, document.title, url.toString());
+        }
+      } catch (_) {}
+    })();
   }, []);
 
   // Fetch data when switching tabs
@@ -92,6 +163,16 @@ function StudentDashboard() {
       console.error(err);
       // Frontend-only fallback
       setCourts(generateFakeCourts());
+    }
+  };
+
+  const fetchWallet = async () => {
+    try {
+      const res = await apiGetWalletBalance();
+      const balance = (res && typeof res.balance === 'number') ? res.balance : undefined;
+      setWalletBalance(balance);
+    } catch (_) {
+      setWalletBalance(undefined);
     }
   };
 
@@ -171,6 +252,24 @@ function StudentDashboard() {
           zIndex: 1,
         }}
       >
+        {Boolean(bannerMsg) && (
+          <div style={{
+            position: 'fixed',
+            top: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#10b981',
+            color: '#fff',
+            borderRadius: 12,
+            padding: '12px 18px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+            zIndex: 9999,
+            fontWeight: 800,
+            letterSpacing: 0.3,
+          }}>
+            {bannerMsg}
+          </div>
+        )}
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header + Stats */}
           <div
@@ -268,6 +367,42 @@ function StudentDashboard() {
                   }}
                 >
                   Available Courts
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "rgba(212, 175, 55, 0.15)",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#003366",
+                  }}
+                >
+                  {typeof walletBalance === 'number' ? `${walletBalance} EGP` : '—'}
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#6b7280",
+                  }}
+                >
+                  Wallet Balance
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setTopUpOpen(true)}
+                    style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', color: '#003366', border: 'none', borderRadius: 8, fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    Add Funds
+                  </button>
                 </div>
               </div>
             </div>
@@ -412,11 +547,21 @@ function StudentDashboard() {
 
           {/* Content */}
           {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />}
-          {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
+          {activeTab === "registered" && <MyEventsList events={registeredEvents} showRefundButton />}
           {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
           {activeTab === "courts" && <CourtsReserve courts={courts} onReserved={handleReserve} />}
         </div>
       </div>
+      {topUpOpen && (
+        <TopUpDialog
+          open={topUpOpen}
+          onClose={() => setTopUpOpen(false)}
+          onSuccess={(res) => {
+            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
+            if (typeof next === 'number') setWalletBalance(next);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import EventList from "../EventList"; // Import the EventList component
 import MyEventsList from "../Functions/MyEventsList";
 import { API_BASE } from "../../services/eventService";
+import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
+import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 
 function TADashboard() {
@@ -9,6 +11,9 @@ function TADashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all, upcoming, allevents, favourites
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [walletBalance, setWalletBalance] = useState(undefined);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
 
   // Mock user data - in production this would come from auth context/props
   const user = { 
@@ -21,6 +26,56 @@ function TADashboard() {
 
   useEffect(() => {
     fetchRegisteredEvents();
+    fetchWallet();
+  }, []);
+
+  useEffect(() => {
+    const onWallet = () => { fetchWallet(); };
+    const onPaymentSuccess = (e) => {
+      try {
+        const amt = e?.detail?.amount;
+        const method = e?.detail?.method;
+        const m1 = method ? `${method} payment successful` : 'Payment successful';
+        const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
+        setBannerMsg(`${m1}${amtTxt}. Receipt emailed to you.`);
+        setTimeout(() => setBannerMsg(''), 6000);
+      } catch (_) {}
+    };
+    window.addEventListener('wallet:updated', onWallet);
+    window.addEventListener('payment:success', onPaymentSuccess);
+    return () => {
+      window.removeEventListener('wallet:updated', onWallet);
+      window.removeEventListener('payment:success', onPaymentSuccess);
+    };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        const sessionId = params.get('session_id');
+        const status = params.get('status');
+        const eventId = params.get('eventId');
+        if (sessionId) {
+          try { await confirmStripeReceipt(sessionId); } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          setBannerMsg('Payment successful. Receipt emailed to you.');
+          setTimeout(() => setBannerMsg(''), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, document.title, url.toString());
+        } else if (status === 'success') {
+          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          setBannerMsg('Payment successful.');
+          setTimeout(() => setBannerMsg(''), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('status');
+          url.searchParams.delete('eventId');
+          window.history.replaceState({}, document.title, url.toString());
+        }
+      } catch (_) {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -230,6 +285,11 @@ function TADashboard() {
       </div>
 
       <div style={{ padding: "80px 40px 80px" }}>
+        {Boolean(bannerMsg) && (
+          <div style={{ position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)', background: '#10b981', color: '#fff', borderRadius: 12, padding: '12px 18px', boxShadow: '0 10px 25px rgba(0,0,0,0.25)', zIndex: 9999, fontWeight: 800, letterSpacing: 0.3 }}>
+            {bannerMsg}
+          </div>
+        )}
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
           <div
@@ -281,6 +341,15 @@ function TADashboard() {
                   {upcomingCount}
                 </div>
                 <div style={{ fontSize: "0.9rem", color: "#6b7280", fontWeight: "500" }}>Upcoming Events</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+            <div style={{ padding: '10px 16px', background: 'rgba(212, 175, 55, 0.15)', borderRadius: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#003366' }}>{typeof walletBalance === 'number' ? `${walletBalance} EGP` : '—'}</div>
+              <div style={{ fontSize: '.85rem', color: '#6b7280' }}>Wallet Balance</div>
+              <div style={{ marginTop: 6 }}>
+                <button type='button' onClick={() => setTopUpOpen(true)} style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', color: '#003366', border: 'none', borderRadius: 8, fontWeight: 800, cursor: 'pointer' }}>Add Funds</button>
               </div>
             </div>
           </div>
@@ -404,12 +473,25 @@ function TADashboard() {
               </div>
             </div>
           ) : (
-            <MyEventsList events={filteredEvents} />
+            <MyEventsList events={filteredEvents} showRefundButton />
           )}
         </div>
       </div>
+      {topUpOpen && (
+        <TopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onSuccess={(res) => {
+          const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
+          if (typeof next === 'number') setWalletBalance(next);
+        }} />
+      )}
     </div>
   );
 }
 
 export default TADashboard;
+  const fetchWallet = async () => {
+    try {
+      const res = await apiGetWalletBalance();
+      const balance = (res && typeof res.balance === 'number') ? res.balance : undefined;
+      setWalletBalance(balance);
+    } catch (_) { setWalletBalance(undefined); }
+  };

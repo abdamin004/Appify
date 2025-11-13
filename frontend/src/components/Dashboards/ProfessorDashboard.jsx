@@ -4,6 +4,8 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import { API_BASE } from "../../services/eventService";
+import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
+import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 
 function ProfessorDashboard() {
@@ -13,6 +15,9 @@ function ProfessorDashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [favouriteEvents, setFavouriteEvents] = useState([]);
   const [user, setUser] = useState({ firstName: "Professor", lastName: "" });
+  const [walletBalance, setWalletBalance] = useState(undefined);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
 
   useEffect(() => {
     const loadUser = () => {
@@ -29,7 +34,62 @@ function ProfessorDashboard() {
     loadUser();
     fetchMyWorkshops();
     fetchRegisteredEvents();
+    fetchWallet();
   }, []);
+
+  // Wallet updates and payment success banner
+  useEffect(() => {
+    const onWallet = () => { fetchWallet(); };
+    const onPaymentSuccess = (e) => {
+      try {
+        const amt = e?.detail?.amount;
+        const method = e?.detail?.method;
+        const u = user || {};
+        const email = u?.email ? ` Receipt emailed to ${u.email}.` : '';
+        const m1 = method ? `${method} payment successful` : 'Payment successful';
+        const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
+        setBannerMsg(`${m1}${amtTxt}.${email}`);
+        setTimeout(() => setBannerMsg(''), 6000);
+      } catch (_) {}
+    };
+    window.addEventListener('wallet:updated', onWallet);
+    window.addEventListener('payment:success', onPaymentSuccess);
+    return () => {
+      window.removeEventListener('wallet:updated', onWallet);
+      window.removeEventListener('payment:success', onPaymentSuccess);
+    };
+  }, [user]);
+
+  // Stripe redirect confirm (session_id or status=success)
+  useEffect(() => {
+    (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        const sessionId = params.get('session_id');
+        const status = params.get('status');
+        const eventId = params.get('eventId');
+        if (sessionId) {
+          try { await confirmStripeReceipt(sessionId); } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
+          setBannerMsg(`Payment successful.${email}`);
+          setTimeout(() => setBannerMsg(''), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, document.title, url.toString());
+        } else if (status === 'success') {
+          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) {}
+          setBannerMsg('Payment successful.');
+          setTimeout(() => setBannerMsg(''), 6000);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('status');
+          url.searchParams.delete('eventId');
+          window.history.replaceState({}, document.title, url.toString());
+        }
+      } catch (_) {}
+    })();
+  }, [user]);
 
   useEffect(() => {
     if (activeTab === "my-workshops" && myWorkshops.length === 0) {
@@ -83,6 +143,16 @@ function ProfessorDashboard() {
     }
   };
 
+  const fetchWallet = async () => {
+    try {
+      const res = await apiGetWalletBalance();
+      const bal = (res && typeof res.balance === 'number') ? res.balance : undefined;
+      setWalletBalance(bal);
+    } catch (_) {
+      setWalletBalance(undefined);
+    }
+  };
+
   const handleCreateWorkshop = () => {
     try {
       navigate("/professor/workshops");
@@ -125,6 +195,11 @@ function ProfessorDashboard() {
           zIndex: 1,
         }}
       >
+        {Boolean(bannerMsg) && (
+          <div style={{ position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)', background: '#10b981', color: '#fff', borderRadius: 12, padding: '12px 18px', boxShadow: '0 10px 25px rgba(0,0,0,0.25)', zIndex: 9999, fontWeight: 800, letterSpacing: 0.3 }}>
+            {bannerMsg}
+          </div>
+        )}
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
           <div
@@ -222,6 +297,25 @@ function ProfessorDashboard() {
               >
                 + Create Workshop
               </a>
+
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "rgba(212, 175, 55, 0.15)",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#003366" }}>
+                  {typeof walletBalance === 'number' ? `${walletBalance} EGP` : '—'}
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>Wallet Balance</div>
+                <div style={{ marginTop: 8 }}>
+                  <button type="button" onClick={() => setTopUpOpen(true)} style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', color: '#003366', border: 'none', borderRadius: 8, fontWeight: 800, cursor: 'pointer' }}>
+                    Add Funds
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -361,11 +455,21 @@ function ProfessorDashboard() {
 
           {/* Content */}
           {activeTab === "browse" && <EventsList enableFavorites={true} />}
-          {activeTab === "registered" && <MyEventsList events={registeredEvents} />}
+          {activeTab === "registered" && <MyEventsList events={registeredEvents} showRefundButton />}
           {activeTab === "my-workshops" && <MyEventsList events={myWorkshops} />}
           {activeTab === 'favourites' && <MyEventsList events={favouriteEvents} />}
         </div>
       </div>
+      {topUpOpen && (
+        <TopUpDialog
+          open={topUpOpen}
+          onClose={() => setTopUpOpen(false)}
+          onSuccess={(res) => {
+            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
+            if (typeof next === 'number') setWalletBalance(next);
+          }}
+        />
+      )}
     </div>
   );
 }
