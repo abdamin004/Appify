@@ -144,7 +144,26 @@ exports.applyToEvent = async (req, res, next) => {
       }
     }
 
-    // Create the application. The (event, organization) unique index will prevent duplicates.
+    // Check if there's an existing application (including cancelled ones)
+    const existingApp = await VendorApplication.findOne({
+      event: ev._id,
+      organization: organization
+    });
+
+    // If there's an existing non-cancelled application, prevent duplicate
+    if (existingApp && existingApp.status !== 'cancelled') {
+      return res.status(409).json({ 
+        success: false, 
+        message: `Organization has already applied to this event (status: ${existingApp.status})` 
+      });
+    }
+
+    // If there's a cancelled application, delete it first to allow re-application
+    if (existingApp && existingApp.status === 'cancelled') {
+      await VendorApplication.findByIdAndDelete(existingApp._id);
+    }
+
+    // Create the application
     const app = await VendorApplication.create({
       event: ev._id,
       organization: organization,
@@ -172,7 +191,7 @@ exports.applyToEvent = async (req, res, next) => {
 
     return res.status(201).json({ success: true, message: 'Application submitted', application: app });
   } catch (e) {
-    // 11000 = duplicate key: unique index (event + organization) → already applied
+    // 11000 = duplicate key: unique index (event + organization) → should not happen now, but handle just in case
     if (e && e.code === 11000) {
       return res.status(409).json({ success: false, message: 'Organization has already applied to this event' });
     }
@@ -329,6 +348,19 @@ exports.applyToLoyaltyProgram = async (req, res, next) => {
 };
 
 
+// List my loyalty applications
+exports.listMyLoyaltyApplications = async (req, res, next) => {
+    try {
+        const vendorId = req.user._id;
+        const applications = await LoyaltyApplication.find({ vendorUser: vendorId })
+            .sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, applications });
+    } catch (error) {
+        console.error('Error listing loyalty applications:', error);
+        return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
 // Cancel a vendor's loyalty program application
 exports.cancelLoyaltyApplication = async (req, res, next) => {
     try {
@@ -343,7 +375,7 @@ exports.cancelLoyaltyApplication = async (req, res, next) => {
 
         // Ensure this vendor owns the application
         if (application.vendorUser.toString() !== vendorId.toString()) {
-            return res.status(403).json({ success: false, message: 'You cannot cancel another vendor’s application' });
+            return res.status(403).json({ success: false, message: 'You cannot cancel another vendor\'s application' });
         }
 
         // Only pending applications can be cancelled
@@ -364,4 +396,58 @@ exports.cancelLoyaltyApplication = async (req, res, next) => {
         console.error('Error cancelling loyalty application:', error);
         return res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
+};
+
+// Delete a cancelled loyalty application
+exports.deleteLoyaltyApplication = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const vendorId = req.user._id;
+
+        const application = await LoyaltyApplication.findById(id);
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Loyalty application not found' });
+        }
+
+        if (application.vendorUser.toString() !== vendorId.toString()) {
+            return res.status(403).json({ success: false, message: 'You cannot delete another vendor\'s application' });
+        }
+
+        if ((application.status || '').toLowerCase() !== 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Only cancelled applications can be deleted' });
+        }
+
+        await LoyaltyApplication.findByIdAndDelete(id);
+        return res.json({ success: true, message: 'Loyalty application deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting loyalty application:', error);
+        return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// Permanently delete a vendor application (only if it's cancelled and owned by the vendor)
+exports.deleteVendorApplication = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const vendorId = req.user._id;
+
+    const app = await VendorApplication.findById(id);
+    if (!app) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    if (app.vendorUser.toString() !== vendorId.toString()) {
+      return res.status(403).json({ success: false, message: 'You cannot delete another vendor\'s application' });
+    }
+
+    if ((app.status || '').toLowerCase() !== 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Only cancelled applications can be deleted' });
+    }
+
+    await VendorApplication.findByIdAndDelete(id);
+    return res.json({ success: true, message: 'Application deleted' });
+  } catch (err) {
+    console.error('Error deleting vendor application:', err);
+    return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
 };
