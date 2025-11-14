@@ -500,3 +500,37 @@ exports.uploadVendorDocuments = async (req, res, next) => {
         return res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 };
+
+const LoyaltyApplication = require('../models/LoyaltyApplication');
+
+// List all loyalty program partners with discount info, all parties are able to view
+exports.listLoyaltyPartners = async (req, res, next) => {
+    try {
+        const apps = await LoyaltyApplication.find({ status: 'approved' })
+            .populate('vendorUser', 'companyName email') // adjust fields based on Vendor model
+            .sort({ createdAt: -1 });
+
+        const partners = apps.map(app => ({
+            loyaltyApplicationId: app._id,
+            vendorId: app.vendorUser ? app.vendorUser._id : undefined,
+            vendorName: app.vendorUser?.companyName || app.organization,
+            discountRate: app.discountRate,
+            promoCode: app.promoCode,
+            termsAndConditions: app.termsAndConditions
+        }));
+
+        return res.status(200).json({
+            success: true,
+            count: partners.length,
+            partners
+        });
+    } catch (err) {
+        console.error('listLoyaltyPartners error:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Error retrieving loyalty partners',
+            error: err.message
+        });
+    }
+};
+

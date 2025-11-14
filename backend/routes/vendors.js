@@ -109,5 +109,12 @@ router.delete(
     vendorCtrl.deleteLoyaltyApplication
 );
 
+// List all vendors that are partners in the GUC loyalty program
+router.get(
+    '/loyalty/partners',
+    auth,
+    roleCheck('Student', 'Staff', 'EventsOffice', 'TA', 'Professor', 'Admin'),
+    vendorCtrl.listLoyaltyPartners
+);
 
 module.exports = router;
