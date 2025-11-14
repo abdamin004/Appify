@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
-import { deleteEvent } from '../services/eventService';
+import { deleteEvent, getApprovedWorkshops } from '../services/eventService';
 import { FaHeart } from 'react-icons/fa';
 import favourites from "../services/favoritesService";
 
@@ -60,7 +60,31 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
 
       const response = await fetch(`${endpoint}?${queryParams}`);
       const data = await response.json();
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      let list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      
+      // Add frontend-approved workshops (draft workshops that were approved)
+      try {
+        const approvedSet = getApprovedWorkshops();
+        if (approvedSet.size > 0) {
+          // Fetch all workshops including drafts
+          const sortRes = await fetch(`${API_BASE}/events/sort`);
+          const sortData = await sortRes.json();
+          if (Array.isArray(sortData)) {
+            const approvedWorkshops = sortData.filter(
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'draft'
+            );
+            // Mark them as published for display
+            approvedWorkshops.forEach(w => { w.status = 'published'; });
+            // Merge with existing list, avoiding duplicates
+            const existingIds = new Set(list.map(e => e._id));
+            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
+            list = [...list, ...newWorkshops];
+          }
+        }
+      } catch (e) {
+        console.log('Error adding approved workshops:', e);
+      }
+      
       setEvents(list);
     } catch (error) {
       console.error("Error fetching events:", error);

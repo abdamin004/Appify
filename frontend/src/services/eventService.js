@@ -147,3 +147,81 @@ export function addEventComment(eventId, content) {
 export function deleteEventComment(commentId) {
   return http('DELETE', `${API_BASE}/events/comment/${commentId}`);
 }
+
+// Workshop approval/rejection functions
+export async function listPendingWorkshops() {
+  try {
+    // Try multiple approaches to get workshops
+    let allWorkshops = [];
+    
+    // Approach 1: Try sortEvents endpoint (doesn't filter by status)
+    try {
+      const sortRes = await fetch(`${API_BASE}/events/sort`);
+      const sortData = await sortRes.json();
+      if (Array.isArray(sortData)) {
+        const workshops = sortData.filter(e => e.type === 'Workshop');
+        allWorkshops = [...allWorkshops, ...workshops];
+      }
+    } catch (e) {
+      console.log('sortEvents approach failed:', e);
+    }
+    
+    // Approach 2: Try filter endpoint
+    try {
+      const q = new URLSearchParams({ type: 'Workshop' });
+      const filterRes = await fetch(`${API_BASE}/events/filter?${q.toString()}`);
+      const filterData = await filterRes.json();
+      if (Array.isArray(filterData)) {
+        allWorkshops = [...allWorkshops, ...filterData];
+      }
+    } catch (e) {
+      console.log('filterEvents approach failed:', e);
+    }
+    
+    // Approach 3: Try getAllEvents
+    try {
+      const allRes = await fetch(`${API_BASE}/events`);
+      const allData = await allRes.json();
+      if (Array.isArray(allData)) {
+        const workshops = allData.filter(e => e.type === 'Workshop');
+        allWorkshops = [...allWorkshops, ...workshops];
+      }
+    } catch (e) {
+      console.log('getAllEvents approach failed:', e);
+    }
+    
+    // Remove duplicates by _id
+    const uniqueWorkshops = Array.from(
+      new Map(allWorkshops.map(w => [w._id, w])).values()
+    );
+    
+    // Filter for draft status workshops
+    return uniqueWorkshops.filter(w => w.status === 'draft');
+  } catch (err) {
+    console.error('Error fetching pending workshops:', err);
+    return [];
+  }
+}
+
+// Get approved workshops from localStorage (frontend-only)
+export function getApprovedWorkshops() {
+  try {
+    const stored = localStorage.getItem('approvedWorkshops');
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function approveWorkshop(workshopId) {
+  return http('PATCH', `${API_BASE}/events/publish/${workshopId}`);
+}
+
+export function rejectWorkshop(workshopId) {
+  return updateEvent(workshopId, { status: 'cancelled' });
+}
+
+// Archive event (mark as completed)
+export function archiveEvent(eventId) {
+  return updateEvent(eventId, { status: 'completed' });
+}

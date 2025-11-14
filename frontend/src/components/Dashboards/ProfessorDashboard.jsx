@@ -7,6 +7,7 @@ import { API_BASE } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
+import { getProfessorNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, getUnreadCount } from "../../services/notificationService";
 
 function ProfessorDashboard() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ function ProfessorDashboard() {
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
+  const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
     const loadUser = () => {
@@ -35,7 +37,23 @@ function ProfessorDashboard() {
     fetchMyWorkshops();
     fetchRegisteredEvents();
     fetchWallet();
+    fetchNotifications();
   }, []);
+
+  const fetchNotifications = () => {
+    try {
+      const rawUser = localStorage.getItem('user');
+      if (!rawUser) return;
+      const u = JSON.parse(rawUser);
+      const professorId = u && (u._id || u.id);
+      if (!professorId) return;
+      const notifs = getProfessorNotifications(professorId);
+      setNotifications(notifs);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setNotifications([]);
+    }
+  };
 
   // Wallet updates and payment success banner
   useEffect(() => {
@@ -98,8 +116,25 @@ function ProfessorDashboard() {
       fetchRegisteredEvents();
     } else if (activeTab === 'favourites') {
       fetchFavourites();
+    } else if (activeTab === 'notifications') {
+      fetchNotifications();
     }
   }, [activeTab]);
+
+  // Parse edit requests from workshop description
+  const parseEditRequests = (description) => {
+    if (!description) return [];
+    const requests = [];
+    const regex = /--- EDIT REQUEST FROM EVENTS OFFICE \(([^)]+)\) ---\s*([\s\S]*?)\s*--- END EDIT REQUEST ---/g;
+    let match;
+    while ((match = regex.exec(description)) !== null) {
+      requests.push({
+        timestamp: match[1],
+        request: match[2].trim(),
+      });
+    }
+    return requests;
+  };
 
   const fetchMyWorkshops = async () => {
     try {
@@ -122,6 +157,16 @@ function ProfessorDashboard() {
       console.error("Error fetching my workshops:", err);
       setMyWorkshops([]);
     }
+  };
+
+  // Get workshops with edit requests
+  const getWorkshopsWithEditRequests = () => {
+    return myWorkshops
+      .map(workshop => ({
+        ...workshop,
+        editRequests: parseEditRequests(workshop.description),
+      }))
+      .filter(workshop => workshop.editRequests.length > 0);
   };
 
   const fetchRegisteredEvents = async () => {
@@ -447,9 +492,97 @@ function ProfessorDashboard() {
                 fontWeight: "700",
                 cursor: "pointer",
                 transition: "all 0.3s",
+                position: "relative",
               }}
             >
               📚 My Workshops
+            </button>
+            <button
+              onClick={() => setActiveTab("edit-requests")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "edit-requests"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "edit-requests" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                position: "relative",
+              }}
+            >
+              ✏️ Edit Requests
+              {getWorkshopsWithEditRequests().length > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "#ef4444",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.7rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {getWorkshopsWithEditRequests().length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("notifications");
+                fetchNotifications();
+              }}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "notifications"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "notifications" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                position: "relative",
+              }}
+            >
+              🔔 Notifications
+              {notifications.filter(n => !n.isRead).length > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "#ef4444",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.7rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {notifications.filter(n => !n.isRead).length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -458,6 +591,288 @@ function ProfessorDashboard() {
           {activeTab === "registered" && <MyEventsList events={registeredEvents} showRefundButton />}
           {activeTab === "my-workshops" && <MyEventsList events={myWorkshops} />}
           {activeTab === 'favourites' && <MyEventsList events={favouriteEvents} />}
+          
+          {activeTab === "notifications" && (
+            <div
+              style={{
+                background: "rgba(255,255,255,0.95)",
+                padding: "30px",
+                borderRadius: "20px",
+                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <h2 style={{ color: "#003366", margin: 0 }}>
+                  Notifications
+                </h2>
+                {notifications.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      try {
+                        const rawUser = localStorage.getItem('user');
+                        if (rawUser) {
+                          const u = JSON.parse(rawUser);
+                          const professorId = u && (u._id || u.id);
+                          if (professorId) {
+                            markAllNotificationsRead(professorId);
+                            fetchNotifications();
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Error marking all as read:', err);
+                      }
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                      color: "#003366",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "0.9rem",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
+              {notifications.length === 0 ? (
+                <p style={{ color: "#6b7280" }}>No notifications at this time.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                  {notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      style={{
+                        padding: "20px",
+                        background: notif.isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(212, 175, 55, 0.15)",
+                        borderRadius: "12px",
+                        border: notif.isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(212, 175, 55, 0.4)",
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                            {notif.type === 'WorkshopApproved' && (
+                              <span style={{ fontSize: "1.5rem" }}>✅</span>
+                            )}
+                            {notif.type === 'WorkshopRejected' && (
+                              <span style={{ fontSize: "1.5rem" }}>❌</span>
+                            )}
+                            <h3 style={{ 
+                              color: "#003366", 
+                              margin: 0, 
+                              fontSize: "1.1rem",
+                              fontWeight: notif.isRead ? "500" : "700",
+                            }}>
+                              {notif.type === 'WorkshopApproved' ? 'Workshop Approved' : notif.type === 'WorkshopRejected' ? 'Workshop Rejected' : 'Notification'}
+                            </h3>
+                            {!notif.isRead && (
+                              <span style={{
+                                background: "#ef4444",
+                                color: "white",
+                                borderRadius: "50%",
+                                width: "10px",
+                                height: "10px",
+                                display: "inline-block",
+                              }} />
+                            )}
+                          </div>
+                          <p style={{ 
+                            color: "#6b7280", 
+                            margin: "8px 0",
+                            fontWeight: notif.isRead ? "400" : "500",
+                          }}>
+                            {notif.message}
+                          </p>
+                          <p style={{ 
+                            color: "#9ca3af", 
+                            fontSize: "0.85rem",
+                            margin: "8px 0 0 0",
+                          }}>
+                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                          {!notif.isRead && (
+                            <button
+                              onClick={() => {
+                                try {
+                                  const rawUser = localStorage.getItem('user');
+                                  if (rawUser) {
+                                    const u = JSON.parse(rawUser);
+                                    const professorId = u && (u._id || u.id);
+                                    if (professorId) {
+                                      markNotificationRead(professorId, notif.id);
+                                      fetchNotifications();
+                                    }
+                                  }
+                                } catch (err) {
+                                  console.error('Error marking as read:', err);
+                                }
+                              }}
+                              style={{
+                                padding: "6px 12px",
+                                background: "#10b981",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "0.85rem",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              try {
+                                const rawUser = localStorage.getItem('user');
+                                if (rawUser) {
+                                  const u = JSON.parse(rawUser);
+                                  const professorId = u && (u._id || u.id);
+                                  if (professorId) {
+                                    deleteNotification(professorId, notif.id);
+                                    fetchNotifications();
+                                  }
+                                }
+                              } catch (err) {
+                                console.error('Error deleting notification:', err);
+                              }
+                            }}
+                            style={{
+                              padding: "6px 12px",
+                              background: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "0.85rem",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "edit-requests" && (
+            <div
+              style={{
+                background: "rgba(255,255,255,0.95)",
+                padding: "30px",
+                borderRadius: "20px",
+                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+              }}
+            >
+              <h2 style={{ color: "#003366", marginBottom: "20px" }}>
+                Edit Requests for My Workshops
+              </h2>
+              {getWorkshopsWithEditRequests().length === 0 ? (
+                <p style={{ color: "#6b7280" }}>No edit requests at this time.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  {getWorkshopsWithEditRequests().map((workshop) => (
+                    <div
+                      key={workshop._id}
+                      style={{
+                        padding: "25px",
+                        background: "rgba(245, 158, 11, 0.1)",
+                        borderRadius: "12px",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                      }}
+                    >
+                      <div style={{ marginBottom: "15px" }}>
+                        <h3 style={{ color: "#003366", marginBottom: "10px", fontSize: "1.3rem" }}>
+                          {workshop.title}
+                        </h3>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginTop: "12px" }}>
+                          <div>
+                            <strong style={{ color: "#003366" }}>Status:</strong>{" "}
+                            <span style={{ 
+                              color: workshop.status === 'draft' ? '#f59e0b' : workshop.status === 'published' ? '#10b981' : '#6b7280',
+                              fontWeight: '600'
+                            }}>
+                              {workshop.status === 'draft' ? 'Pending Approval' : workshop.status === 'published' ? 'Published' : workshop.status}
+                            </span>
+                          </div>
+                          <div>
+                            <strong style={{ color: "#003366" }}>Location:</strong>{" "}
+                            <span style={{ color: "#6b7280" }}>{workshop.location}</span>
+                          </div>
+                          <div>
+                            <strong style={{ color: "#003366" }}>Start Date:</strong>{" "}
+                            <span style={{ color: "#6b7280" }}>
+                              {workshop.startDate
+                                ? new Date(workshop.startDate).toLocaleString()
+                                : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div style={{ marginTop: "20px" }}>
+                        <h4 style={{ color: "#003366", marginBottom: "15px", fontSize: "1.1rem" }}>
+                          Edit Requests ({workshop.editRequests.length})
+                        </h4>
+                        {workshop.editRequests.map((editRequest, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: "15px",
+                              background: "white",
+                              borderRadius: "8px",
+                              marginBottom: "12px",
+                              border: "1px solid #e5e7eb",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                              <strong style={{ color: "#f59e0b", fontSize: "0.9rem" }}>
+                                Request from Events Office
+                              </strong>
+                              <span style={{ color: "#6b7280", fontSize: "0.85rem" }}>
+                                {editRequest.timestamp}
+                              </span>
+                            </div>
+                            <p style={{ color: "#374151", margin: 0, lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                              {editRequest.request}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div style={{ marginTop: "15px", display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={() => navigate(`/professor/workshops?edit=${workshop._id}`)}
+                          style={{
+                            padding: "10px 20px",
+                            background: "#f59e0b",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "0.95rem",
+                          }}
+                        >
+                          ✏️ Edit Workshop
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {topUpOpen && (
