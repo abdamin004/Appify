@@ -44,6 +44,13 @@ router.post('/unregister/:eventId', auth, eventController.unregisterFromEvent);
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
 
+// Add a comment on an event (can be anytime)
+router.post('/:id/comments',auth,roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.addEventComment);
 
+// View all ratings on an event
+router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
+
+// Add a rating on an event (ONLY after event has ended)
+router.post('/:id/ratings',auth,roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.addEventRating);
 
 module.exports = router;
