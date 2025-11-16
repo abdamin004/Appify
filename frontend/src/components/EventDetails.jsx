@@ -26,7 +26,9 @@ export default function EventDetails() {
           getEventRatings(id)
         ]);
         setEvent(e);
+        // getEventComments now returns array directly (handles backend format)
         setComments(Array.isArray(cs) ? cs : []);
+        // getEventRatings now returns { average, count, ratings, histogram } format
         setRatings(rs && typeof rs === 'object' ? rs : { average: 0, count: 0, ratings: [], histogram: {} });
       } catch (err) {
         setError(err?.message || 'Failed to load event');

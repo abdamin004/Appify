@@ -129,15 +129,44 @@ export async function getEventById(id) {
   return res.json();
 }
 export async function getEventComments(id) {
-  const res = await fetch(`${API_BASE}/events/${id}/comments`);
-  return res.json();
+  // Backend requires auth, so use http helper which includes token
+  const res = await http('GET', `${API_BASE}/events/${id}/comments`);
+  // Backend returns { success: true, comments: [...], count: X }
+  // Return comments array for compatibility
+  return Array.isArray(res) ? res : (res?.comments || []);
 }
+
 export async function getEventRatings(id) {
-  const res = await fetch(`${API_BASE}/events/${id}/ratings`);
-  return res.json();
+  // Backend requires auth, so use http helper which includes token
+  const res = await http('GET', `${API_BASE}/events/${id}/ratings`);
+  // Backend returns { success: true, averageRating: X, ratings: [...], count: X }
+  // Convert to expected format: { average: X, ratings: [...], count: X, histogram: {} }
+  if (Array.isArray(res)) {
+    // If it's already an array (old format), convert it
+    const count = res.length;
+    const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
+    const average = count > 0 ? total / count : 0;
+    const histogram = [1,2,3,4,5].reduce((acc, v) => {
+      acc[v] = res.filter(r => (r.rating || r.value) === v).length;
+      return acc;
+    }, {});
+    return { average, count, ratings: res, histogram };
+  }
+  // New format: { success: true, averageRating: X, ratings: [...], count: X }
+  const average = res.averageRating ?? res.average ?? 0;
+  const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
+  const ratings = res.ratings || [];
+  const histogram = [1,2,3,4,5].reduce((acc, v) => {
+    acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
+    return acc;
+  }, {});
+  return { average, count, ratings, histogram };
 }
+
 export function rateEvent(id, value) {
-  return http('POST', `${API_BASE}/events/${id}/rate`, { value });
+  // Backend expects POST /events/:id/ratings with { rating: value }
+  // Frontend was calling /events/:id/rate with { value }
+  return http('POST', `${API_BASE}/events/${id}/ratings`, { rating: value });
 }
 
 // Comments (auth required to add/delete)

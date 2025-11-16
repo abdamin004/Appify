@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getEventComments, addEventComment } from "../../services/eventService";
+import { getEventComments, addEventComment, rateEvent } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
 import { FaStar } from "react-icons/fa";
 import PayDialog from "../Payments/PayDialog";
@@ -133,12 +133,28 @@ function MyEventsList({ events, showRefundButton = false }) {
     }
   }
 
-  const setEventRating = (eventId, value) => {
+  const setEventRating = async (eventId, value) => {
+    // Update local state immediately for better UX
     setRatings((prev) => {
       const next = { ...prev, [eventId]: value };
       saveRatings(next);
       return next;
     });
+    
+    // Send to backend
+    try {
+      await rateEvent(eventId, value);
+    } catch (err) {
+      console.error('Failed to save rating to backend:', err);
+      // Revert local state on error
+      setRatings((prev) => {
+        const next = { ...prev };
+        delete next[eventId];
+        saveRatings(next);
+        return next;
+      });
+      alert(err?.message || 'Failed to save rating. Please try again.');
+    }
   };
 
   const hasEventEnded = (evt) => {
@@ -197,6 +213,7 @@ function MyEventsList({ events, showRefundButton = false }) {
       setCommentsLoading(prev => ({ ...prev, [eventId]: true }));
       setCommentsError(prev => ({ ...prev, [eventId]: "" }));
       const rows = await getEventComments(eventId);
+      // getEventComments now returns array directly (handles backend format)
       setCommentsByEvent(prev => ({ ...prev, [eventId]: Array.isArray(rows) ? rows : [] }));
     } catch (err) {
       setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to load comments" }));
