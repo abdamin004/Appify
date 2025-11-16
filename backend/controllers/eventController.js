@@ -10,7 +10,6 @@ const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
-const Rating = require('../models/Rating');
 const Payment = require('../models/Payment');
 const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
 
