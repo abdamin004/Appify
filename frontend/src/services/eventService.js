@@ -225,3 +225,74 @@ export function rejectWorkshop(workshopId) {
 export function archiveEvent(eventId) {
   return updateEvent(eventId, { status: 'completed' });
 }
+
+// Helper function to create notifications for all users when an event is published
+export async function notifyAllUsersAboutNewEvent(event) {
+  try {
+    // Dynamic import to avoid circular dependencies
+    const notificationService = await import('./notificationService');
+    const { 
+      createStudentNotification, 
+      createEventOfficeNotification,
+      markEventsAsSeen,
+      createProfessorNotification
+    } = notificationService;
+    
+    if (!event || event.status !== 'published') return;
+    
+    const eventId = String(event._id || event.id);
+    const eventType = event.type || 'Event';
+    const eventTitle = event.title || 'New Event';
+    
+    // Mark event as seen immediately (so polling doesn't create duplicate notifications)
+    markEventsAsSeen([eventId]);
+    
+    // Create notification for all user types
+    const notification = {
+      type: 'NewEvent',
+      message: `New ${eventType}: ${eventTitle}`,
+      eventId: eventId,
+      eventTitle: eventTitle,
+      eventType: eventType,
+    };
+    
+    // Create student notification (shared by students, staff, TA)
+    createStudentNotification(notification);
+    
+    // Create event office notification
+    createEventOfficeNotification(notification);
+    
+    // Create notifications for all professors (get all professor IDs from localStorage)
+    // We'll create a notification for each professor we can find
+    try {
+      const allKeys = Object.keys(localStorage);
+      const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
+      professorKeys.forEach(key => {
+        const professorId = key.replace('professorNotifications_', '');
+        if (professorId) {
+          createProfessorNotification(professorId, notification);
+        }
+      });
+    } catch (profErr) {
+      console.log('Could not create professor notifications:', profErr);
+    }
+    
+    // Show browser notification if permission granted
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(`New ${eventType} Available`, {
+          body: eventTitle,
+          icon: '/favicon.ico',
+          tag: `event-${eventId}`,
+        });
+      } catch (notifErr) {
+        console.log('Browser notification failed:', notifErr);
+      }
+    }
+    
+    // Dispatch custom event to refresh notifications in all dashboards
+    window.dispatchEvent(new CustomEvent('newEventCreated', { detail: { event } }));
+  } catch (err) {
+    console.error('Error creating notifications for new event:', err);
+  }
+}

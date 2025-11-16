@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import EventsList from "../AdminEventList";
 import MyEventsList from "../Functions/MyEventsList";
 import adminService from "../../services/adminService";
-import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent } from "../../services/eventService";
-import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount } from "../../services/notificationService";
+import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
+import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ function EventOfficeDashboard() {
   const [vendorRequests, setVendorRequests] = useState([]);
   const [gymSessions, setGymSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
@@ -31,7 +32,45 @@ function EventOfficeDashboard() {
 
   useEffect(() => {
     fetchNotifications();
+    fetchReminders();
+    initializeSeenEvents();
+    const pollInterval = setInterval(() => {
+      checkForNewEvents();
+    }, 30000);
+    const reminderInterval = setInterval(() => {
+      checkForReminders();
+    }, 60000);
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(reminderInterval);
+    };
   }, []);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(err => {
+        console.log('Notification permission request failed:', err);
+      });
+    }
+  }, []);
+
+  // Listen for new event creation events
+  useEffect(() => {
+    const handleNewEvent = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('newEventCreated', handleNewEvent);
+    return () => window.removeEventListener('newEventCreated', handleNewEvent);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      fetchNotifications();
+    } else if (activeTab === 'reminders') {
+      fetchReminders();
+    }
+  }, [activeTab]);
 
   // Refresh notifications when switching to workshop approvals or notifications tab
   useEffect(() => {
@@ -86,7 +125,7 @@ function EventOfficeDashboard() {
     }
   };
 
-  const handleApproveWorkshop = (workshopId) => {
+  const handleApproveWorkshop = async (workshopId) => {
     // Frontend-only approval - no backend calls
     if (!window.confirm("Are you sure you want to approve and publish this workshop?")) return;
     
@@ -121,6 +160,11 @@ function EventOfficeDashboard() {
         workshopTitle: workshop.title,
       });
     }
+    
+    // Create notifications for all users about the newly published workshop
+    const publishedWorkshop = { ...workshop, status: 'published' };
+    const { notifyAllUsersAboutNewEvent } = await import('../../services/eventService');
+    notifyAllUsersAboutNewEvent(publishedWorkshop);
     
     // Show success message
     alert("Workshop approved and published successfully!");
@@ -223,6 +267,173 @@ function EventOfficeDashboard() {
     } catch (err) {
       console.error("Error fetching notifications:", err);
       setNotifications([]);
+    }
+  };
+
+  const initializeSeenEvents = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/events`);
+      const data = await res.json();
+      const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      const publishedEvents = events.filter(e => e.status === 'published');
+      const eventIds = publishedEvents.map(e => String(e._id || e.id));
+      markEventsAsSeen(eventIds);
+    } catch (err) {
+      console.error('Error initializing seen events:', err);
+    }
+  };
+
+  const checkForNewEvents = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/events`);
+      const data = await res.json();
+      const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      const publishedEvents = events.filter(e => e.status === 'published');
+      
+      const seenIds = getSeenEventIds();
+      const newEvents = publishedEvents.filter(e => {
+        const eventId = String(e._id || e.id);
+        return !seenIds.has(eventId);
+      });
+
+      if (newEvents.length > 0) {
+        const newEventIds = newEvents.map(e => String(e._id || e.id));
+        markEventsAsSeen(newEventIds);
+
+        newEvents.forEach(event => {
+          const eventId = String(event._id || event.id);
+          const eventType = event.type || 'Event';
+          
+          createEventOfficeNotification({
+            type: 'NewEvent',
+            message: `New ${eventType}: ${event.title}`,
+            eventId: eventId,
+            eventTitle: event.title,
+            eventType: eventType,
+          });
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`New ${eventType} Available`, {
+                body: event.title,
+                icon: '/favicon.ico',
+                tag: `event-${eventId}`,
+              });
+            } catch (notifErr) {
+              console.log('Browser notification failed:', notifErr);
+            }
+          }
+        });
+
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Error checking for new events:', err);
+    }
+  };
+
+  const fetchReminders = () => {
+    try {
+      const notifs = getEventOfficeNotifications();
+      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
+      setReminders(reminderNotifs);
+    } catch (err) {
+      console.error('Error fetching reminders:', err);
+      setReminders([]);
+    }
+  };
+
+  const checkForReminders = async () => {
+    try {
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      
+      if (!res.ok) return;
+      
+      const registeredEvents = await res.json();
+      const events = Array.isArray(registeredEvents) ? registeredEvents : [];
+      
+      const storedUser = localStorage.getItem("user");
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      const userId = user && (user._id || user.id);
+      if (!userId) return;
+      
+      const sentReminders = getSentReminders(userId);
+      const now = new Date();
+      
+      events.forEach(event => {
+        if (!event.startDate) return;
+        
+        const startDate = new Date(event.startDate);
+        const eventId = String(event._id || event.id);
+        const eventTitle = event.title || 'Event';
+        const eventType = event.type || 'Event';
+        
+        const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const oneDayReminderId = `${eventId}_1day`;
+        const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
+        
+        if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
+          markReminderSent(userId, oneDayReminderId);
+          createReminderNotification({
+            type: 'EventReminder',
+            message: `Reminder: "${eventTitle}" starts in 1 day!`,
+            eventId: eventId,
+            eventTitle: eventTitle,
+            eventType: eventType,
+            reminderType: '1day',
+            eventStartDate: startDate.toISOString(),
+          });
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`Event Reminder: ${eventTitle}`, {
+                body: `Starts in 1 day at ${startDate.toLocaleString()}`,
+                icon: '/favicon.ico',
+                tag: `reminder-${oneDayReminderId}`,
+              });
+            } catch (notifErr) {
+              console.log('Browser notification failed:', notifErr);
+            }
+          }
+        }
+        
+        const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
+        const oneHourReminderId = `${eventId}_1hour`;
+        const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
+        
+        if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
+          markReminderSent(userId, oneHourReminderId);
+          createReminderNotification({
+            type: 'EventReminder',
+            message: `Reminder: "${eventTitle}" starts in 1 hour!`,
+            eventId: eventId,
+            eventTitle: eventTitle,
+            eventType: eventType,
+            reminderType: '1hour',
+            eventStartDate: startDate.toISOString(),
+          });
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(`Event Reminder: ${eventTitle}`, {
+                body: `Starts in 1 hour at ${startDate.toLocaleString()}`,
+                icon: '/favicon.ico',
+                tag: `reminder-${oneHourReminderId}`,
+              });
+            } catch (notifErr) {
+              console.log('Browser notification failed:', notifErr);
+            }
+          }
+        }
+      });
+      
+      fetchReminders();
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error checking for reminders:', err);
     }
   };
 
@@ -668,7 +879,7 @@ function EventOfficeDashboard() {
               }}
             >
               🔔 Notifications
-              {unreadNotifications > 0 && (
+              {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
                 <span
                   style={{
                     position: "absolute",
@@ -686,7 +897,53 @@ function EventOfficeDashboard() {
                     fontWeight: "bold",
                   }}
                 >
-                  {unreadNotifications}
+                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("reminders");
+                fetchReminders();
+              }}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "reminders"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "reminders" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                position: "relative",
+              }}
+            >
+              ⏰ Reminders
+              {reminders.filter(n => !n.isRead).length > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "#ef4444",
+                    color: "white",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.7rem",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {reminders.filter(n => !n.isRead).length}
                 </span>
               )}
             </button>
@@ -922,6 +1179,175 @@ function EventOfficeDashboard() {
             </div>
           )}
 
+          {activeTab === "reminders" && (
+            <div
+              style={{
+                background: "rgba(255,255,255,0.95)",
+                padding: "30px",
+                borderRadius: "20px",
+                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <h2 style={{ color: "#003366", margin: 0 }}>
+                  Event Reminders
+                </h2>
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markEventOfficeNotificationRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                      color: "#003366",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "0.9rem",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
+              {reminders.length === 0 ? (
+                <p style={{ color: "#6b7280" }}>No reminders at this time.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                  {reminders.map((reminder) => {
+                    const isRead = reminder.read || reminder.isRead;
+                    return (
+                      <div
+                        key={reminder.id}
+                        style={{
+                          padding: "20px",
+                          background: isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(245, 158, 11, 0.15)",
+                          borderRadius: "12px",
+                          border: isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(245, 158, 11, 0.4)",
+                          position: "relative",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                              <span style={{ fontSize: "1.5rem" }}>⏰</span>
+                              <h3 style={{ 
+                                color: "#003366", 
+                                margin: 0, 
+                                fontSize: "1.1rem",
+                                fontWeight: isRead ? "500" : "700",
+                              }}>
+                                Event Reminder
+                              </h3>
+                              {!isRead && (
+                                <span style={{
+                                  background: "#ef4444",
+                                  color: "white",
+                                  borderRadius: "50%",
+                                  width: "10px",
+                                  height: "10px",
+                                  display: "inline-block",
+                                }} />
+                              )}
+                            </div>
+                            <p style={{ 
+                              color: "#6b7280", 
+                              margin: "8px 0",
+                              fontWeight: isRead ? "400" : "500",
+                            }}>
+                              {reminder.message}
+                            </p>
+                            {reminder.eventStartDate && (
+                              <p style={{ 
+                                color: "#9ca3af", 
+                                fontSize: "0.85rem",
+                                margin: "4px 0",
+                              }}>
+                                Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
+                              </p>
+                            )}
+                            {reminder.eventId && (
+                              <button
+                                onClick={() => {
+                                  window.location.href = `/events/${reminder.eventId}`;
+                                }}
+                                style={{
+                                  marginTop: "10px",
+                                  padding: "8px 16px",
+                                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                                  color: "#003366",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  fontSize: "0.9rem",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                View Event
+                              </button>
+                            )}
+                            <p style={{ 
+                              color: "#9ca3af", 
+                              fontSize: "0.85rem",
+                              margin: "8px 0 0 0",
+                            }}>
+                              {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                            {!isRead && (
+                              <button
+                                onClick={() => {
+                                  markEventOfficeNotificationRead(reminder.id);
+                                  fetchReminders();
+                                }}
+                                style={{
+                                  padding: "6px 12px",
+                                  background: "#10b981",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  fontSize: "0.85rem",
+                                  fontWeight: "600",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Mark Read
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                deleteEventOfficeNotification(reminder.id);
+                                fetchReminders();
+                              }}
+                              style={{
+                                padding: "6px 12px",
+                                background: "#ef4444",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "0.85rem",
+                                fontWeight: "600",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === "notifications" && (
             <div
               style={{
@@ -935,7 +1361,7 @@ function EventOfficeDashboard() {
                 <h2 style={{ color: "#003366", margin: 0 }}>
                   Notifications
                 </h2>
-                {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
+                {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
                   <button
                     onClick={() => {
                       // Mark all frontend notifications as read
@@ -985,13 +1411,18 @@ function EventOfficeDashboard() {
                               {notif.type === 'WorkshopSubmitted' && (
                                 <span style={{ fontSize: "1.5rem" }}>📝</span>
                               )}
+                              {notif.type === 'NewEvent' && (
+                                <span style={{ fontSize: "1.5rem" }}>🎉</span>
+                              )}
                               <h3 style={{ 
                                 color: "#003366", 
                                 margin: 0, 
                                 fontSize: "1.1rem",
                                 fontWeight: isRead ? "500" : "700",
                               }}>
-                                {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' : notif.type || 'Notification'}
+                                {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' : 
+                                 notif.type === 'NewEvent' ? 'New Event Available' : 
+                                 notif.type || 'Notification'}
                               </h3>
                               {!isRead && (
                                 <span style={{
@@ -1007,19 +1438,36 @@ function EventOfficeDashboard() {
                                 <span style={{ color: "#10b981", fontSize: "1.2rem", fontWeight: "bold" }}>✓</span>
                               )}
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                               <p style={{ 
                                 color: "#6b7280", 
                                 margin: "8px 0",
                                 fontWeight: isRead ? "400" : "500",
                                 flex: 1,
                               }}>
-                                {notif.message || notif.type === 'WorkshopSubmitted' 
+                                {notif.type === 'WorkshopSubmitted' 
                                   ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
                                   : notif.message || 'No message'}
                               </p>
-                              {isRead && (
-                                <span style={{ color: "#10b981", fontSize: "1.3rem" }}>✅</span>
+                              {notif.eventId && (
+                                <button
+                                  onClick={() => {
+                                    window.location.href = `/events/${notif.eventId}`;
+                                  }}
+                                  style={{
+                                    alignSelf: "flex-start",
+                                    padding: "8px 16px",
+                                    background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                                    color: "#003366",
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    fontSize: "0.9rem",
+                                    fontWeight: "600",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  View Event
+                                </button>
                               )}
                             </div>
                             <p style={{ 

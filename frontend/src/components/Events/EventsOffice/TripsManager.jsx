@@ -84,9 +84,17 @@ function TripsManager() {
         console.log('Creating trip as user:', userObj.email, 'Role:', userObj.role);
       } catch (e) {}
       
-      await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
+      const createdTrip = await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
       setSuccess('Trip created');
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      
+      // Create notifications for all users if event is published
+      const tripEvent = createdTrip?.event || createdTrip;
+      if (tripEvent && (tripEvent.status === 'published' || form.status === 'published')) {
+        const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
+        notifyAllUsersAboutNewEvent(tripEvent);
+      }
+      
       await refresh();
     } catch (err) { 
       console.error('Error creating trip:', err);
