@@ -34,10 +34,10 @@ router.patch(
 );
 
 router.get(
-  '/notifications',
+  '/notifications/unread-count',
   auth,
   roleCheck('Admin', 'EventOffice'),
-  adminController.listAdminNotifications
+  adminController.getUnreadNotificationsCount
 );
 
 router.patch(
@@ -52,6 +52,38 @@ router.patch(
   auth,
   roleCheck('Admin', 'EventOffice'),
   adminController.markAllAdminNotificationsRead
+);
+
+// Get attendees report
+router.get(
+  '/reports/attendees',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.getAttendeesReport
+);
+
+// Get sales report
+router.get(
+  '/reports/sales',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.getSalesReport
+);
+
+// Get vendor documents for approved bazaar/booth applications
+router.get(
+  '/vendor-documents',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.getVendorDocuments
+);
+
+// Download/view specific vendor document
+router.get(
+  '/vendor-documents/:vendorId/:documentType',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.downloadVendorDocument
 );
 
 module.exports = router;
