@@ -8,6 +8,7 @@ const Bazaar = require('../models/Bazaar');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
+const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Rating = require('../models/Rating');
 const Payment = require('../models/Payment');
@@ -667,54 +668,140 @@ async unregisterFromEvent(req, res) {
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
         }
-    }
-    ,
-    // GET /events/:id/comments - list comments for event
+    },
     async getEventComments(req, res) {
         try {
-            const { id } = req.params;
-            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
-            const comments = await Comment.find({ event: id })
-                .populate('user', 'firstName lastName email role')
-                .sort({ createdAt: -1 });
-            res.json(comments);
+            const eventId  = req.params.id;
+
+            // Make sure event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const comments = await Comment.find({ event: eventId })
+                .populate('user', 'firstName lastName email') // adjust to your User fields
+                .sort({ createdAt: -1 }); // newest first
+
+            return res.status(200).json({
+                success: true,
+                count: comments.length,
+                comments
+            });
         } catch (err) {
-            res.status(500).json({ message: err.message });
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
         }
     },
-    // GET /events/:id/ratings - aggregate ratings for event
+
     async getEventRatings(req, res) {
         try {
-            const { id } = req.params;
-            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
-            const ratings = await Rating.find({ event: id }).populate('user', 'firstName lastName role');
+            const eventId  = req.params.id;
+
+            // Make sure event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const ratings = await Rating.find({ event: eventId })
+                .populate('user', 'firstName lastName email') // adjust to your User fields
+                .sort({ createdAt: -1 });
+
             const count = ratings.length;
-            const total = ratings.reduce((sum, r) => sum + (r.value || 0), 0);
-            const average = count > 0 ? (total / count) : 0;
-            const histogram = [1,2,3,4,5].reduce((acc,v)=>{ acc[v]=ratings.filter(r=>r.value===v).length; return acc; },{});
-            res.json({ average, count, histogram, ratings });
+            const average =
+                count === 0
+                    ? null
+                    : ratings.reduce((sum, r) => sum + (r.rating || 0), 0) / count;
+
+            return res.status(200).json({
+                success: true,
+                count,
+                averageRating: average,
+                ratings
+            });
         } catch (err) {
-            res.status(500).json({ message: err.message });
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
         }
     },
-    // POST /events/:id/rate - set or update current user's rating
-    async setRating(req, res) {
+
+   
+
+    // Wrapper function for route /:id/ratings (maps id to eventId)
+    async addEventRating(req, res) {
+        const eventId = req.params.id;
+        const { rating } = req.body;
+        const userId = req.user._id;
+
         try {
-            const { id } = req.params;
-            const { value } = req.body;
-            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
-            const v = Number(value);
-            if (!v || v < 1 || v > 5) return res.status(400).json({ message: 'Rating value must be 1-5' });
-            const userId = req.user && req.user._id;
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-            const doc = await Rating.findOneAndUpdate(
-                { event: id, user: userId },
-                { $set: { value: v } },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-            res.json({ success: true, rating: doc });
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const now = new Date();
+
+            if (!event.endDate || new Date(event.endDate) > now) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You can only rate this event after it has ended.'
+                });
+            }
+
+            if (!event.registeredUsers || !event.registeredUsers.some(u => u.toString() === userId.toString())) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You must be registered for this event to rate it.'
+                });
+            }
+
+            const numericRating = Number(rating);
+            if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Rating must be a number between 1 and 5.'
+                });
+            }
+
+            const existing = await Rating.findOne({ event: eventId, user: userId });
+            if (existing) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You have already rated this event.'
+                });
+            }
+
+            const newRating = await Rating.create({
+                event: eventId,
+                user: userId,
+                rating: numericRating
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Rating added successfully',
+                rating: newRating
+            });
         } catch (err) {
-            res.status(500).json({ message: err.message });
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
         }
     }
+
 };

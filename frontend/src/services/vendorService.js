@@ -15,6 +15,24 @@ export const applyToEvent = (eventId, payload) => fetchJson(`${API_BASE}/vendor/
 export const listOrganizations = () => fetchJson(`${API_BASE}/vendor/organizations`);
 export const listUpcomingBazaars = () => fetchJson(`${API_BASE}/vendor/bazaars/upcoming`);
 export const listUpcomingBooths = () => fetchJson(`${API_BASE}/vendor/booths/upcoming`);
+export const cancelVendorApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/vendor-applications/${applicationId}/cancel`, { method: 'POST' });
+export const deleteVendorApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/vendor-applications/${applicationId}`, { method: 'DELETE' });
+export const applyToLoyaltyProgram = (payload) => fetchJson(`${API_BASE}/vendor/loyalty/apply`, { method: 'POST', body: JSON.stringify(payload) });
+export const listMyLoyaltyApplications = () => fetchJson(`${API_BASE}/vendor/loyalty/mine`);
+export const cancelLoyaltyApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/loyalty/${applicationId}/cancel`, { method: 'POST' });
+export const deleteLoyaltyApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/loyalty/${applicationId}`, { method: 'DELETE' });
 
-const vendorService = { requestBooth, applyToEvent, listOrganizations, listUpcomingBazaars, listUpcomingBooths };
+const vendorService = { 
+  requestBooth, 
+  applyToEvent, 
+  listOrganizations, 
+  listUpcomingBazaars, 
+  listUpcomingBooths,
+  cancelVendorApplication,
+  deleteVendorApplication,
+  applyToLoyaltyProgram,
+  listMyLoyaltyApplications,
+  cancelLoyaltyApplication,
+  deleteLoyaltyApplication
+};
 export default vendorService;

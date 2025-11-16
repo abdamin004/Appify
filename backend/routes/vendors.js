@@ -4,6 +4,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck'); // roleCheck('Vendor') etc.
 const vendorCtrl = require('../controllers/vendorController');
+const vendorUpload = require('../middleware/vendorUpload');
 
 // 1) Vendor can view upcoming bazaars (published, future)
 router.get(
@@ -69,12 +70,59 @@ router.post(
     vendorCtrl.cancelVendorApplication
 );
 
+// Delete a cancelled vendor application
+router.delete(
+  '/vendor-applications/:id',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.deleteVendorApplication
+);
+
 // Vendor applies to GUC loyalty program
 router.post(
     '/loyalty/apply',
     auth,
     roleCheck('Vendor'),
     vendorCtrl.applyToLoyaltyProgram
+);
+
+// List my loyalty applications
+router.get(
+    '/loyalty/mine',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.listMyLoyaltyApplications
+);
+
+// Cancel loyalty application (only vendor who created it)
+router.post(
+    '/loyalty/:id/cancel',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.cancelLoyaltyApplication
+);
+
+// Delete a cancelled loyalty application
+router.delete(
+    '/loyalty/:id',
+    auth,
+    roleCheck('Vendor'),
+    vendorCtrl.deleteLoyaltyApplication
+);
+// List all vendors that are partners in the GUC loyalty program
+router.get(
+  '/loyalty/partners',
+  auth,
+  roleCheck('Student', 'Staff', 'EventsOffice', 'TA', 'Professor', 'Admin'),
+  vendorCtrl.listLoyaltyPartners
+);
+
+router.post(
+  '/vendor-documents/upload',
+  auth,
+  roleCheck('Vendor'),
+  vendorUpload,
+  vendorCtrl.uploadVendorDocuments
 );
 
 

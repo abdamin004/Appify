@@ -1,12 +1,29 @@
 const mongoose = require('mongoose');
 
 const ratingSchema = new mongoose.Schema({
-  event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true, index: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  value: { type: Number, required: true, min: 1, max: 5 },
-}, { timestamps: true });
+    rating: {
+        type: Number,
+        min: 1,  //star ratings
+        max: 5,
+        required: true
+    },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    event: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event',
+        required: true
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
+});
 
-ratingSchema.index({ event: 1, user: 1 }, { unique: true });
+// Prevent duplicate ratings by same user
+ratingSchema.index({ user: 1, event: 1 }, { unique: true });
 
 module.exports = mongoose.model('Rating', ratingSchema);
-
