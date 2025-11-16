@@ -670,7 +670,7 @@ async unregisterFromEvent(req, res) {
     },
     async getEventComments(req, res) {
         try {
-            const { eventId } = req.params;
+            const eventId  = req.params.id;
 
             // Make sure event exists
             const event = await Event.findById(eventId);
@@ -698,79 +698,9 @@ async unregisterFromEvent(req, res) {
         }
     },
 
-    async addRating(req, res) {
-        try {
-            const { eventId } = req.params;
-            const { rating } = req.body;  // expect a number 1–5
-            const userId = req.user._id;
-
-            // Check event exists
-            const event = await Event.findById(eventId);
-            if (!event) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Event not found'
-                });
-            }
-
-            const now = new Date();
-
-            // Business rule: user can only rate if the event has ended
-            if (!event.endDate || new Date(event.endDate) > now) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You can only rate this event after it has ended.'
-                });
-            }
-
-            // (Optional but usually logical): must be registered for the event to rate
-            if (!event.registeredUsers || !event.registeredUsers.some(u => u.toString() === userId.toString())) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'You must be registered for this event to rate it.'
-                });
-            }
-
-            // Validate rating value (1–5)
-            const numericRating = Number(rating);
-            if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Rating must be a number between 1 and 5.'
-                });
-            }
-
-            // Only one rating per user per event (also enforced by unique index)
-            const existing = await Rating.findOne({ event: eventId, user: userId });
-            if (existing) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You have already rated this event.'
-                });
-            }
-
-            const newRating = await Rating.create({
-                event: eventId,
-                user: userId,
-                rating: numericRating
-            });
-
-            return res.status(201).json({
-                success: true,
-                message: 'Rating added successfully',
-                rating: newRating
-            });
-        } catch (err) {
-            return res.status(500).json({
-                success: false,
-                message: err.message
-            });
-        }
-    },
-
     async getEventRatings(req, res) {
         try {
-            const { eventId } = req.params;
+            const eventId  = req.params.id;
 
             // Make sure event exists
             const event = await Event.findById(eventId);
@@ -803,7 +733,74 @@ async unregisterFromEvent(req, res) {
                 message: err.message
             });
         }
-    }
+    },
 
+   
+
+    // Wrapper function for route /:id/ratings (maps id to eventId)
+    async addEventRating(req, res) {
+        const eventId = req.params.id;
+        const { rating } = req.body;
+        const userId = req.user._id;
+
+        try {
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const now = new Date();
+
+            if (!event.endDate || new Date(event.endDate) > now) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You can only rate this event after it has ended.'
+                });
+            }
+
+            if (!event.registeredUsers || !event.registeredUsers.some(u => u.toString() === userId.toString())) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You must be registered for this event to rate it.'
+                });
+            }
+
+            const numericRating = Number(rating);
+            if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Rating must be a number between 1 and 5.'
+                });
+            }
+
+            const existing = await Rating.findOne({ event: eventId, user: userId });
+            if (existing) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You have already rated this event.'
+                });
+            }
+
+            const newRating = await Rating.create({
+                event: eventId,
+                user: userId,
+                rating: numericRating
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Rating added successfully',
+                rating: newRating
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    }
 
 };

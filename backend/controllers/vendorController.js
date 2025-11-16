@@ -501,7 +501,7 @@ exports.uploadVendorDocuments = async (req, res, next) => {
     }
 };
 
-const LoyaltyApplication = require('../models/LoyaltyApplication');
+
 
 // List all loyalty program partners with discount info, all parties are able to view
 exports.listLoyaltyPartners = async (req, res, next) => {
