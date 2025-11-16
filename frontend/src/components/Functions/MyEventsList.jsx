@@ -159,6 +159,26 @@ function MyEventsList({ events, showRefundButton = false }) {
     return Boolean(attendedFlag || attendedLocal);
   };
 
+  // Check if user is registered for the event (for comments - requirement 17)
+  const isRegistered = (evt) => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return false;
+      const user = JSON.parse(raw);
+      const userId = user && (user._id || user.id);
+      if (!userId) return false;
+      
+      // Check registeredUsers array in event
+      const registeredUsers = evt?.registeredUsers || evt?.event?.registeredUsers || [];
+      return Array.isArray(registeredUsers) && registeredUsers.some(u => {
+        const uId = String(u._id || u.id || u);
+        return uId === String(userId);
+      });
+    } catch {
+      return false;
+    }
+  };
+
   const toggleAttendedLocal = (eventId) => {
     const next = new Set(toggleAttended(eventId).map(String));
     setAttendedSet(next);
@@ -260,6 +280,7 @@ function MyEventsList({ events, showRefundButton = false }) {
         const location = getLocation(evt);
         const capacity = getCapacity(evt);
         const allowed = canRate(evt);
+        const canComment = isRegistered(evt); // Comments require registration only, not attendance
         const current = ratings[id] || 0;
         const price = getPrice(evt);
         const serverPaid = Boolean(evt?.paymentStatus || evt?.paid || evt?.event?.paymentStatus || evt?.event?.paid);
@@ -497,29 +518,29 @@ function MyEventsList({ events, showRefundButton = false }) {
                       type="text"
                       value={newCommentByEvent[id] || ''}
                       onChange={(e) => setNewCommentByEvent(prev => ({ ...prev, [id]: e.target.value }))}
-                      placeholder={allowed ? 'Write a comment…' : 'Comments enabled after you mark attendance'}
-                      disabled={!allowed}
+                      placeholder={canComment ? 'Write a comment…' : 'You must be registered for this event to comment'}
+                      disabled={!canComment}
                       style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb' }}
                     />
                     <button
                       onClick={() => submitComment(id)}
-                      disabled={!allowed || !String(newCommentByEvent[id] || '').trim() || !!commentsLoading[id]}
+                      disabled={!canComment || !String(newCommentByEvent[id] || '').trim() || !!commentsLoading[id]}
                       style={{
                         padding: '10px 14px',
-                        background: (!allowed || commentsLoading[id]) ? '#e5e7eb' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+                        background: (!canComment || commentsLoading[id]) ? '#e5e7eb' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
                         color: '#003366',
                         border: 'none',
                         borderRadius: 10,
                         fontWeight: 800,
-                        cursor: (!allowed || commentsLoading[id]) ? 'not-allowed' : 'pointer'
+                        cursor: (!canComment || commentsLoading[id]) ? 'not-allowed' : 'pointer'
                       }}
                     >
                       Post
                     </button>
                   </div>
-                  {!allowed && (
+                  {!canComment && (
                     <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 6 }}>
-                      You can comment after you mark attendance for this event.
+                      You must be registered for this event to comment.
                     </div>
                   )}
                 </div>
