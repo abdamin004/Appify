@@ -26,7 +26,13 @@ const vendorSchema = new mongoose.Schema({
   role: {
     type: String,
     default: 'Vendor' // role beta3 el vendor
-  }
+    },
+    taxCardUrl: {
+        type: String // relative path to uploaded tax card
+    },
+    logoUrl: {
+        type: String // relative path to uploaded logo image
+    }
 }, { timestamps: true }); // timestamps 3ashan yeb2a 3ando createdAt w updatedAt automatically
 
 // Hash el password abl ma n7ot el vendor fel database
