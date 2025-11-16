@@ -501,8 +501,6 @@ exports.uploadVendorDocuments = async (req, res, next) => {
     }
 };
 
-
-
 // List all loyalty program partners with discount info, all parties are able to view
 exports.listLoyaltyPartners = async (req, res, next) => {
     try {
