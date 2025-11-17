@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema({
   // Context
   application: { type: mongoose.Schema.Types.ObjectId, ref: 'VendorApplication' },
   event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
-  organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+  organization: { type: String, ref: 'Organization' },
 
   // State
   isRead: { type: Boolean, default: false, index: true },

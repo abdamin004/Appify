@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
+const Event = require('../models/Event');
+const Trip = require('../models/Trip');
+const Vendor = require('../models/Vendor');
 const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEmail, sendVendorApplicationRejectionEmail } = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
@@ -377,21 +382,31 @@ exports.reviewVendorApplication = async (req, res) => {
   }
 };
 
-exports.listAdminNotifications = async (req, res) => {
+
+// Get unread notifications count for admins
+exports.getUnreadNotificationsCount = async (req, res) => {
   try {
-    const unreadOnly = (req.query.unreadOnly || '').toString().toLowerCase() === 'true';
-    const filter = { recipientsRoles: { $in: ['Admin', 'EventOffice'] } };
-    if (unreadOnly) filter.isRead = false;
+    const pendingOnly = (req.query.pendingOnly || '').toString().toLowerCase() === 'true';
+    
+    const filter = { 
+      recipientsRoles: { $in: ['Admin', 'EventOffice'] },
+      isRead: false
+    };
+    
+    // If pendingOnly is true, only count VendorApplicationSubmitted notifications
+    if (pendingOnly) {
+      filter.type = 'VendorApplicationSubmitted';
+    }
 
-    const notifs = await Notification.find(filter)
-      .sort({ createdAt: -1 })
-      .populate('application', 'status')
-      .populate('event', 'title type startDate')
-      .populate('organization', 'name');
+    const count = await Notification.countDocuments(filter);
 
-    res.status(200).json({ success: true, notifications: notifs });
+    res.status(200).json({ 
+      success: true, 
+      unreadCount: count,
+      pendingVendorRequests: pendingOnly ? count : undefined
+    });
   } catch (error) {
-    console.error('Error listing notifications:', error);
+    console.error('Error getting unread notifications count:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 };
@@ -437,5 +452,524 @@ exports.listAllComments = async (req, res) => {
   } catch (error) {
     console.error('Error listing comments:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// Get attendees report - total number of attendees in events
+exports.getAttendeesReport = async (req, res) => {
+  try {
+    const { status, type, startDate, endDate, title, eventName } = req.query;
+    
+    // Build filter
+    const filter = {};
+    
+    // Filter by status
+    if (status) filter.status = status;
+    
+    // Filter by event type
+    if (type) filter.type = type;
+    
+    // Filter by event name/title (case-insensitive partial match)
+    const searchName = title || eventName;
+    if (searchName) {
+      filter.title = { $regex: searchName, $options: 'i' };
+    }
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      filter.startDate = {};
+      if (startDate) filter.startDate.$gte = new Date(startDate);
+      if (endDate) filter.startDate.$lte = new Date(endDate);
+    }
+
+    // Get all events matching the filter
+    const events = await Event.find(filter)
+      .select('title type status startDate endDate location capacity registeredUsers')
+      .populate('registeredUsers', 'firstName lastName email')
+      .sort({ startDate: -1 });
+
+    // Calculate statistics
+    let totalAttendees = 0;
+    let totalEvents = events.length;
+    const eventsByType = {};
+    const eventDetails = [];
+
+    events.forEach(event => {
+      const attendeeCount = event.registeredUsers ? event.registeredUsers.length : 0;
+      totalAttendees += attendeeCount;
+
+      // Group by event type
+      if (!eventsByType[event.type]) {
+        eventsByType[event.type] = {
+          type: event.type,
+          totalEvents: 0,
+          totalAttendees: 0,
+          events: []
+        };
+      }
+      eventsByType[event.type].totalEvents++;
+      eventsByType[event.type].totalAttendees += attendeeCount;
+
+      // Event details
+      const eventDetail = {
+        eventId: event._id,
+        title: event.title,
+        type: event.type,
+        status: event.status,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        capacity: event.capacity || 0,
+        attendeeCount: attendeeCount,
+        utilizationRate: event.capacity > 0 
+          ? ((attendeeCount / event.capacity) * 100).toFixed(2) + '%'
+          : 'N/A',
+        isFull: event.capacity > 0 && attendeeCount >= event.capacity
+      };
+      
+      eventDetails.push(eventDetail);
+      eventsByType[event.type].events.push(eventDetail);
+    });
+
+    // Convert eventsByType object to array
+    const breakdownByType = Object.values(eventsByType);
+
+    // Calculate average attendees per event
+    const averageAttendeesPerEvent = totalEvents > 0 
+      ? (totalAttendees / totalEvents).toFixed(2)
+      : 0;
+
+    // Find events with highest attendance
+    const topEvents = [...eventDetails]
+      .sort((a, b) => b.attendeeCount - a.attendeeCount)
+      .slice(0, 10);
+
+    res.status(200).json({
+      success: true,
+      report: {
+        filters: {
+          status: status || null,
+          type: type || null,
+          title: searchName || null,
+          startDate: startDate || null,
+          endDate: endDate || null
+        },
+        summary: {
+          totalEvents: totalEvents,
+          totalAttendees: totalAttendees,
+          averageAttendeesPerEvent: parseFloat(averageAttendeesPerEvent)
+        },
+        breakdownByType: breakdownByType,
+        topEvents: topEvents,
+        allEvents: eventDetails,
+        generatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error generating attendees report:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get sales report - revenue from different events
+exports.getSalesReport = async (req, res) => {
+  try {
+    const { status, type, startDate, endDate, title, eventName, sortBy, sortOrder } = req.query;
+    
+    // Pricing configuration for vendor booths (can be moved to config file)
+    const BOOTH_PRICING = {
+      '2x2': 500,  // $500 for 2x2 booth
+      '4x4': 1000  // $1000 for 4x4 booth
+    };
+    
+    // Build filter for events
+    const eventFilter = {};
+    if (status) eventFilter.status = status;
+    if (type) eventFilter.type = type;
+    const searchName = title || eventName;
+    if (searchName) {
+      eventFilter.title = { $regex: searchName, $options: 'i' };
+    }
+    if (startDate || endDate) {
+      eventFilter.startDate = {};
+      if (startDate) eventFilter.startDate.$gte = new Date(startDate);
+      if (endDate) eventFilter.startDate.$lte = new Date(endDate);
+    }
+    
+    // Validate sort parameters
+    const validSortOrders = ['asc', 'desc', 'ascending', 'descending'];
+    const sortDirection = validSortOrders.includes(sortOrder?.toLowerCase()) 
+      ? sortOrder.toLowerCase() 
+      : 'desc'; // default to descending (highest revenue first)
+    
+    // Normalize sort direction
+    const isAscending = sortDirection === 'asc' || sortDirection === 'ascending';
+
+    // Get all events matching the filter
+    const events = await Event.find(eventFilter)
+      .select('title type status startDate endDate location registeredUsers')
+      .sort({ startDate: -1 });
+
+    // Calculate Trip revenue (price × registered users)
+    const tripEvents = await Trip.find(eventFilter)
+      .select('title type status startDate endDate location price registeredUsers')
+      .populate('registeredUsers', 'firstName lastName email')
+      .sort({ startDate: -1 });
+
+    let tripRevenue = 0;
+    const tripDetails = [];
+    
+    tripEvents.forEach(trip => {
+      const attendeeCount = trip.registeredUsers ? trip.registeredUsers.length : 0;
+      const revenue = (trip.price || 0) * attendeeCount;
+      tripRevenue += revenue;
+      
+      tripDetails.push({
+        eventId: trip._id,
+        title: trip.title,
+        type: trip.type,
+        status: trip.status,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        location: trip.location,
+        price: trip.price || 0,
+        attendeeCount: attendeeCount,
+        revenue: revenue
+      });
+    });
+
+    // Calculate Vendor Application revenue (booth fees for paid applications)
+    const vendorAppFilter = {};
+    if (startDate || endDate) {
+      vendorAppFilter.createdAt = {};
+      if (startDate) vendorAppFilter.createdAt.$gte = new Date(startDate);
+      if (endDate) vendorAppFilter.createdAt.$lte = new Date(endDate);
+    }
+    
+    // Only count paid and approved applications
+    vendorAppFilter.paid = true;
+    vendorAppFilter.status = 'approved';
+
+    const vendorApplications = await VendorApplication.find(vendorAppFilter)
+      .populate('event', 'title type status startDate endDate location')
+      .sort({ createdAt: -1 });
+
+    let vendorRevenue = 0;
+    const vendorDetails = [];
+    const vendorRevenueByEvent = {};
+
+    vendorApplications.forEach(app => {
+      if (!app.event) return; // Skip if event is deleted
+      
+      // Apply event filters if specified
+      if (type && app.event.type !== type) return;
+      if (status && app.event.status !== status) return;
+      if (searchName && !app.event.title.toLowerCase().includes(searchName.toLowerCase())) return;
+      if (startDate && new Date(app.event.startDate) < new Date(startDate)) return;
+      if (endDate && new Date(app.event.startDate) > new Date(endDate)) return;
+
+      const boothPrice = BOOTH_PRICING[app.boothSize] || 0;
+      vendorRevenue += boothPrice;
+
+      const eventKey = String(app.event._id);
+      if (!vendorRevenueByEvent[eventKey]) {
+        vendorRevenueByEvent[eventKey] = {
+          eventId: app.event._id,
+          title: app.event.title,
+          type: app.event.type,
+          status: app.event.status,
+          startDate: app.event.startDate,
+          endDate: app.event.endDate,
+          location: app.event.location,
+          applications: [],
+          totalRevenue: 0
+        };
+      }
+      
+      vendorRevenueByEvent[eventKey].applications.push({
+        applicationId: app._id,
+        organization: app.organization,
+        boothSize: app.boothSize,
+        price: boothPrice
+      });
+      vendorRevenueByEvent[eventKey].totalRevenue += boothPrice;
+
+      vendorDetails.push({
+        applicationId: app._id,
+        eventId: app.event._id,
+        eventTitle: app.event.title,
+        eventType: app.event.type,
+        organization: app.organization,
+        boothSize: app.boothSize,
+        price: boothPrice,
+        paid: app.paid,
+        status: app.status
+      });
+    });
+
+    // Convert vendorRevenueByEvent to array
+    const vendorRevenueByEventArray = Object.values(vendorRevenueByEvent);
+
+    // Calculate totals
+    const totalRevenue = tripRevenue + vendorRevenue;
+    const totalTripEvents = tripDetails.length;
+    const totalVendorApplications = vendorDetails.length;
+
+    // Revenue breakdown by event type
+    const revenueByType = {};
+    
+    tripDetails.forEach(trip => {
+      if (!revenueByType[trip.type]) {
+        revenueByType[trip.type] = { type: trip.type, revenue: 0, count: 0 };
+      }
+      revenueByType[trip.type].revenue += trip.revenue;
+      revenueByType[trip.type].count++;
+    });
+
+    vendorRevenueByEventArray.forEach(event => {
+      if (!revenueByType[event.type]) {
+        revenueByType[event.type] = { type: event.type, revenue: 0, count: 0 };
+      }
+      revenueByType[event.type].revenue += event.totalRevenue;
+      revenueByType[event.type].count += event.applications.length;
+    });
+
+    const revenueByTypeArray = Object.values(revenueByType);
+
+    // Top revenue events (combining trips and vendor events)
+    let allRevenueEvents = [
+      ...tripDetails.map(t => ({ ...t, source: 'Trip' })),
+      ...vendorRevenueByEventArray.map(v => ({ 
+        eventId: v.eventId,
+        title: v.title,
+        type: v.type,
+        status: v.status,
+        startDate: v.startDate,
+        endDate: v.endDate,
+        location: v.location,
+        revenue: v.totalRevenue,
+        source: 'Vendor',
+        applicationCount: v.applications.length
+      }))
+    ];
+    
+    // Sort by revenue based on sortOrder parameter
+    if (sortBy === 'revenue' || !sortBy) {
+      allRevenueEvents.sort((a, b) => {
+        return isAscending 
+          ? a.revenue - b.revenue  // ascending (least to greatest)
+          : b.revenue - a.revenue;  // descending (greatest to least)
+      });
+    }
+    
+    // Apply limit for top events (only if not sorting, or if explicitly requested)
+    if (!sortBy || sortBy === 'revenue') {
+      allRevenueEvents = allRevenueEvents.slice(0, 10);
+    }
+    
+    // Sort trip details by revenue
+    if (sortBy === 'revenue' || !sortBy) {
+      tripDetails.sort((a, b) => {
+        return isAscending 
+          ? a.revenue - b.revenue
+          : b.revenue - a.revenue;
+      });
+    }
+    
+    // Sort vendor revenue by event revenue
+    if (sortBy === 'revenue' || !sortBy) {
+      vendorRevenueByEventArray.sort((a, b) => {
+        return isAscending 
+          ? a.totalRevenue - b.totalRevenue
+          : b.totalRevenue - a.totalRevenue;
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      report: {
+        filters: {
+          status: status || null,
+          type: type || null,
+          title: searchName || null,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          sortBy: sortBy || 'revenue',
+          sortOrder: sortDirection
+        },
+        summary: {
+          totalRevenue: totalRevenue,
+          tripRevenue: tripRevenue,
+          vendorRevenue: vendorRevenue,
+          totalTripEvents: totalTripEvents,
+          totalVendorApplications: totalVendorApplications
+        },
+        revenueByType: revenueByTypeArray,
+        tripRevenue: {
+          total: tripRevenue,
+          events: tripDetails
+        },
+        vendorRevenue: {
+          total: vendorRevenue,
+          events: vendorRevenueByEventArray,
+          applications: vendorDetails
+        },
+        topRevenueEvents: allRevenueEvents,
+        generatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error generating sales report:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
+  }
+};
+
+// Get vendor documents for approved bazaar/booth applications
+exports.getVendorDocuments = async (req, res) => {
+  try {
+    const { eventId, organization, vendorId } = req.query;
+    
+    // Build filter for approved vendor applications to Bazaar or Booth events
+    const appFilter = {
+      status: 'approved',
+      event: { $exists: true }
+    };
+    
+    if (eventId) appFilter.event = eventId;
+    if (organization) appFilter.organization = { $regex: organization, $options: 'i' };
+    if (vendorId) appFilter.vendorUser = vendorId;
+
+    // Get approved vendor applications
+    const applications = await VendorApplication.find(appFilter)
+      .populate('event', 'title type startDate endDate location status')
+      .populate('vendorUser', 'companyName email taxCardUrl logoUrl')
+      .sort({ createdAt: -1 });
+
+    // Filter to only Bazaar and Booth events
+    const filteredApplications = applications.filter(app => 
+      app.event && (app.event.type === 'Bazaar' || app.event.type === 'Booth')
+    );
+
+    // Format response with vendor documents
+    const vendorDocuments = filteredApplications.map(app => ({
+      applicationId: app._id,
+      event: {
+        id: app.event._id,
+        title: app.event.title,
+        type: app.event.type,
+        startDate: app.event.startDate,
+        endDate: app.event.endDate,
+        location: app.event.location,
+        status: app.event.status
+      },
+      vendor: {
+        id: app.vendorUser._id,
+        companyName: app.vendorUser.companyName,
+        email: app.vendorUser.email,
+        taxCardUrl: app.vendorUser.taxCardUrl || null,
+        logoUrl: app.vendorUser.logoUrl || null,
+        taxCardAvailable: !!app.vendorUser.taxCardUrl,
+        logoAvailable: !!app.vendorUser.logoUrl
+      },
+      organization: app.organization,
+      boothSize: app.boothSize,
+      attendees: app.attendees || [],
+      setupDurationWeeks: app.setupDurationWeeks,
+      setupLocation: app.setupLocation,
+      paid: app.paid,
+      createdAt: app.createdAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: vendorDocuments.length,
+      vendorDocuments: vendorDocuments
+    });
+  } catch (error) {
+    console.error('Error fetching vendor documents:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
+  }
+};
+
+// Download/view a specific vendor document
+exports.downloadVendorDocument = async (req, res) => {
+  try {
+    const { vendorId, documentType } = req.params;
+    
+    if (!['taxCard', 'logo'].includes(documentType)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid document type. Use "taxCard" or "logo"' 
+      });
+    }
+
+    // Get vendor
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Vendor not found' 
+      });
+    }
+
+    // Get document URL
+    const documentUrl = documentType === 'taxCard' ? vendor.taxCardUrl : vendor.logoUrl;
+    
+    if (!documentUrl) {
+      return res.status(404).json({ 
+        success: false,
+        message: `${documentType === 'taxCard' ? 'Tax card' : 'Logo'} not found for this vendor` 
+      });
+    }
+
+    // Construct full file path
+    const filePath = path.join(__dirname, '..', documentUrl);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Document file not found on server' 
+      });
+    }
+
+    // Get file extension to set appropriate content type
+    const ext = path.extname(filePath).toLowerCase();
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg'
+    };
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+
+    // Set headers for download
+    const filename = `${vendor.companyName}_${documentType}${ext}`;
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Error downloading vendor document:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
   }
 };
