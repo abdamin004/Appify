@@ -9,6 +9,7 @@ const AvailabilitySlotSchema = new Schema({
   isBooked: { type: Boolean, default: false },
   bookedBy: { type: Types.ObjectId, ref: 'User' }, // user who booked it
   bookingRef: { type: String },                    // optional booking reference ID
+  bookingName: { type: String },                   // student's display name at booking time
 });
 
 const CourtSchema = new Schema({

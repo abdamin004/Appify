@@ -1,6 +1,6 @@
 import React from 'react';
 
-const EventCard = ({ event, onClick, onDelete }) => {
+const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed }) => {
   const icons = { Workshop: '🛠️', Trip: '🚌', Bazaar: '🏪', Booth: '🎪', Conference: '🎤' };
   const typeColors = {
     Workshop: { bg: 'rgba(212, 175, 55, 0.15)', text: '#003366' },
@@ -23,6 +23,23 @@ const EventCard = ({ event, onClick, onDelete }) => {
     if (onDelete) onDelete(event._id);
   };
 
+  const handleArchiveClick = (e) => {
+    e.stopPropagation();
+    if (onArchive) onArchive(event._id, event);
+  };
+
+  const eventHasPassed = hasEventPassed ? hasEventPassed(event) : false;
+  // Check if archived (backend status or frontend localStorage)
+  const isArchived = event.status === 'completed' || (typeof window !== 'undefined' && (() => {
+    try {
+      const stored = localStorage.getItem('archivedEvents');
+      const archivedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+      return archivedSet.has(event._id);
+    } catch {
+      return false;
+    }
+  })());
+
   const hasRegistrations = (event.registeredCount || (event.registeredUsers && event.registeredUsers.length) || 0) > 0;
 
   return (
@@ -31,6 +48,7 @@ const EventCard = ({ event, onClick, onDelete }) => {
       <div className="event-image" style={{ background: event.imageUrl ? `url(${event.imageUrl}) center/cover` : 'linear-gradient(135deg, #003366 0%, #001a33 100%)' }}>
         {!event.imageUrl && <span className="event-icon">{icons[event.type] || '📅'}</span>}
         {event.status === 'cancelled' && <div className="cancelled-badge">CANCELLED</div>}
+        {isArchived && <div className="archived-badge">ARCHIVED</div>}
       </div>
 
       {/* Content */}
@@ -88,12 +106,43 @@ const EventCard = ({ event, onClick, onDelete }) => {
           {event.registrationDeadline && new Date(event.registrationDeadline) > new Date() && (
             <div className="deadline-info">⏰ Register by {formatDate(event.registrationDeadline)}</div>
           )}
-          {/* Delete button for admins: only show if no registrations */}
-          {onDelete && !hasRegistrations && (
-            <div style={{ marginTop: 12 }}>
-              <button onClick={handleDeleteClick} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 6 }}>Delete</button>
-            </div>
-          )}
+          {/* Action buttons for admins */}
+          <div style={{ marginTop: 12, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {onDelete && !hasRegistrations && (
+              <button 
+                onClick={handleDeleteClick} 
+                style={{ 
+                  backgroundColor: '#dc2626', 
+                  color: '#fff', 
+                  border: 'none', 
+                  padding: '8px 12px', 
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: '600'
+                }}
+              >
+                Delete
+              </button>
+            )}
+            {onArchive && eventHasPassed && !isArchived && (
+              <button 
+                onClick={handleArchiveClick} 
+                style={{ 
+                  backgroundColor: '#6b7280', 
+                  color: '#fff', 
+                  border: 'none', 
+                  padding: '8px 12px', 
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: '600'
+                }}
+              >
+                📦 Archive
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -131,6 +180,17 @@ const EventCard = ({ event, onClick, onDelete }) => {
           right: 10px;
           padding: 6px 12px;
           background: #dc2626;
+          color: white;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          font-weight: bold;
+        }
+        .archived-badge {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          padding: 6px 12px;
+          background: #6b7280;
           color: white;
           border-radius: 8px;
           font-size: 0.75rem;

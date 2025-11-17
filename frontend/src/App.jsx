@@ -29,6 +29,7 @@ import CommentModeration from "./components/Admin/CommentModeration";
 import ViewEvents from "./components/Admin/ViewEvents";
 import RegisterEvents from "./components/RegisterEvents";
 import GymSessions from "./components/GymSessions";
+import EventDetails from "./components/EventDetails";
 
 
 function App() {
@@ -75,6 +76,7 @@ function App() {
           <Route path="/professor/workshops" element={<WorkshopsManager />} />
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
+          <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/register-events" element={<RegisterEvents />} />
           <Route path="/gym-sessions" element={<GymSessions />} />
         

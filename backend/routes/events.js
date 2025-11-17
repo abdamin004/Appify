@@ -44,6 +44,9 @@ router.post('/unregister/:eventId', auth, eventController.unregisterFromEvent);
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
 
+// Get single event by ID (must be before /:id/comments and /:id/ratings)
+router.get('/:id', eventController.getEventById);
+
 router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventComments);
 // View all ratings on an event
 router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
