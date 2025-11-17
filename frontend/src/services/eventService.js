@@ -126,6 +126,21 @@ export function deleteEvent(id) {
 // Event details + comments/ratings
 export async function getEventById(id) {
   const res = await fetch(`${API_BASE}/events/${id}`);
+  if (!res.ok) {
+    const text = await res.text();
+    let errorMsg = `Failed to load event (${res.status})`;
+    try {
+      const json = JSON.parse(text);
+      errorMsg = json.message || json.error || errorMsg;
+    } catch (_) {
+      if (text.includes('<!DOCTYPE')) {
+        errorMsg = 'Server returned HTML instead of JSON. Check if backend is running correctly.';
+      } else if (text) {
+        errorMsg = text;
+      }
+    }
+    throw new Error(errorMsg);
+  }
   return res.json();
 }
 export async function getEventComments(id) {
