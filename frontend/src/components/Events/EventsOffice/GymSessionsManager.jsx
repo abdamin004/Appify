@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createGymSession, listGymSessions, updateGymSession, cancelGymSession } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -40,6 +42,7 @@ function GymSessionsManager() {
     instructor: '',
     capacity: '',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -113,10 +116,18 @@ function GymSessionsManager() {
       };
       const createdSession = await createGymSession(payload);
       setSuccess('Gym session created');
+      
+      // Save user restrictions if any
+      const sessionEvent = createdSession?.event || createdSession;
+      const eventId = sessionEvent?._id || sessionEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const sessionEvent = createdSession?.event || createdSession;
       if (sessionEvent && (sessionEvent.status === 'published' || payload.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(sessionEvent);
@@ -221,6 +232,11 @@ function GymSessionsManager() {
               <span>Instructor</span>
             </label>
           </div>
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
           <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Session'}
           </button>

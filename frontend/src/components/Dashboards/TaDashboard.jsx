@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import EventList from "../EventList"; // Import the EventList component
 import MyEventsList from "../Functions/MyEventsList";
+import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { API_BASE } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
@@ -159,8 +160,14 @@ function TADashboard() {
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
       
+      // Filter out restricted events that user can't access
+      const accessibleEvents = publishedEvents.filter(e => {
+        const eventId = e._id || e.id;
+        return canUserAccessEvent(eventId);
+      });
+      
       const seenIds = getSeenEventIds();
-      const newEvents = publishedEvents.filter(e => {
+      const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
         return !seenIds.has(eventId);
       });
@@ -316,7 +323,14 @@ function TADashboard() {
         return;
       }
       const data = await res.json();
-      setRegisteredEvents(Array.isArray(data) ? data : []);
+      const events = Array.isArray(data) ? data : [];
+      // Filter out restricted events that user can't access
+      const filteredEvents = events.filter(event => {
+        const eventId = event._id || event.id;
+        if (!eventId) return true; // Include events without ID
+        return canUserAccessEvent(eventId);
+      });
+      setRegisteredEvents(filteredEvents);
     } catch (err) {
       console.error("Error fetching registered events:", err);
       setRegisteredEvents([]);
@@ -351,6 +365,13 @@ function TADashboard() {
   };
 
   const filteredEvents = registeredEvents.filter((event) => {
+    // First check if user has access to this event
+    const eventId = event._id || event.id;
+    if (eventId && !canUserAccessEvent(eventId)) {
+      console.log('Filtering out restricted event from registered list:', eventId, event.title);
+      return false;
+    }
+    // Then apply the "upcoming" filter if needed
     if (filter === "upcoming") return isUpcoming(event);
     return true;
   });
@@ -364,7 +385,11 @@ function TADashboard() {
       const res = await fetch(`${API_BASE}/events`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      const filtered = list.filter(ev => ids.includes(String(ev._id || ev.id)));
+      const filtered = list.filter(ev => {
+        const eventId = ev._id || ev.id;
+        // Check if event is in favorites AND user has access
+        return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
+      });
       setFavouriteEvents(filtered);
     } catch (_) {
       setFavouriteEvents([]);

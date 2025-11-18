@@ -6,6 +6,7 @@ import { API_BASE } from "../services/eventService";
 import { deleteEvent, getApprovedWorkshops } from '../services/eventService';
 import { FaHeart } from 'react-icons/fa';
 import favourites from "../services/favoritesService";
+import { canUserAccessEvent } from "../services/eventRestrictionService";
 
 function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false }) {
   const navigate = useNavigate();
@@ -89,7 +90,18 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         console.log('Error adding approved workshops:', e);
       }
       
-      setEvents(list);
+      // Filter events based on user restrictions (frontend-only)
+      const filteredList = list.filter(event => {
+        const eventId = event._id || event.id;
+        if (!eventId) return true; // Include events without ID
+        const hasAccess = canUserAccessEvent(eventId);
+        if (!hasAccess) {
+          console.log('Filtered out restricted event:', eventId, event.title);
+        }
+        return hasAccess;
+      });
+      
+      setEvents(filteredList);
     } catch (error) {
       console.error("Error fetching events:", error);
     } finally {

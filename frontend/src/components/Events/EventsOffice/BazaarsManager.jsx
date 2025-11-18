@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createBazaar, listBazaars, updateEvent } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -37,6 +39,7 @@ function BazaarsManager() {
     registrationDeadline: '',
     status: 'published',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -56,10 +59,18 @@ function BazaarsManager() {
     try {
       const createdBazaar = await createBazaar(form);
       setSuccess('Bazaar created');
+      
+      // Save user restrictions if any
+      const bazaarEvent = createdBazaar?.event || createdBazaar;
+      const eventId = bazaarEvent?._id || bazaarEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const bazaarEvent = createdBazaar?.event || createdBazaar;
       if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(bazaarEvent);
@@ -129,6 +140,11 @@ function BazaarsManager() {
               <span>Registration Deadline</span>
             </label>
           </div>
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
           <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Bazaar'}
           </button>

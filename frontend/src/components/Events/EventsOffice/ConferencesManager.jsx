@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createConference, listConferences, updateEvent } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -37,6 +39,7 @@ function ConferencesManager() {
     fundingSource: 'internal', // Changed from 'GUC' to 'internal'
     extraRequiredResourses: false,
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +72,14 @@ function ConferencesManager() {
       const payload = { ...form, location: 'N/A' };
       const createdConference = await createConference(payload);
       setSuccess('Conference created');
+      
+      // Save user restrictions if any
+      const conferenceEvent = createdConference?.event || createdConference;
+      const eventId = conferenceEvent?._id || conferenceEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({
         title: '',
         shortDescription: '',
@@ -82,9 +93,9 @@ function ConferencesManager() {
         fundingSource: 'internal', // Changed from 'GUC' to 'internal'
         extraRequiredResourses: false,
       });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const conferenceEvent = createdConference?.event || createdConference;
       if (conferenceEvent && (conferenceEvent.status === 'published' || payload.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(conferenceEvent);
@@ -188,6 +199,11 @@ function ConferencesManager() {
             />
             <span>Extra Required Resources</span>
           </label>
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
           <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Conference'}
           </button>

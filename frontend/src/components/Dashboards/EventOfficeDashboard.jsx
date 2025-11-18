@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import EventsList from "../AdminEventList";
 import MyEventsList from "../Functions/MyEventsList";
+import QRCodeGenerator from "../QRCode/QRCodeGenerator";
+import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
@@ -15,6 +17,7 @@ function EventOfficeDashboard() {
   const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
+  const [qrCodeEvent, setQrCodeEvent] = useState(null);
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
     // Load approved workshops from localStorage
     try {
@@ -947,10 +950,35 @@ function EventOfficeDashboard() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: "15px 30px",
+                background:
+                  activeTab === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Booth Polls
+            </button>
           </div>
 
           {/* Content */}
-          {activeTab === "browse" && <EventsList />}
+          {activeTab === "browse" && (
+            <EventsList 
+              onGenerateQR={(event) => setQrCodeEvent(event)} 
+            />
+          )}
 
           {activeTab === "vendor-requests" && (
             <div
@@ -1348,6 +1376,10 @@ function EventOfficeDashboard() {
             </div>
           )}
 
+          {activeTab === "polls" && (
+            <BoothPollManager />
+          )}
+
           {activeTab === "notifications" && (
             <div
               style={{
@@ -1700,6 +1732,14 @@ function EventOfficeDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code Generator Modal */}
+      {qrCodeEvent && (
+        <QRCodeGenerator 
+          event={qrCodeEvent} 
+          onClose={() => setQrCodeEvent(null)} 
+        />
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 import { deleteEvent } from '../services/eventService';
 
-function EventsList({ filterByTypes = null, presetType = null }) {
+function EventsList({ filterByTypes = null, presetType = null, onGenerateQR = null }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -435,6 +435,7 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                   onDelete={handleDeleteEvent}
                   onArchive={handleArchiveEvent}
                   hasEventPassed={hasEventPassed}
+                  onGenerateQR={onGenerateQR}
                 />
               ))}
             </div>
