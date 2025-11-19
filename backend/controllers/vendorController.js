@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Event = require('../models/Event');       // base model with discriminators
+const Booth = require('../models/Booth');       // Booth discriminator
 const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
@@ -110,17 +111,21 @@ exports.applyToEvent = async (req, res, next) => {
 
     // Normalize input - if it's an id-like string we'll try by id first, otherwise try title
     let ev = null;
+    
+    // Find existing event - vendors must apply to existing events created by EventOffice
     if (isValidId(eventId)) {
-      ev = await Event.findById(eventId).select('type status startDate title');
+      ev = await Event.findById(eventId).select('type status startDate title location');
     }
     if (!ev) {
       // Treat eventId as title (exact match) or eventName provided
       const titleToFind = body.eventName || eventId;
       if (titleToFind && typeof titleToFind === 'string') {
-        ev = await Event.findOne({ title: titleToFind, status: 'published' }).select('type status startDate title');
+        ev = await Event.findOne({ title: titleToFind, status: 'published' }).select('type status startDate title location');
       }
     }
-    if (!ev) return res.status(404).json({ success: false, message: 'Event not found' });
+    if (!ev) {
+      return res.status(404).json({ success: false, message: 'Event not found. Please select an existing event.' });
+    }
 
     /*
     // Organization must exist
@@ -144,15 +149,17 @@ exports.applyToEvent = async (req, res, next) => {
       }
 
 
-    // Booth-only rules
+    // Booth-only rules - setupDurationWeeks and setupLocation are optional for Booth events
+    // Location is already set by EventOffice when creating the Booth event
     if (ev.type === 'Booth') {
-      const okInt = Number.isInteger(setupDurationWeeks);
-      if (!okInt || setupDurationWeeks < 1 || setupDurationWeeks > 4) {
-        return badReq(res, 'setupDurationWeeks must be an integer between 1 and 4');
+      // setupDurationWeeks and setupLocation are optional - can be provided by vendor or set by EventOffice
+      if (setupDurationWeeks !== undefined) {
+        const okInt = Number.isInteger(setupDurationWeeks);
+        if (!okInt || setupDurationWeeks < 1 || setupDurationWeeks > 4) {
+          return badReq(res, 'setupDurationWeeks must be an integer between 1 and 4');
+        }
       }
-      if (!setupLocation || typeof setupLocation !== 'string') {
-        return badReq(res, 'setupLocation is required (map slot id/code)');
-      }
+      // setupLocation is optional - vendor can specify preferred location or use event location
     }
 
     // Check if there's an existing application (including cancelled ones)
@@ -182,7 +189,7 @@ exports.applyToEvent = async (req, res, next) => {
       attendees,
       boothSize,
       setupDurationWeeks: ev.type === 'Booth' ? setupDurationWeeks : undefined,
-      setupLocation:      ev.type === 'Booth' ? setupLocation      : undefined,
+      setupLocation:      ev.type === 'Booth' ? (setupLocation || ev.location) : undefined,
       notes
     });
 
