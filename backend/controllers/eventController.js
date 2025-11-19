@@ -807,53 +807,100 @@ async unregisterFromEvent(req, res) {
         }
     },
 
-    // POST /api/events/gym-sessions/:sessionId/register
-    async registerForGymSession(req, res) {
+    async addEventToFavorites(req, res) {
         try {
-            const { sessionId } = req.params;
+            const { eventId } = req.params;
             const userId = req.user._id;
 
-            // 1) Find the gym session
-            const session = await GymSession.findById(sessionId);
-            if (!session) {
-                return res.status(404).json({ message: 'Gym session not found' });
+            // 1) Ensure event exists and is published (optional but makes sense)
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
             }
 
-            // 2) Prevent registering to a past session (use startDate from base Event)
-            const now = new Date();
-            if (session.startDate && session.startDate < now) {
-                return res.status(400).json({ message: 'Cannot register to a past gym session' });
+            // 2) Load user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
             }
 
-            // 3) Check if already registered
-            const alreadyRegistered = (session.attendees || []).some(
-                (att) => att.toString() === userId.toString()
+            user.favoriteEvents = user.favoriteEvents || [];
+
+            // 3) Prevent duplicates
+            const alreadyFav = user.favoriteEvents.some(
+                (id) => id.toString() === eventId.toString()
             );
-            if (alreadyRegistered) {
-                return res.status(400).json({ message: 'You are already registered for this gym session' });
+            if (alreadyFav) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
             }
 
-            // 4) Check capacity
-            if (session.attendees && session.attendees.length >= session.capacity) {
-                return res.status(400).json({ message: 'This gym session is full' });
-            }
-
-            // 5) Add user to attendees
-            session.attendees = session.attendees || [];
-            session.attendees.push(userId);
-            await session.save();
+            // 4) Add to favorites and save
+            user.favoriteEvents.push(eventId);
+            await user.save();
 
             return res.status(200).json({
                 success: true,
-                message: 'Successfully registered for gym session',
-                sessionId: session._id,
-                currentAttendees: session.attendees.length
+                message: 'Event added to favorites successfully',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    type: event.type,
+                    startDate: event.startDate,
+                    location: event.location
+                }
             });
         } catch (err) {
-            console.error('registerForGymSession error:', err);
-            return res.status(500).json({ message: 'Server error', error: err.message });
+            console.error('addEventToFavorites error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
         }
     },
+
+    async getMyFavoriteEvents(req, res) {
+        try {
+            const userId = req.user._id;
+
+            const user = await User.findById(userId).populate({
+                path: 'favoriteEvents',
+                populate: { path: 'vendors', options: { strictPopulate: false } }
+            });
+
+            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+
+            if (events.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'No favorite events yet',
+                    events: []
+                });
+            }
+
+            const enriched = await attachApprovedParticipants(events);
+
+            return res.status(200).json({
+                success: true,
+                count: enriched.length,
+                events: enriched
+            });
+        } catch (err) {
+            console.error('getMyFavoriteEvents error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    }
 
 
 };

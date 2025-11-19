@@ -54,7 +54,10 @@ router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor',
 // Add a rating on an event (ONLY after event has ended)
 router.post('/:id/ratings',auth,roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.addEventRating);
 
-// Register to attend a gym session
-router.post('/gym-sessions/:sessionId/register',auth,roleCheck('Student', 'Staff', 'TA', 'Professor'),eventController.registerForGymSession);
+// Add event to favorites
+router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
+
+// View my favorites list
+router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
 
 module.exports = router;
