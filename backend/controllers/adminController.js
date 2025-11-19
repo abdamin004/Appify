@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const XLSX = require('xlsx');
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Trip = require('../models/Trip');
@@ -966,6 +967,97 @@ exports.downloadVendorDocument = async (req, res) => {
     
   } catch (error) {
     console.error('Error downloading vendor document:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
+  }
+};
+
+// Export registered users for an event to Excel
+exports.exportEventRegistrations = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Find the event
+    const event = await Event.findById(eventId)
+      .populate('registeredUsers', 'firstName lastName email role studentStaffId')
+      .select('title type startDate endDate location registeredUsers');
+
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Event not found' 
+      });
+    }
+
+    // Check if event is a Conference (exclude conferences)
+    if (event.type === 'Conference') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Cannot export registrations for Conference events' 
+      });
+    }
+
+    // Get registered users
+    const registeredUsers = event.registeredUsers || [];
+
+    if (registeredUsers.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'No registered users found for this event' 
+      });
+    }
+
+    // Prepare data for Excel
+    const excelData = registeredUsers.map((user, index) => ({
+      'No.': index + 1,
+      'First Name': user.firstName || '',
+      'Last Name': user.lastName || '',
+      'Full Name': `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      'Email': user.email || '',
+      'Role': user.role || '',
+      'Student/Staff ID': user.studentStaffId || ''
+    }));
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths
+    const columnWidths = [
+      { wch: 5 },   // No.
+      { wch: 15 },  // First Name
+      { wch: 15 },  // Last Name
+      { wch: 25 },  // Full Name
+      { wch: 30 },  // Email
+      { wch: 15 },  // Role
+      { wch: 18 }   // Student/Staff ID
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registered Users');
+
+    // Generate Excel file buffer
+    const excelBuffer = XLSX.write(workbook, { 
+      type: 'buffer', 
+      bookType: 'xlsx' 
+    });
+
+    // Set response headers for file download
+    const filename = `${event.title.replace(/[^a-z0-9]/gi, '_')}_Registrations_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache');
+
+    // Send the file
+    res.send(excelBuffer);
+
+  } catch (error) {
+    console.error('Error exporting event registrations:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
