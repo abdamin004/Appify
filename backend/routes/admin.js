@@ -86,4 +86,12 @@ router.get(
   adminController.downloadVendorDocument
 );
 
+// Export event registrations to Excel
+router.get(
+  '/events/:eventId/export-registrations',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.exportEventRegistrations
+);
+
 module.exports = router;
