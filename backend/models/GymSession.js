@@ -40,7 +40,19 @@ const gymSessionSchema = new mongoose.Schema({
   prerequisites: {
     type: String,
     trim: true
-  }
+    },
+
+    capacity: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    attendees: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }
+    ]
 });
 
 const GymSession = Event.discriminator('GymSession', gymSessionSchema);

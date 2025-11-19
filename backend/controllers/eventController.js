@@ -805,6 +805,55 @@ async unregisterFromEvent(req, res) {
                 message: err.message
             });
         }
-    }
+    },
+
+    // POST /api/events/gym-sessions/:sessionId/register
+    async registerForGymSession(req, res) {
+        try {
+            const { sessionId } = req.params;
+            const userId = req.user._id;
+
+            // 1) Find the gym session
+            const session = await GymSession.findById(sessionId);
+            if (!session) {
+                return res.status(404).json({ message: 'Gym session not found' });
+            }
+
+            // 2) Prevent registering to a past session (use startDate from base Event)
+            const now = new Date();
+            if (session.startDate && session.startDate < now) {
+                return res.status(400).json({ message: 'Cannot register to a past gym session' });
+            }
+
+            // 3) Check if already registered
+            const alreadyRegistered = (session.attendees || []).some(
+                (att) => att.toString() === userId.toString()
+            );
+            if (alreadyRegistered) {
+                return res.status(400).json({ message: 'You are already registered for this gym session' });
+            }
+
+            // 4) Check capacity
+            if (session.attendees && session.attendees.length >= session.capacity) {
+                return res.status(400).json({ message: 'This gym session is full' });
+            }
+
+            // 5) Add user to attendees
+            session.attendees = session.attendees || [];
+            session.attendees.push(userId);
+            await session.save();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Successfully registered for gym session',
+                sessionId: session._id,
+                currentAttendees: session.attendees.length
+            });
+        } catch (err) {
+            console.error('registerForGymSession error:', err);
+            return res.status(500).json({ message: 'Server error', error: err.message });
+        }
+    },
+
 
 };
