@@ -111,9 +111,17 @@ function GymSessionsManager() {
         sessionType: form.sessionType,
         instructor: form.instructor,
       };
-      await createGymSession(payload);
+      const createdSession = await createGymSession(payload);
       setSuccess('Gym session created');
       setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
+      
+      // Create notifications for all users if event is published
+      const sessionEvent = createdSession?.event || createdSession;
+      if (sessionEvent && (sessionEvent.status === 'published' || payload.status === 'published')) {
+        const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
+        notifyAllUsersAboutNewEvent(sessionEvent);
+      }
+      
       await refresh();
     } catch (err) { setError(err.message || 'Failed to create'); }
     finally { setLoading(false); }
