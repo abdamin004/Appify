@@ -38,6 +38,9 @@ function currentUserId() {
 export function createBazaar(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Bazaar', createdBy: currentUserId() });
 }
+export function createBooth(payload) {
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Booth', createdBy: currentUserId() });
+}
 export function createTrip(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Trip', createdBy: currentUserId() });
 }
@@ -57,6 +60,10 @@ export function updateEvent(id, payload) {
 // Lists (by type)
 export async function listBazaars() {
   const res = await fetch(`${API_BASE}/events/filter?type=Bazaar`);
+  return res.json();
+}
+export async function listBooths() {
+  const res = await fetch(`${API_BASE}/events/filter?type=Booth`);
   return res.json();
 }
 export async function listTrips() {

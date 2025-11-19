@@ -464,6 +464,7 @@ function EventOfficeDashboard() {
   const handleCreateEvent = (type) => {
     const routes = {
       bazaar: "/events-office/bazaars",
+      booth: "/events-office/booths",
       trip: "/events-office/trips",
       conference: "/events-office/conferences",
       gym: "/events-office/gym-sessions",
@@ -662,6 +663,21 @@ function EventOfficeDashboard() {
                     }}
                   >
                     🏪 Create/edit Bazaar
+                  </button>
+                  <button
+                    onClick={() => handleCreateEvent("booth")}
+                    style={{
+                      width: "100%",
+                      padding: "12px 20px",
+                      background: "transparent",
+                      border: "none",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      color: "#003366",
+                    }}
+                  >
+                    🏬 Create/edit Booth
                   </button>
                   <button
                     onClick={() => handleCreateEvent("trip")}

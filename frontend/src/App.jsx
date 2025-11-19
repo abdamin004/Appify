@@ -10,6 +10,7 @@ import Navbar from "./components/Navbar";
 import EventList from "./components/EventList";
 // Events management pages (role-based)
 import BazaarsManager from "./components/Events/EventsOffice/BazaarsManager";
+import BoothsManager from "./components/Events/EventsOffice/BoothsManager";
 import TripsManager from "./components/Events/EventsOffice/TripsManager";
 import WorkshopsManager from "./components/Events/Professor/WorkshopsManager";
 import ConferencesManager from "./components/Events/EventsOffice/ConferencesManager";
@@ -68,6 +69,7 @@ function App() {
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
           {/* Events Office */}
           <Route path="/events-office/bazaars" element={<BazaarsManager />} />
+          <Route path="/events-office/booths" element={<BoothsManager />} />
           <Route path="/events-office/trips" element={<TripsManager />} />
           <Route path="/events-office/conferences" element={<ConferencesManager />} />
           <Route path="/events-office/gym-sessions" element={<GymSessionsManager />} />
