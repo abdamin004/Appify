@@ -801,6 +801,102 @@ async unregisterFromEvent(req, res) {
                 message: err.message
             });
         }
+    },
+
+    async addEventToFavorites(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // 1) Ensure event exists and is published (optional but makes sense)
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // 2) Load user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            user.favoriteEvents = user.favoriteEvents || [];
+
+            // 3) Prevent duplicates
+            const alreadyFav = user.favoriteEvents.some(
+                (id) => id.toString() === eventId.toString()
+            );
+            if (alreadyFav) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
+            }
+
+            // 4) Add to favorites and save
+            user.favoriteEvents.push(eventId);
+            await user.save();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event added to favorites successfully',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    type: event.type,
+                    startDate: event.startDate,
+                    location: event.location
+                }
+            });
+        } catch (err) {
+            console.error('addEventToFavorites error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getMyFavoriteEvents(req, res) {
+        try {
+            const userId = req.user._id;
+
+            const user = await User.findById(userId).populate({
+                path: 'favoriteEvents',
+                populate: { path: 'vendors', options: { strictPopulate: false } }
+            });
+
+            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+
+            if (events.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'No favorite events yet',
+                    events: []
+                });
+            }
+
+            const enriched = await attachApprovedParticipants(events);
+
+            return res.status(200).json({
+                success: true,
+                count: enriched.length,
+                events: enriched
+            });
+        } catch (err) {
+            console.error('getMyFavoriteEvents error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
     }
+
 
 };

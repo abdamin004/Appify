@@ -17,7 +17,12 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
   registeredEvents: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Event' 
-  }]
+    }],
+
+    favoriteEvents: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event'
+    }]
 });
 
 // Password hashing middleware
