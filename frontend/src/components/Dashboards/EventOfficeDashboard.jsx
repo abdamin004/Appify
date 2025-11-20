@@ -809,8 +809,8 @@ function EventOfficeDashboard() {
             </button>
             <button
       onClick={() => {
-        setActiveTab("vendor-documents"); // keep your active tab logic
-        navigate("/admin/vendor-documents"); // navigate to the route
+        setActiveTab("vendor-documents"); 
+        navigate("/admin/vendor-documents"); 
       }}
       style={{
         flex: 1,
@@ -831,6 +831,30 @@ function EventOfficeDashboard() {
     >
       📄 Vendor Documents
     </button>
+<button
+  onClick={() => {
+    setActiveTab("attendees-report"); 
+    navigate("/admin/attendees-report"); 
+  }}
+  style={{
+    flex: 1,
+    minWidth: "150px",
+    padding: "15px 30px",
+    background:
+      activeTab === "attendees-report"
+        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+        : "transparent",
+    color: activeTab === "attendees-report" ? "#003366" : "#6b7280",
+    border: "none",
+    borderRadius: "15px",
+    fontSize: "1rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "all 0.3s",
+  }}
+>
+  📊 Attendees Report
+</button>
   
 
 
