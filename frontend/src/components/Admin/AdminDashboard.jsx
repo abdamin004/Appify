@@ -33,6 +33,7 @@ export default function AdminDashboard() {
               <Link style={linkStyle} to="/admin/notifications">Notifications</Link>
               <Link style={linkStyle} to="/admin/comments">Comment Moderation</Link>
               <Link style={linkStyle} to="/admin/view-events">View Events</Link>
+               <Link style={linkStyle} to="/admin/vendor-documents">Vendor Documents</Link>
             </div>
           </div>
         </div>

@@ -808,6 +808,33 @@ function EventOfficeDashboard() {
               )}
             </button>
             <button
+      onClick={() => {
+        setActiveTab("vendor-documents"); // keep your active tab logic
+        navigate("/admin/vendor-documents"); // navigate to the route
+      }}
+      style={{
+        flex: 1,
+        minWidth: "150px",
+        padding: "15px 30px",
+        background:
+          activeTab === "vendor-documents"
+            ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+            : "transparent",
+        color: activeTab === "vendor-documents" ? "#003366" : "#6b7280",
+        border: "none",
+        borderRadius: "15px",
+        fontSize: "1rem",
+        fontWeight: "700",
+        cursor: "pointer",
+        transition: "all 0.3s",
+      }}
+    >
+      📄 Vendor Documents
+    </button>
+  
+
+
+            <button
               onClick={() => setActiveTab("gym-sessions")}
               style={{
                 flex: 1,
