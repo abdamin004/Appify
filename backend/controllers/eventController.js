@@ -13,6 +13,7 @@ const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
 const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
+const Notification = require('../models/Notification');
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -136,6 +137,20 @@ module.exports = {
                     break;
                 default:
                     event = await Event.create(eventData);
+            }
+            //  NEW EVENT NOTIFICATION — ONLY if published
+            if (event.status === 'published') {
+                try {
+                    await Notification.create({
+                        type: 'NewEventPublished',
+                        message: `A new ${event.type || 'event'} has been added: ${event.title}`,
+                        event: event._id,
+                        recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+                    });
+                } catch (notifyErr) {
+                    console.error('Failed to create new event notification:', notifyErr);
+                    // do NOT fail the request
+                }
             }
 
             res.status(201).json({
@@ -629,6 +644,18 @@ async unregisterFromEvent(req, res) {
         event.status = 'published';
         await event.save();
 
+        //  New Event Published notification
+        try {
+            await Notification.create({
+                type: 'NewEventPublished',
+                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                event: event._id,
+                recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+            });
+        } catch (notifyErr) {
+            console.error('Failed to create publish event notification:', notifyErr);
+            // don't fail the request because of a notification error
+        }
         res.status(200).json({
             success: true,
             message: 'Event published successfully',
