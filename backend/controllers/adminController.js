@@ -10,6 +10,7 @@ const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEm
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
+const LoyaltyApplication = require('../models/LoyaltyApplication');
 
 // List all users with optional filtering
 exports.listAllUsers = async (req, res) => {
@@ -970,6 +971,82 @@ exports.downloadVendorDocument = async (req, res) => {
       success: false,
       message: 'Internal Server Error', 
       error: error.message 
+    });
+  }
+};
+
+// List loyalty applications (with optional status filter)
+exports.listLoyaltyApplications = async (req, res) => {
+  try {
+    const { status } = req.query; // pending, approved, rejected, or undefined (all)
+    
+    const filter = status ? { status } : {};
+    
+    const applications = await LoyaltyApplication.find(filter)
+      .populate('vendorUser', 'email companyName')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      applications
+    });
+  } catch (error) {
+    console.error('Error listing loyalty applications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
+  }
+};
+
+// Review (approve/reject) a loyalty application
+exports.reviewLoyaltyApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body; // action: 'approve' or 'reject'
+    
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action. Must be "approve" or "reject"'
+      });
+    }
+    
+    const application = await LoyaltyApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loyalty application not found'
+      });
+    }
+    
+    if (application.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Application is already ${application.status}`
+      });
+    }
+    
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    application.status = newStatus;
+    application.notes = notes || '';
+    application.reviewedAt = new Date();
+    application.reviewedBy = req.user.id; // Assuming req.user is set by auth middleware
+    
+    await application.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `Application ${newStatus} successfully`,
+      application
+    });
+  } catch (error) {
+    console.error('Error reviewing loyalty application:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };

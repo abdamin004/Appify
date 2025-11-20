@@ -24,22 +24,69 @@ function BoothPollManager() {
     loadVendorRequests();
   }, []);
 
-  const loadPolls = () => {
-    const allPolls = getAllPolls();
-    setPolls(allPolls);
+  const loadPolls = async () => {
+    try {
+      const allPolls = await getAllPolls();
+      setPolls(allPolls);
+    } catch (err) {
+      console.error('Error loading polls:', err);
+      setPolls([]);
+    }
   };
 
   const loadVendorRequests = async () => {
     try {
-      const res = await adminService.listPendingVendorApplications();
-      setVendorRequests(res.applications || []);
+      const [pendingRes, approvedRes] = await Promise.all([
+        adminService.listPendingVendorApplications(),
+        adminService.listApprovedVendorApplications(),
+      ]);
+
+      const pendingList = Array.isArray(pendingRes?.applications)
+        ? pendingRes.applications
+        : Array.isArray(pendingRes)
+          ? pendingRes
+          : [];
+
+      const approvedDocs = Array.isArray(approvedRes?.vendorDocuments)
+        ? approvedRes.vendorDocuments
+        : Array.isArray(approvedRes)
+          ? approvedRes
+          : [];
+
+      const normalizedPending = pendingList.map((req) => ({
+        ...req,
+        status: req.status || 'pending',
+      }));
+
+      const normalizedApproved = approvedDocs.map((doc) => ({
+        _id: doc.applicationId || doc._id,
+        status: 'approved',
+        organization: doc.organization || doc.vendor?.companyName || 'Vendor',
+        boothSize: doc.boothSize,
+        attendees: doc.attendees || [],
+        event: {
+          _id: doc.event?.id || doc.event?._id,
+          title: doc.event?.title,
+          type: doc.event?.type,
+          startDate: doc.event?.startDate,
+          location: doc.event?.location,
+        },
+        vendorUser: {
+          email: doc.vendor?.email,
+          companyName: doc.vendor?.companyName,
+          _id: doc.vendor?.id || doc.vendor?._id,
+        },
+        notes: doc.notes,
+      }));
+
+      setVendorRequests([...normalizedApproved, ...normalizedPending]);
     } catch (err) {
       console.error('Error loading vendor requests:', err);
       setVendorRequests([]);
     }
   };
 
-  const handleCreatePoll = () => {
+  const handleCreatePoll = async () => {
     if (!pollTitle.trim()) {
       alert('Please enter a poll title');
       return;
@@ -65,7 +112,7 @@ function BoothPollManager() {
         totalVotes: 0,
       };
 
-      createPoll(pollData);
+      await createPoll(pollData);
       setShowCreatePoll(false);
       setPollTitle('');
       setPollDescription('');
@@ -89,17 +136,23 @@ function BoothPollManager() {
     });
   };
 
-  const handleClosePoll = (pollId) => {
-    if (confirm('Are you sure you want to close this poll?')) {
-      updatePoll(pollId, { status: 'closed' });
+  const handleClosePoll = async (pollId) => {
+    if (!confirm('Are you sure you want to close this poll?')) return;
+    try {
+      await updatePoll(pollId, { status: 'closed' });
       loadPolls();
+    } catch (err) {
+      alert('Failed to close poll: ' + err.message);
     }
   };
 
-  const handleDeletePoll = (pollId) => {
-    if (confirm('Are you sure you want to delete this poll?')) {
-      deletePoll(pollId);
+  const handleDeletePoll = async (pollId) => {
+    if (!confirm('Are you sure you want to delete this poll?')) return;
+    try {
+      await deletePoll(pollId);
       loadPolls();
+    } catch (err) {
+      alert('Failed to delete poll: ' + err.message);
     }
   };
 
@@ -122,7 +175,7 @@ function BoothPollManager() {
     .map(([eventId, data]) => ({ eventId, ...data }));
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div id="booth-polls-section" style={{ padding: '20px' }}>
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -254,6 +307,9 @@ function BoothPollManager() {
                             }}>
                               {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
                             </div>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
+                            Status: {req.status ? req.status.charAt(0).toUpperCase() + req.status.slice(1) : 'pending'}
                           </div>
                         </div>
                       );

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import VisitorQRCodeManager from "../Vendor/VisitorQRCodeManager";
+import CompanyDocumentsUpload from "../Vendor/CompanyDocumentsUpload";
+import AttendeeIDUpload from "../Vendor/AttendeeIDUpload";
 import vendorService from "../../services/vendorService";
 import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
 import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
@@ -391,6 +394,69 @@ function VendorDashboard() {
             >
               ⭐ Loyalty Program
             </button>
+            <button
+              onClick={() => setActiveTab("visitor-qrcodes")}
+              style={{
+                flex: 1,
+                padding: "15px 20px",
+                background:
+                  activeTab === "visitor-qrcodes"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "visitor-qrcodes" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                minWidth: "180px",
+              }}
+            >
+              📧 Visitor QR Codes
+            </button>
+            <button
+              onClick={() => setActiveTab("company-documents")}
+              style={{
+                flex: 1,
+                padding: "15px 20px",
+                background:
+                  activeTab === "company-documents"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "company-documents" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                minWidth: "180px",
+              }}
+            >
+              📄 Company Documents
+            </button>
+            <button
+              onClick={() => setActiveTab("attendee-ids")}
+              style={{
+                flex: 1,
+                padding: "15px 20px",
+                background:
+                  activeTab === "attendee-ids"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "attendee-ids" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                minWidth: "180px",
+              }}
+            >
+              🆔 Attendee IDs
+            </button>
           </div>
 
           {/* Upcoming Events Sub-Tabs */}
@@ -764,6 +830,15 @@ function VendorDashboard() {
                 </div>
               )}
             </div>
+          )}
+          {activeTab === "visitor-qrcodes" && (
+            <VisitorQRCodeManager />
+          )}
+          {activeTab === "company-documents" && (
+            <CompanyDocumentsUpload />
+          )}
+          {activeTab === "attendee-ids" && (
+            <AttendeeIDUpload />
           )}
         </div>
       </div>

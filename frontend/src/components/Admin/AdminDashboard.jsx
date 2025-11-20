@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import LoyaltyPartnersList from '../Loyalty/LoyaltyPartnersList';
 
 export default function AdminDashboard() {
+  const [showLoyalty, setShowLoyalty] = React.useState(false);
+  
   const cardStyle = {
     background: 'rgba(255,255,255,0.95)',
     borderRadius: 20,
@@ -19,6 +22,34 @@ export default function AdminDashboard() {
     textDecoration: 'none',
     textAlign: 'center'
   };
+  
+  if (showLoyalty) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ paddingTop: '120px', padding: '120px 40px 80px', position: 'relative', zIndex: 1 }}>
+          <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+            <button
+              onClick={() => setShowLoyalty(false)}
+              style={{
+                padding: '12px 24px',
+                background: 'rgba(255,255,255,0.95)',
+                color: '#003366',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginBottom: '20px',
+              }}
+            >
+              ← Back to Admin Dashboard
+            </button>
+            <LoyaltyPartnersList />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)', position: 'relative', overflow: 'hidden' }}>
       <div style={{ paddingTop: '120px', padding: '120px 40px 80px', position: 'relative', zIndex: 1 }}>
@@ -30,9 +61,16 @@ export default function AdminDashboard() {
               <Link style={linkStyle} to="/admin/users">User Management</Link>
               <Link style={linkStyle} to="/admin/create">Create Admin / EventOffice</Link>
               <Link style={linkStyle} to="/admin/vendor-applications">Vendor Applications</Link>
+              <Link style={linkStyle} to="/admin/loyalty-applications">Loyalty Applications</Link>
               <Link style={linkStyle} to="/admin/notifications">Notifications</Link>
               <Link style={linkStyle} to="/admin/comments">Comment Moderation</Link>
               <Link style={linkStyle} to="/admin/view-events">View Events</Link>
+              <button
+                onClick={() => setShowLoyalty(true)}
+                style={linkStyle}
+              >
+                ⭐ Loyalty Partners
+              </button>
             </div>
           </div>
         </div>

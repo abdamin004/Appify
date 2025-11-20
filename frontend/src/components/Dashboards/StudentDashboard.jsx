@@ -9,6 +9,8 @@ import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentS
 import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
+import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
+import StudentPollVoting from "../Polls/StudentPollVoting";
 import { 
   getStudentNotifications, 
   createStudentNotification, 
@@ -911,6 +913,48 @@ function StudentDashboard() {
               )}
             </button>
 
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "loyalty"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ⭐ Loyalty Partners
+            </button>
+
+            <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Vote for Vendors
+            </button>
+
           </div>
 
           {/* Content */}
@@ -1096,6 +1140,13 @@ function StudentDashboard() {
                 </div>
               )}
             </div>
+          )}
+          
+          {activeTab === "loyalty" && (
+            <LoyaltyPartnersList />
+          )}
+          {activeTab === "polls" && (
+            <StudentPollVoting />
           )}
           
           {activeTab === "notifications" && (

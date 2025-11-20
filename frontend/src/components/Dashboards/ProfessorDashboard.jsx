@@ -10,6 +10,8 @@ import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManu
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import { getProfessorNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, getUnreadCount, createProfessorNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
+import StudentPollVoting from "../Polls/StudentPollVoting";
 
 function ProfessorDashboard() {
   const navigate = useNavigate();
@@ -607,6 +609,7 @@ function ProfessorDashboard() {
               marginBottom: "30px",
               display: "flex",
               gap: "10px",
+              flexWrap: "wrap",
             }}
           >
             <button
@@ -863,6 +866,49 @@ function ProfessorDashboard() {
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                minWidth: "180px",
+                padding: "15px 30px",
+                background:
+                  activeTab === "loyalty"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ⭐ Loyalty Partners
+            </button>
+            <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                minWidth: "180px",
+                padding: "15px 30px",
+                background:
+                  activeTab === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Vote for Vendors
+            </button>
           </div>
 
           {/* Content */}
@@ -1070,6 +1116,13 @@ function ProfessorDashboard() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "loyalty" && (
+            <LoyaltyPartnersList />
+          )}
+          {activeTab === "polls" && (
+            <StudentPollVoting />
           )}
 
           {activeTab === "notifications" && (

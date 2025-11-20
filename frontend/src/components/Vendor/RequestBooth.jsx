@@ -40,14 +40,14 @@ useEffect(() => {
         if (Array.isArray(x)) return x;
         if (Array.isArray(x.data)) return x.data;
 
-      // NEW: handle common named arrays
+        // NEW: handle common named arrays
         const d = x.data ?? x;
-        const keys = ['bazaars', 'booths', 'items', 'organizations', 'orgs', 'results'];
+        const keys = ['events', 'bazaars', 'booths', 'items', 'organizations', 'orgs', 'results'];
         for (const k of keys) {
           if (Array.isArray(d?.[k])) return d[k];
         }
-      return [];
-    };
+        return [];
+      };
 
 
       const rawBazaars = toArray(bzRes);
@@ -73,7 +73,19 @@ useEffect(() => {
         setFormData(prev => ({ ...prev, eventId: merged[0].idStr }));
       }
 
-      setOrganizations(orgsRaw);
+      // Add default organizations if list is empty, or add GUC to the list
+      const defaultOrgs = [{ _id: 'default-guc', name: 'GUC' }];
+      if (orgsRaw.length === 0) {
+        setOrganizations(defaultOrgs);
+      } else {
+        // Check if GUC already exists, if not add it
+        const hasGUC = orgsRaw.some(o => (o.name || '').toLowerCase() === 'guc');
+        if (!hasGUC) {
+          setOrganizations([...defaultOrgs, ...orgsRaw]);
+        } else {
+          setOrganizations(orgsRaw);
+        }
+      }
 
       // Optional: preselect org from localStorage vendor profile
       try {
@@ -118,13 +130,13 @@ useEffect(() => {
   const updateAttendee = (idx, key, value) => {
     setFormData(prev => {
       const attendees = [...(prev.attendees || [])];
-      attendees[idx] = { ...(attendees[idx] || { name: '', email: '' }), [key]: value };
+      attendees[idx] = { ...(attendees[idx] || { name: '', email: '', idNumber: '' }), [key]: value };
       return { ...prev, attendees };
     });
   };
 
   const addAttendee = () => {
-    setFormData(prev => ({ ...prev, attendees: [...(prev.attendees || []), { name: '', email: '' }] }));
+    setFormData(prev => ({ ...prev, attendees: [...(prev.attendees || []), { name: '', email: '', idNumber: '' }] }));
   };
 
   const removeAttendee = (idx) => {
@@ -151,7 +163,7 @@ useEffect(() => {
       const payload = {
         organization: formData.organization,
         boothSize: formData.boothSize,
-        attendees: (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email),
+        attendees: (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email && a.idNumber),
         ...(isBooth ? {
           setupDurationWeeks: Number(formData.setupDurationWeeks),
           setupLocation: formData.setupLocation,
@@ -194,30 +206,43 @@ useEffect(() => {
             onChange={(e) => setField('eventId', e.target.value)}
             required
             style={{ width: '100%', padding: 10 }}
+            disabled={events.length === 0}
           >
-            <option value="">Select an event</option>
+            <option value="">{events.length > 0 ? 'Select an event' : 'No upcoming booths or bazaars available'}</option>
             {events.map(ev => (
               <option key={ev.idStr} value={ev.idStr}>
                 {ev.title} — {ev.type} — {ev.startDate ? new Date(ev.startDate).toLocaleDateString() : ''}
               </option>
             ))}
           </select>
+          {events.length === 0 && (
+            <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
+              Event Office needs to publish upcoming booth/bazaar events before vendors can apply.
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', marginBottom: 8 }}>Organization</label>
-          <select
+          <input
+            type="text"
             name="organization"
             value={formData.organization}
             onChange={(e) => setField('organization', e.target.value)}
+            list="organizations-list"
+            placeholder="Type or select organization (e.g., GUC)"
             required
-            style={{ width: '100%', padding: 10 }}
-          >
-            <option value="">Select organization</option>
+            style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '1rem' }}
+          />
+          <datalist id="organizations-list">
             {organizations.map(o => (
-              <option key={o._id} value={o.name}>{o.name}</option>
+              <option key={o._id || o.name} value={o.name} />
             ))}
-          </select>
+            {organizations.length === 0 && <option value="GUC" />}
+          </datalist>
+          <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
+            💡 Type your organization name (e.g., "GUC") or select from dropdown suggestions
+          </div>
         </div>
 
         <div style={{ marginBottom: 12 }}>
@@ -235,16 +260,17 @@ useEffect(() => {
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 8 }}>Attendees (up to 5)</label>
+          <label style={{ display: 'block', marginBottom: 8 }}>Attendees (up to 5) - Name, Email, and ID Number required</label>
           {(formData.attendees || []).map((a, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input placeholder="Name" value={a.name} onChange={e => updateAttendee(idx, 'name', e.target.value)} style={{ flex: 1, padding: 8 }} />
-              <input placeholder="Email" value={a.email} onChange={e => updateAttendee(idx, 'email', e.target.value)} style={{ flex: 1, padding: 8 }} />
-              <button type="button" onClick={() => removeAttendee(idx)}>Remove</button>
+            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <input placeholder="Name *" value={a.name || ''} onChange={e => updateAttendee(idx, 'name', e.target.value)} required style={{ flex: 1, minWidth: '150px', padding: 8 }} />
+              <input type="email" placeholder="Email *" value={a.email || ''} onChange={e => updateAttendee(idx, 'email', e.target.value)} required style={{ flex: 1, minWidth: '150px', padding: 8 }} />
+              <input placeholder="ID Number *" value={a.idNumber || ''} onChange={e => updateAttendee(idx, 'idNumber', e.target.value)} required style={{ flex: 1, minWidth: '120px', padding: 8 }} />
+              <button type="button" onClick={() => removeAttendee(idx)} style={{ padding: '8px 12px' }}>Remove</button>
             </div>
           ))}
           {(formData.attendees || []).length < 5 &&
-            <button type="button" onClick={addAttendee}>Add attendee</button>
+            <button type="button" onClick={addAttendee} style={{ padding: '8px 16px', marginTop: 8 }}>Add attendee</button>
           }
         </div>
 

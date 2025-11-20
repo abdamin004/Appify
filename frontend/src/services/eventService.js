@@ -48,6 +48,9 @@ export function createWorkshop(payload) {
 export function createConference(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Conference', createdBy: currentUserId() });
 }
+export function createBooth(payload) {
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Booth', createdBy: currentUserId() });
+}
 
 // Update any event by id
 export function updateEvent(id, payload) {
@@ -66,6 +69,10 @@ export async function listTrips() {
 
 export async function listConferences() {
   const res = await fetch(`${API_BASE}/events/filter?type=Conference`);
+  return res.json();
+}
+export async function listBooths() {
+  const res = await fetch(`${API_BASE}/events/filter?type=Booth`);
   return res.json();
 }
 

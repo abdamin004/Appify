@@ -18,6 +18,8 @@ import {
   markReminderSent,
   createReminderNotification
 } from "../../services/notificationService";
+import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
+import StudentPollVoting from "../Polls/StudentPollVoting";
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
@@ -778,10 +780,52 @@ function TADashboard() {
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setFilter("loyalty")}
+              style={{
+                flex: 1,
+                padding: "14px 24px",
+                background: filter === "loyalty" ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
+                color: filter === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ⭐ Loyalty Partners
+            </button>
+            <button
+              onClick={() => setFilter("polls")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  filter === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: filter === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Vote for Vendors
+            </button>
           </div>
 
           {/* Events List */}
-          {filter === "allevents" ? (
+          {filter === "loyalty" ? (
+            <LoyaltyPartnersList />
+          ) : filter === "polls" ? (
+            <StudentPollVoting />
+          ) : filter === "allevents" ? (
             <EventList enableFavorites={true} />
           ) : filter === 'favourites' ? (
             <MyEventsList events={favouriteEvents} />

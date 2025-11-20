@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Workshop = require('../models/Workshop');
 const Trip = require('../models/Trip');
 const Bazaar = require('../models/Bazaar');
+const Booth = require('../models/Booth');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
@@ -123,6 +124,9 @@ module.exports = {
                     break;
                 case 'Bazaar':  
                     event = await Bazaar.create({...eventData, vendors});
+                    break;
+                case 'Booth':
+                    event = await Booth.create({...eventData, vendors});
                     break;
                 case 'Conference':
                     event = await Conference.create({...eventData, websiteLink, requiredBudget, fundingSource, extraRequiredResourses});

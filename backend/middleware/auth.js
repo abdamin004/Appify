@@ -37,8 +37,10 @@ return res.status(401).json({ success: false, error: 'Invalid token payload' });
 }
 
 let user = await User.findById(payload.id);
+let isVendor = false;
 if (!user) {
 user = await Vendor.findById(payload.id);
+isVendor = !!user;
 }
 
 if (!user) {
@@ -46,7 +48,12 @@ console.error(' User not found with ID:', payload.id);
 return res.status(401).json({ success: false, error: 'User not found' });
 }
 
-//console.log(' User authenticated:', user.email, 'Role:', user.role);
+// Ensure vendor has role field set
+if (isVendor && !user.role) {
+user.role = 'Vendor';
+}
+
+//console.log(' User authenticated:', user.email, 'Role:', user.role, 'IsVendor:', isVendor);
 req.user = user;
 next();
 } catch (err) {

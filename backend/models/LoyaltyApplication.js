@@ -29,6 +29,17 @@ const loyaltyApplicationSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'approved', 'rejected', 'cancelled'],
     default: 'pending'
+  },
+  notes: {
+    type: String,
+    default: ''
+  },
+  reviewedAt: {
+    type: Date
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, { timestamps: true });
 
