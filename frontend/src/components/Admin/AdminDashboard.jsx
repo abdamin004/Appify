@@ -35,6 +35,7 @@ export default function AdminDashboard() {
               <Link style={linkStyle} to="/admin/view-events">View Events</Link>
                <Link style={linkStyle} to="/admin/vendor-documents">Vendor Documents</Link>
               <Link style={linkStyle} to="/admin/attendees-report">Attendees Report</Link>
+              <Link style={linkStyle} to="/admin/sales-report">Sales Report</Link>
             </div>
           </div>
         </div>

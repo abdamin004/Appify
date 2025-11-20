@@ -33,6 +33,7 @@ import GymSessions from "./components/GymSessions";
 import EventDetails from "./components/EventDetails";
 import VendorDocuments from "./components/Admin/VendorDocuments";
 import AttendeesReport from "./components/Admin/AttendeesReport";
+import SalesReport from "./components/Admin/SalesReport";
 
 
 function App() {
@@ -96,6 +97,7 @@ function App() {
           <Route path="/admin/view-events" element={<ViewEvents />} />
           <Route path="/admin/vendor-documents" element={<VendorDocuments />} />
           <Route path="/admin/attendees-report" element={<AttendeesReport />} />
+          <Route path="/admin/sales-report" element={<SalesReport />} />
         </Routes>
       </div>
     </>
