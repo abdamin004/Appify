@@ -34,6 +34,7 @@ app.use('/api/courts', require('./routes/court'));
 app.use('/api/auth', require('./routes/Auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/vendor', require('./routes/vendors'));
+app.use('/api/users', require('./routes/users'));
 app.use('/api/polls', require('./routes/polls'));
 app.use('/api/payments', require('./routes/payments'));
 

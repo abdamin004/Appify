@@ -119,6 +119,15 @@ module.exports = {
             switch (type) {
                 case 'Workshop':
                     event = await Workshop.create({...eventData, professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses});
+                    const eventOffice = await User.find({ role: 'EventOffice' });
+                    eventOffice.forEach(office => {
+                        office.notifications.push({
+                            message: `New workshop titled "${event.title}" has been submitted for approval.`,
+                            date: new Date(),
+                            read: false,
+                        });
+                        office.save();
+                    });
                     break;
                 case 'Trip':
                     event = await Trip.create({...eventData, price});
@@ -271,7 +280,7 @@ module.exports = {
 
     async getMyWorkshops(req, res) {
         try {
-            const professorId = req.query.professorId || '670abc12345...';
+            const professorId = req.user._id;
             const workshops = await Workshop.find({ createdBy: professorId });
             res.status(200).json(workshops);
         } catch (err) {
@@ -279,166 +288,224 @@ module.exports = {
         }
     },// Add this to your eventController.js
 
-async registerForEvent(req, res) {
-    try {
-        const eventId = req.params.eventId;
-        const userId = req.user._id;
+    // GET /events/workshops/registrations - Get registered users & remaining spots for my workshops
+    async getWorkshopRegistrations(req, res) {
+        try {
+            const professorId = req.user._id;
 
-        // Find the event
-        const event = await Event.findById(eventId);
-        console.log('Registering user', userId, 'for event', eventId);
-        if (!event) {
-            return res.status(404).json({ 
+            // Find workshops created by this professor
+            const workshops = await Workshop.find({ createdBy: professorId })
+                .populate('registeredUsers', 'firstName lastName email') // populate user details
+                .exec();
+
+            // Map each workshop to include registered users and remaining spots
+            const workshopsInfo = workshops.map(ws => {
+                const registeredUsers = ws.registeredUsers || [];
+                const capacity = ws.capacity || 0;
+                const remainingSpots = capacity - registeredUsers.length;
+
+                return {
+                    id: ws._id,
+                    title: ws.title,
+                    startDate: ws.startDate,
+                    endDate: ws.endDate,
+                    location: ws.location,
+                    capacity,
+                    remainingSpots,
+                    registeredUsers
+                };
+            });
+
+            res.status(200).json({
+                success: true,
+                workshops: workshopsInfo
+            });
+        } catch (err) {
+            console.error('Error fetching workshop registrations:', err);
+            res.status(500).json({
                 success: false,
-                message: 'Event not found' 
+                message: err.message
             });
         }
+    },
 
-        // Check if event has already started
-        if (new Date(event.startDate) <= new Date()) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Cannot register for an event that has already started' 
-            });
-        }
-
-        // Check if registration deadline has passed
-        if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Registration deadline has passed' 
-            });
-        }
-
-      
-
-        // Check if event is at capacity
-        if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Event is at full capacity' 
-            });
-        }
-
-        // Check if user is already registered
-        if (event.registeredUsers && event.registeredUsers.includes(userId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are already registered for this event' 
-            });
-        }
-
-        // Find the user
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ 
-                success: false,
-                message: 'User not found' 
-            });
-        }
-
-        // Check if user already registered
-        if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are already registered for this event' 
-            });
-        }
-
-        // Add user to event's registeredUsers array
-        event.registeredUsers = event.registeredUsers || [];
-        event.registeredUsers.push(userId);
-        await event.save();
-
-        // Add event to user's registeredEvents array
-        user.registeredEvents = user.registeredEvents || [];
-        user.registeredEvents.push(eventId);
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Successfully registered for the event',
-            event: {
-                id: event._id,
-                title: event.title,
-                startDate: event.startDate,
-                location: event.location
+    async viewWorkshopStatusAndEditRequests(req, res) {
+        try {
+            const workshopId = req.params.id;
+            const workshop = await Workshop.findById(workshopId);
+            if (!workshop) {
+                return res.status(404).json({ error: 'Workshop not found' });
             }
-        });
+            res.status(200).json({
+                success: true,
+                status: workshop.status,
+                editRequests: workshop.editRequests
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    },
 
-    } catch (err) {
-        console.error('Registration error:', err);
-        res.status(500).json({ 
-            success: false,
-            message: err.message 
-        });
-    }
-},
+    async registerForEvent(req, res) {
+        try {
+            const eventId = req.params.eventId;
+            const userId = req.user._id;
 
-async unregisterFromEvent(req, res) {
-    try {
-        const { eventId } = req.params;
-        const userId = req.user._id;
+            // Find the event
+            const event = await Event.findById(eventId);
+            console.log('Registering user', userId, 'for event', eventId);
+            if (!event) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Event not found' 
+                });
+            }
 
-        // Find the event
-        const event = await Event.findById(eventId);
-        if (!event) {
-            return res.status(404).json({ 
+            // Check if event has already started
+            if (new Date(event.startDate) <= new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Cannot register for an event that has already started' 
+                });
+            }
+
+            // Check if registration deadline has passed
+            if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Registration deadline has passed' 
+                });
+            }
+
+        
+
+            // Check if event is at capacity
+            if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Event is at full capacity' 
+                });
+            }
+
+            // Check if user is already registered
+            if (event.registeredUsers && event.registeredUsers.includes(userId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are already registered for this event' 
+                });
+            }
+
+            // Find the user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'User not found' 
+                });
+            }
+
+            // Check if user already registered
+            if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are already registered for this event' 
+                });
+            }
+
+            // Add user to event's registeredUsers array
+            event.registeredUsers = event.registeredUsers || [];
+            event.registeredUsers.push(userId);
+            await event.save();
+
+            // Add event to user's registeredEvents array
+            user.registeredEvents = user.registeredEvents || [];
+            user.registeredEvents.push(eventId);
+            await user.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Successfully registered for the event',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    startDate: event.startDate,
+                    location: event.location
+                }
+            });
+
+        } catch (err) {
+            console.error('Registration error:', err);
+            res.status(500).json({ 
                 success: false,
-                message: 'Event not found' 
+                message: err.message 
             });
         }
+    },
 
-        // Check if event has already started
-        if (new Date(event.startDate) <= new Date()) {
-            return res.status(400).json({ 
+    async unregisterFromEvent(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // Find the event
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Event not found' 
+                });
+            }
+
+            // Check if event has already started
+            if (new Date(event.startDate) <= new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Cannot unregister from an event that has already started' 
+                });
+            }
+
+            // Check if user is registered
+            if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are not registered for this event' 
+                });
+            }
+
+            // Find the user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'User not found' 
+                });
+            }
+
+            // Remove user from event's registeredUsers array
+            event.registeredUsers = event.registeredUsers.filter(
+                id => id.toString() !== userId.toString()
+            );
+            await event.save();
+
+            // Remove event from user's registeredEvents array
+            user.registeredEvents = user.registeredEvents.filter(
+                id => id.toString() !== eventId.toString()
+            );
+            await user.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Successfully unregistered from the event'
+            });
+
+        } catch (err) {
+            console.error('Unregistration error:', err);
+            res.status(500).json({ 
                 success: false,
-                message: 'Cannot unregister from an event that has already started' 
+                message: err.message 
             });
         }
-
-        // Check if user is registered
-        if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are not registered for this event' 
-            });
-        }
-
-        // Find the user
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ 
-                success: false,
-                message: 'User not found' 
-            });
-        }
-
-        // Remove user from event's registeredUsers array
-        event.registeredUsers = event.registeredUsers.filter(
-            id => id.toString() !== userId.toString()
-        );
-        await event.save();
-
-        // Remove event from user's registeredEvents array
-        user.registeredEvents = user.registeredEvents.filter(
-            id => id.toString() !== eventId.toString()
-        );
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Successfully unregistered from the event'
-        });
-
-    } catch (err) {
-        console.error('Unregistration error:', err);
-        res.status(500).json({ 
-            success: false,
-            message: err.message 
-        });
-    }
-},
+    },
 
     async updateEvent(req, res) {
         try {
@@ -597,6 +664,119 @@ async unregisterFromEvent(req, res) {
             res.status(400).json({ error: err.message });
         }
     },
+
+    async acceptOrRejectWorkshopRequests(req, res) {
+        try {
+            const { workshopId } = req.params;
+            const { action } = req.body; // "accept" or "reject"
+
+            // Only Admin or EventOffice can do this
+            if (!['Admin', 'EventOffice'].includes(req.user.role)) {
+                return res.status(403).json({ error: "Not authorized" });
+            }
+
+            const workshop = await Workshop.findById(workshopId).populate("createdBy");
+            if (!workshop) {
+                return res.status(404).json({ error: "Workshop not found" });
+            }
+
+            const professor = workshop.createdBy;
+            if (!professor) {
+                return res.status(404).json({ error: "Workshop creator not found" });
+            }
+
+            if (action === "accept") {
+                workshop.status = "published";
+                await workshop.save();
+
+                // Send notification to professor
+                professor.notifications.push({
+                    message: `Your workshop "${workshop.title}" has been accepted and published.`,
+                    date: new Date(),
+                    read: false
+                });
+                await professor.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Workshop approved and published",
+                    workshop
+                });
+
+            } else if (action === "reject") {
+                workshop.status = "rejected";
+                await workshop.save();
+
+                professor.notifications.push({
+                    message: `Your workshop "${workshop.title}" has been rejected.`,
+                    date: new Date(),
+                    read: false
+                });
+                await professor.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Workshop rejected.",
+                    workshop
+                });
+            }
+
+            return res.status(400).json({ error: 'Invalid action. Use "accept" or "reject".' });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+
+    async requestWorkshopEdit(req, res) {
+        try {
+            const { workshopId } = req.params;
+            const { field, requestedValue } = req.body;
+
+            // Only EventOffice can request edits
+            if (req.user.role !== "EventOffice") {
+                return res.status(403).json({ error: "Only Event Office can request workshop edits" });
+            }
+
+            const workshop = await Workshop.findById(workshopId).populate("createdBy");
+            if (!workshop) {
+                return res.status(404).json({ error: "Workshop not found" });
+            }
+
+            const professor = workshop.createdBy;
+
+            workshop.editRequests.push({
+                field,
+                requestedValue,
+                requestedBy: req.user._id,
+                date: new Date(),
+                resolved: false
+            });
+
+            await workshop.save();
+
+            // Notify professor
+            professor.notifications.push({
+                message: `The Event Office requested changes to your workshop "${workshop.title}" (Field: ${field}).`,
+                date: new Date(),
+                read: false
+            });
+            await professor.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "Edit request submitted successfully.",
+                workshop
+            });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
 
     async deleteEvent(req, res) {
         try {
