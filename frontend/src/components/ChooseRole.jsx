@@ -4,6 +4,7 @@ import SignupStaff from './SignupStaff';
 import SignupVendor from './SignupVendor';
 import Navbar from './Navbar.jsx';
 import { useNavigate } from "react-router-dom";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../utils/designSystem';
 
 function ChooseRole() {
 const navigate = useNavigate();
@@ -33,7 +34,7 @@ const navigate = useNavigate();
   return (
     <div style={{ 
       minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)',
+      background: colors.bgPrimary,
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -61,20 +62,29 @@ const navigate = useNavigate();
       
       <Navbar />
       
-      <div style={{ paddingTop: '100px', paddingBottom: '50px', padding: '100px 20px 50px 20px', position: 'relative', zIndex: 1 }}>
+      <div style={{ 
+        paddingTop: spacing['8xl'], 
+        paddingBottom: spacing['5xl'], 
+        padding: `${spacing['8xl']} ${spacing.xl} ${spacing['5xl']}`, 
+        position: 'relative', 
+        zIndex: 1 
+      }}>
         {!selectedRole ? (
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+            <div style={{ textAlign: 'center', marginBottom: spacing['6xl'] }}>
               <h2 style={{ 
-                fontSize: '3rem', 
-                fontWeight: 'bold', 
-                color: 'white', 
-                marginBottom: '15px',
-                textShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+                fontSize: typography.fontSize['4xl'], 
+                fontWeight: typography.fontWeight.bold, 
+                color: colors.white, 
+                marginBottom: spacing.lg,
+                textShadow: shadows.lg
               }}>
                 Welcome to GUC Event Manager
               </h2>
-              <p style={{ fontSize: '1.3rem', color: 'rgba(212, 175, 55, 0.95)' }}>
+              <p style={{ 
+                fontSize: typography.fontSize.xl, 
+                color: colors.accent 
+              }}>
                 Choose your role to get started
               </p>
             </div>
@@ -82,7 +92,7 @@ const navigate = useNavigate();
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
-              gap: '30px',
+              gap: spacing['3xl'],
               maxWidth: '1000px',
               margin: '0 auto'
             }}>
@@ -91,52 +101,55 @@ const navigate = useNavigate();
                   key={role.id}
                   onClick={() => setSelectedRole(role.id)}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    borderRadius: '20px',
-                    boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
-                    padding: '40px 30px',
+                    background: colors.bgCard,
+                    borderRadius: borderRadius['2xl'],
+                    boxShadow: shadows.md,
+                    padding: `${spacing['2xl']} ${spacing['3xl']}`,
                     textAlign: 'center',
                     border: '2px solid transparent',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: transitions.normal,
                     transform: 'translateY(0)',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-8px)';
-                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(212, 175, 55, 0.3)';
-                    e.currentTarget.style.border = '2px solid rgba(212, 175, 55, 0.3)';
+                    e.currentTarget.style.boxShadow = shadows.xl;
+                    e.currentTarget.style.border = `2px solid ${colors.accent}`;
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.2)';
+                    e.currentTarget.style.boxShadow = shadows.md;
                     e.currentTarget.style.border = '2px solid transparent';
                   }}
                 >
-                  <div style={{ marginBottom: '20px' }}>
+                  <div style={{ marginBottom: spacing.xl }}>
                     <div style={{
                       width: '80px',
                       height: '80px',
                       background: 'rgba(212, 175, 55, 0.15)',
-                      borderRadius: '50%',
+                      borderRadius: borderRadius.full,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       margin: '0 auto',
-                      fontSize: '2.5rem',
-                      transition: 'all 0.3s ease'
+                      fontSize: typography.fontSize['3xl'],
+                      transition: transitions.normal
                     }}>
                       {role.icon}
                     </div>
                   </div>
                   <h3 style={{ 
-                    fontSize: '1.5rem', 
-                    fontWeight: 'bold', 
-                    color: '#003366', 
-                    marginBottom: '10px' 
+                    fontSize: typography.fontSize.xl, 
+                    fontWeight: typography.fontWeight.bold, 
+                    color: colors.primary, 
+                    marginBottom: spacing.md 
                   }}>
                     {role.label}
                   </h3>
-                  <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>
+                  <p style={{ 
+                    color: colors.gray500, 
+                    fontSize: typography.fontSize.sm 
+                  }}>
                     {role.description}
                   </p>
                 </button>
@@ -147,33 +160,30 @@ const navigate = useNavigate();
           <div style={{ 
             maxWidth: '700px', 
             margin: '0 auto', 
-            background: 'rgba(255, 255, 255, 0.95)', 
-            borderRadius: '20px', 
-            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)', 
-            padding: '40px'
+            background: colors.bgCard, 
+            borderRadius: borderRadius['2xl'], 
+            boxShadow: shadows.lg, 
+            padding: spacing['2xl'],
+            border: `1px solid ${colors.gray200}`,
           }}>
             <button
               onClick={() => setSelectedRole('')}
               style={{
-                marginBottom: '30px',
-                color: '#d4af37',
-                fontWeight: '600',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s'
+                ...buttonStyles.back,
+                marginBottom: spacing['3xl'],
+                background: colors.bgCard,
+                color: colors.primary,
+                borderColor: colors.primary
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#b8941f';
-                e.currentTarget.style.transform = 'translateX(-5px)';
+                e.target.style.background = colors.accent;
+                e.target.style.color = colors.primary;
+                e.target.style.borderColor = colors.accent;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#d4af37';
-                e.currentTarget.style.transform = 'translateX(0)';
+                e.target.style.background = colors.bgCard;
+                e.target.style.color = colors.primary;
+                e.target.style.borderColor = colors.primary;
               }}
             >
               ← Back to role selection

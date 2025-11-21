@@ -3,6 +3,7 @@ import { topupWallet } from '../../services/paymentService';
 
 export default function TopUpDialog({ open, onClose, onSuccess }) {
   const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('card');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -40,6 +41,48 @@ export default function TopUpDialog({ open, onClose, onSuccess }) {
           <div style={{ opacity: 0.85, fontSize: 13 }}>Enter an amount in EGP</div>
         </div>
         <form onSubmit={handleTopUp} style={{ padding: 20 }}>
+          <label style={{ display: 'block', color: '#374151', fontWeight: 700, marginBottom: 8 }}>Payment Method</label>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[
+              { value: 'card', label: '💳 Credit/Debit Card', icon: '💳' },
+              { value: 'bank', label: '🏦 Bank Transfer', icon: '🏦' },
+              { value: 'wallet', label: '📱 Mobile Wallet', icon: '📱' }
+            ].map(method => (
+              <button
+                key={method.value}
+                type="button"
+                onClick={() => setPaymentMethod(method.value)}
+                style={{
+                  flex: 1,
+                  minWidth: '100px',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  border: `2px solid ${paymentMethod === method.value ? '#d4af37' : '#e5e7eb'}`,
+                  background: paymentMethod === method.value ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                  color: '#374151',
+                  fontWeight: paymentMethod === method.value ? 700 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontSize: 14
+                }}
+                onMouseEnter={(e) => {
+                  if (paymentMethod !== method.value) {
+                    e.target.style.borderColor = '#d4af37';
+                    e.target.style.background = 'rgba(212, 175, 55, 0.05)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (paymentMethod !== method.value) {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.background = '#fff';
+                  }
+                }}
+              >
+                {method.label}
+              </button>
+            ))}
+          </div>
+
           <label style={{ display: 'block', color: '#374151', fontWeight: 700, marginBottom: 8 }}>Amount (EGP)</label>
           <input
             type="number"

@@ -16,7 +16,7 @@
 
 .title {
   font-size: 28px;
-  color: royalblue;
+  color: #003366;
   font-weight: 600;
   letter-spacing: -1px;
   position: relative;
@@ -32,13 +32,13 @@
   width: 16px;
   border-radius: 50%;
   left: 0px;
-  background-color: royalblue;
+  background-color: #d4af37;
 }
 
 .title::before {
   width: 18px;
   height: 18px;
-  background-color: royalblue;
+  background-color: #d4af37;
 }
 
 .title::after {
@@ -57,11 +57,11 @@
 }
 
 .signin a {
-  color: royalblue;
+  color: #003366;
 }
 
 .signin a:hover {
-  text-decoration: underline royalblue;
+  text-decoration: underline #d4af37;
 }
 
 .flex {
@@ -76,10 +76,18 @@
 
 .form label .input {
   width: 100%;
-  padding: 10px 10px 20px 10px;
+  padding: 14px 18px 20px 18px;
   outline: 0;
-  border: 1px solid rgba(105, 105, 105, 0.397);
-  border-radius: 10px;
+  border: 2px solid rgba(229, 231, 235, 1);
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.form label .input:focus {
+  border-color: #b8941f;
+  box-shadow: 0 0 0 3px rgba(184, 148, 31, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .form label .input + span {
@@ -110,16 +118,24 @@
 .submit {
   border: none;
   outline: none;
-  background-color: royalblue;
-  padding: 10px;
-  border-radius: 10px;
-  color: #fff;
-  font-size: 16px;
-  transform: .3s ease;
+  background: linear-gradient(135deg, #b8941f 0%, #9a7a1a 100%);
+  padding: 16px 32px;
+  border-radius: 14px;
+  color: #003366;
+  font-size: 1.05rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(184, 148, 31, 0.4);
 }
 
 .submit:hover {
-  background-color: rgb(56, 90, 194);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(184, 148, 31, 0.5);
+}
+
+.submit:active {
+  transform: translateY(0);
 }
 
 @keyframes pulse {

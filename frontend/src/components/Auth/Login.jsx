@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
+import { colors, spacing, borderRadius, shadows, typography, transitions, inputStyles, buttonStyles } from "../../utils/designSystem"; 
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
@@ -7,45 +8,6 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '20px'
-  };
-
-  const spanStyle = {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    color: '#003366'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '10px',
-    fontSize: '1rem',
-    outline: 'none',
-    transition: 'all 0.2s',
-    backgroundColor: 'white',
-    boxSizing: 'border-box'
-  };
-
-  const buttonStyle = {
-    width: '100%',
-    padding: '14px',
-    background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-    color: '#003366',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '1.05rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all 0.3s',
-    boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)',
-    marginTop: '10px'
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -109,93 +71,155 @@ export default function Login({ onLogin }) {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
+        background: colors.bgPrimary,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: spacing.xl,
       }}
     >
       <div style={{
         maxWidth: '500px',
         margin: '0 auto',
-        padding: '30px',
-        background: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: '16px',
-        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+        padding: spacing['3xl'],
+        background: colors.bgCard,
+        borderRadius: borderRadius['2xl'],
+        boxShadow: shadows.lg,
+        border: `1px solid ${colors.gray200}`,
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#003366', marginBottom: '10px' }}>
+        <div style={{ textAlign: 'center', marginBottom: spacing['3xl'] }}>
+          <h2 style={{ 
+            fontSize: typography.fontSize['2xl'], 
+            fontWeight: typography.fontWeight.bold, 
+            color: colors.primary, 
+            marginBottom: spacing.md 
+          }}>
             Welcome Back
           </h2>
-          <p style={{ fontSize: '1rem', color: '#6b7280' }}>
+          <p style={{ 
+            fontSize: typography.fontSize.base, 
+            color: colors.gray500 
+          }}>
             Sign in to continue to your account
           </p>
         </div>
 
         {error && (
           <p style={{
-            marginBottom: "20px",
-            color: "#dc2626",
+            marginBottom: spacing.xl,
+            color: colors.error,
             textAlign: "center",
-            fontWeight: '500',
-            fontSize: '0.95rem'
+            fontWeight: typography.fontWeight.medium,
+            fontSize: typography.fontSize.sm,
+            padding: spacing.md,
+            background: colors.errorLight,
+            borderRadius: borderRadius.md,
           }}>
             {error}
           </p>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={labelStyle}>
-            <span style={spanStyle}>Email Address</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              style={inputStyle}
-              onFocus={(e) => {
-                e.target.style.borderColor = "#d4af37";
-                e.target.style.boxShadow = "0 0 0 3px rgba(212, 175, 55, 0.1)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "#e5e7eb";
-                e.target.style.boxShadow = "none";
-              }}
-            />
+          <div style={{ marginBottom: spacing.xl }}>
+            <label style={{
+              display: 'block',
+              marginBottom: spacing.sm,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.primary
+            }}>
+              Email Address
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                style={{
+                  ...inputStyles.base,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  paddingLeft: '44px',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = colors.accent;
+                  e.target.style.boxShadow = `0 0 0 3px rgba(212, 175, 55, 0.1)`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = colors.gray200;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+              <span style={{
+                position: 'absolute',
+                left: spacing.lg,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: typography.fontSize.lg,
+                color: colors.gray400,
+              }}>📧</span>
+            </div>
           </div>
 
-          <div style={labelStyle}>
-            <span style={spanStyle}>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              style={inputStyle}
-              onFocus={(e) => {
-                e.target.style.borderColor = "#d4af37";
-                e.target.style.boxShadow = "0 0 0 3px rgba(212, 175, 55, 0.1)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "#e5e7eb";
-                e.target.style.boxShadow = "none";
-              }}
-            />
+          <div style={{ marginBottom: spacing.xl }}>
+            <label style={{
+              display: 'block',
+              marginBottom: spacing.sm,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.primary
+            }}>
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                style={{
+                  ...inputStyles.base,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  paddingLeft: '44px',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = colors.accent;
+                  e.target.style.boxShadow = `0 0 0 3px rgba(212, 175, 55, 0.1)`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = colors.gray200;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+              <span style={{
+                position: 'absolute',
+                left: spacing.lg,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: typography.fontSize.lg,
+                color: colors.gray400,
+              }}>🔒</span>
+            </div>
           </div>
 
           <button 
             type="submit"
-            style={buttonStyle}
+            style={{
+              ...buttonStyles.primary,
+              width: '100%',
+              marginTop: spacing.md
+            }}
             onMouseEnter={(e) => {
               e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.5)';
+              e.target.style.boxShadow = shadows.accentHover;
             }}
             onMouseLeave={(e) => {
               e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.3)';
+              e.target.style.boxShadow = shadows.accent;
             }}
           >
             Sign In
@@ -203,22 +227,29 @@ export default function Login({ onLogin }) {
         </form>
 
         <p style={{
-          marginTop: '20px',
+          marginTop: spacing.xl,
           textAlign: 'center',
-          fontSize: '0.95rem',
-          color: '#6b7280'
+          fontSize: typography.fontSize.sm,
+          color: colors.gray500
         }}>
           Don't have an account?{" "}
           <button 
             onClick={() => navigate('/ChooseRole')}
             style={{
-              color: '#d4af37',
-              fontWeight: '600',
+              color: colors.accent,
+              fontWeight: typography.fontWeight.semibold,
               textDecoration: 'none',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              fontSize: '0.95rem'
+              fontSize: typography.fontSize.sm,
+              transition: transitions.fast
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.textDecoration = 'none';
             }}
           >
             Sign Up

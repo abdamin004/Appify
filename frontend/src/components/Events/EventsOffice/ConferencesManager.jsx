@@ -1,29 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createConference, listConferences, updateEvent } from '../../../services/eventService';
+import { createConference, listConferences, updateEvent, getEventById } from '../../../services/eventService';
+import { showToast } from '../../../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
-const pageWrap = {
-  minHeight: '100vh',
-  background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)',
-  padding: '100px 20px 60px',
-};
-
-const panel = {
-  maxWidth: 1100,
-  margin: '0 auto',
-  background: '#fff',
-  borderRadius: 16,
-  padding: 24,
-  boxShadow: '0 18px 40px -24px rgba(0,0,0,0.35)',
-  border: '1px solid #e5e7eb',
-};
-
-const h1Style = { margin: 0, color: '#003366', fontWeight: 800, fontSize: 28, textAlign: 'center' };
-const sectionTitle = { color: '#003366', fontWeight: 700, fontSize: 18, marginTop: 8 };
-const yellow = '#d4af37';
-
-function ConferencesManager() {
+function ConferencesManager({ editOnly = false }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  const autoEditApplied = useRef(false);
+  const editId = editOnly ? params.id : null;
   const [form, setForm] = useState({
     title: '',
     shortDescription: '',
@@ -39,36 +27,103 @@ function ConferencesManager() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [confs, setConfs] = useState([]);
   const [listLoading, setListLoading] = useState(false);
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({});
 
-  async function refresh() {
+  const clearEditParam = () => {
     try {
-      setListLoading(true);
-      const rows = await listConferences();
-      setConfs(Array.isArray(rows) ? rows : []);
-    } catch (e) {
-      console.error('Failed to load conferences', e);
-      setError('Failed to load conferences');
-      setConfs([]);
-    } finally {
-      setListLoading(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('edit');
+      window.history.replaceState({}, '', url.toString());
+    } catch (_) {}
+  };
+
+  async function refresh() {
+    if (!editOnly) {
+      try {
+        setListLoading(true);
+        const rows = await listConferences();
+        setConfs(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        console.error('Failed to load conferences', e);
+        showToast.error('Failed to load conferences');
+        setConfs([]);
+      } finally {
+        setListLoading(false);
+      }
     }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [editOnly]);
+
+  // Load event for editing when in edit-only mode
+  useEffect(() => {
+    if (editOnly && editId && !editing) {
+      loadConferenceForEdit(editId);
+    }
+  }, [editOnly, editId]);
+
+  const loadConferenceForEdit = async (id) => {
+    setLoading(true);
+    try {
+      const conf = await getEventById(id);
+      if (conf) {
+        setEditData({
+          title: conf.title || '',
+          shortDescription: conf.shortDescription || '',
+          startDate: conf.startDate ? conf.startDate.slice(0,16) : '',
+          endDate: conf.endDate ? conf.endDate.slice(0,16) : '',
+          registrationDeadline: conf.registrationDeadline ? conf.registrationDeadline.slice(0,16) : '',
+          status: conf.status || 'published',
+          agenda: conf.description || '',
+          websiteLink: conf.websiteLink || '',
+          requiredBudget: conf.requiredBudget || '',
+          fundingSource: conf.fundingSource || 'internal',
+          extraRequiredResourses: !!conf.extraRequiredResourses,
+        });
+        setEditing(id);
+      } else {
+        showToast.error('Conference not found');
+        navigate('/EventOfficeDashboard');
+      }
+    } catch (err) {
+      showToast.error(err.message || 'Failed to load conference');
+      navigate('/EventOfficeDashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Legacy support: If opened with ?edit=<id>, auto-start editing that conference once
+  useEffect(() => {
+    if (editOnly) return; // Skip if in edit-only mode
+    try {
+      if (autoEditApplied.current) return;
+      const urlParams = new URLSearchParams(window.location.search || "");
+      const targetFromQuery = urlParams.get('edit');
+      const targetFromState = (location && location.state && location.state.edit) || null;
+      const targetId = targetFromState || targetFromQuery;
+      if (targetId && !editing && Array.isArray(confs) && confs.length) {
+        const row = confs.find(c => String(c._id) === String(targetId));
+        if (row) {
+          startEdit(row);
+          autoEditApplied.current = true;
+        }
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, [confs, editing, editOnly]);
 
   const onCreate = async (e) => {
     e.preventDefault();
-    setLoading(true); setError(''); setSuccess('');
+    setLoading(true);
     try {
       const payload = { ...form, location: 'N/A' };
       const createdConference = await createConference(payload);
-      setSuccess('Conference created');
+      showToast.success('Conference created successfully');
       setForm({
         title: '',
         shortDescription: '',
@@ -91,8 +146,10 @@ function ConferencesManager() {
       }
       
       await refresh();
+      // Redirect to Event Office dashboard
+      navigate('/EventOfficeDashboard');
     } catch (err) {
-      setError(err.message || 'Failed to create');
+      showToast.error(err.message || 'Failed to create conference');
     } finally { setLoading(false); }
   };
 
@@ -114,26 +171,90 @@ function ConferencesManager() {
   };
 
   const onSave = async (id) => {
-    setLoading(true); setError(''); setSuccess('');
+    setLoading(true);
     try {
       const payload = { ...editData };
       await updateEvent(id, payload);
-      setSuccess('Conference updated');
-      setEditing(null); setEditData({});
-      await refresh();
-    } catch (err) { setError(err.message || 'Failed to update'); }
-    finally { setLoading(false); }
+      showToast.success('Conference updated successfully');
+      setEditing(null); 
+      setEditData({});
+      clearEditParam();
+      // Redirect to EventOfficeDashboard after saving
+      navigate('/EventOfficeDashboard');
+    } catch (err) { 
+      showToast.error(err.message || 'Failed to update conference');
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={pageWrap}>
+    <div style={{
+      minHeight: '100vh',
+      background: colors.bgPrimary,
+      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
+    }}>
       <div style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 260, height: 260, background: 'rgba(212,175,55,0.12)', borderRadius: '50%', filter: 'blur(60px)' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: -40, 
+          right: -40, 
+          width: 260, 
+          height: 260, 
+          background: 'rgba(212,175,55,0.12)', 
+          borderRadius: '50%', 
+          filter: 'blur(60px)' 
+        }} />
       </div>
-      <div style={panel}>
-        <h1 style={h1Style}>Events Office — Conferences</h1>
-        <h2 style={sectionTitle}>Create Conference</h2>
-        <form className="form managerForm" onSubmit={onCreate}>
+      <div style={{
+        maxWidth: 1100,
+        margin: '0 auto',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
+        borderRadius: borderRadius['2xl'],
+        padding: spacing['3xl'],
+        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
+        border: `1px solid rgba(0,51,102,0.1)`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: spacing.md }}>
+          <button
+            onClick={() => navigate('/EventOfficeDashboard')}
+            style={{
+              ...buttonStyles.back,
+              background: colors.bgCard,
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = colors.accent;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = colors.bgCard;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.primary;
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+        <h1 style={{
+          margin: 0,
+          color: colors.primary,
+          fontWeight: typography.fontWeight.extrabold,
+          fontSize: typography.fontSize['2xl'],
+          textAlign: 'center',
+          marginBottom: spacing['2xl']
+        }}>{editOnly ? 'Edit Conference' : 'Events Office — Conferences'}</h1>
+        {!editOnly && !editing && (
+          <>
+            <h2 style={{ 
+              color: colors.primary, 
+              fontWeight: typography.fontWeight.bold, 
+              fontSize: typography.fontSize.lg, 
+              marginTop: spacing.xl,
+              marginBottom: spacing.lg,
+            }}>Create Conference</h2>
+            <form className="form managerForm" onSubmit={onCreate}>
           <label>
             <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
             <span>Title</span>
@@ -188,68 +309,429 @@ function ConferencesManager() {
             />
             <span>Extra Required Resources</span>
           </label>
-          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+          <button 
+            className="submit" 
+            type="submit" 
+            disabled={loading} 
+            style={{ 
+              ...buttonStyles.primary,
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accentHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accent;
+              }
+            }}
+          >
             {loading ? 'Creating...' : 'Create Conference'}
           </button>
-          {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
-          {success && <p className="message" style={{ color: 'green' }}>{success}</p>}
         </form>
+          </>
+        )}
 
-        <h2 style={sectionTitle}>Existing Conferences</h2>
-        {listLoading && (
-          <div style={{ textAlign: 'center', padding: 24, color: '#003366' }}>Loading conferences…</div>
+        {editing && (() => {
+          const conf = confs.find(c => c._id === editing);
+          if (!conf) return null;
+          return (
+            <div style={{
+              background: colors.white,
+              borderRadius: borderRadius.xl,
+              padding: spacing['2xl'],
+              marginTop: spacing.xl,
+              marginBottom: spacing['2xl'],
+              boxShadow: shadows.lg,
+              border: `1px solid ${colors.gray200}`,
+            }}>
+              <div style={{
+                marginBottom: spacing.xl,
+                paddingBottom: spacing.lg,
+                borderBottom: `2px solid ${colors.gray200}`,
+              }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  fontWeight: typography.fontWeight.bold, 
+                  fontSize: typography.fontSize.xl,
+                  margin: 0,
+                }}>✏️ Edit Conference</h2>
+              </div>
+              <div style={{ display: 'grid', gap: spacing.lg }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Title *</span>
+                    <input 
+                      className="input" 
+                      required 
+                      value={editData.title} 
+                      onChange={e=>setEditData({ ...editData, title: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Short Description</span>
+                    <input 
+                      className="input" 
+                      value={editData.shortDescription} 
+                      onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Start Date/Time *</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      required 
+                      value={editData.startDate} 
+                      onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>End Date/Time *</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      required 
+                      value={editData.endDate} 
+                      onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Registration Deadline</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      value={editData.registrationDeadline} 
+                      onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Conference Website Link *</span>
+                    <input 
+                      className="input" 
+                      type="url" 
+                      required 
+                      value={editData.websiteLink} 
+                      onChange={e=>setEditData({ ...editData, websiteLink: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Full Agenda</span>
+                    <textarea 
+                      className="input" 
+                      value={editData.agenda} 
+                      onChange={e=>setEditData({ ...editData, agenda: e.target.value })} 
+                      style={{ 
+                        ...inputStyles.base, 
+                        width: '100%',
+                        minHeight: 120, 
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Required Budget</span>
+                    <input 
+                      className="input" 
+                      type="number" 
+                      min="0" 
+                      value={editData.requiredBudget} 
+                      onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Source of Funding</span>
+                    <select 
+                      className="input" 
+                      value={editData.fundingSource} 
+                      onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    >
+                      <option value="internal">Internal</option>
+                      <option value="external">External</option>
+                    </select>
+                  </label>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  padding: spacing.md,
+                  background: colors.gray50,
+                  borderRadius: borderRadius.md,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={editData.extraRequiredResourses}
+                    onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })}
+                    style={{ width: 20, height: 20, cursor: 'pointer' }}
+                  />
+                  <span style={{ 
+                    color: colors.primary, 
+                    fontWeight: typography.fontWeight.medium,
+                    fontSize: typography.fontSize.base,
+                  }}>Extra Required Resources</span>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: spacing.md, 
+                  marginTop: spacing.lg,
+                  paddingTop: spacing.lg,
+                  borderTop: `1px solid ${colors.gray200}`,
+                }}>
+                  <button 
+                    type="button" 
+                    onClick={() => onSave(editing)} 
+                    disabled={loading}
+                    style={{ 
+                      ...buttonStyles.primary,
+                      flex: 1,
+                      padding: `${spacing.md} ${spacing.xl}`,
+                      fontSize: typography.fontSize.base,
+                      opacity: loading ? 0.7 : 1,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.target.style.boxShadow = shadows.accentHover;
+                        e.target.style.transform = 'translateY(-2px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.target.style.boxShadow = shadows.accent;
+                        e.target.style.transform = 'translateY(0)';
+                      }
+                    }}
+                  >
+                    {loading ? '💾 Saving...' : '💾 Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {!editOnly && (
+          <>
+            <h2 style={{ 
+              color: colors.primary, 
+              fontWeight: typography.fontWeight.bold, 
+              fontSize: typography.fontSize.lg, 
+              marginTop: spacing['3xl'],
+              marginBottom: spacing.lg,
+            }}>Existing Conferences</h2>
+            {listLoading && (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: spacing['3xl'], 
+            color: colors.primary,
+            fontSize: typography.fontSize.base,
+          }}>
+            Loading conferences…
+          </div>
         )}
         {!listLoading && confs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 24, color: '#6b7280' }}>No conferences yet.</div>
+          <div style={{ 
+            textAlign: 'center', 
+            padding: spacing['3xl'], 
+            color: colors.gray500,
+            fontSize: typography.fontSize.base,
+          }}>
+            No conferences yet.
+          </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+          gap: spacing.lg 
+        }}>
           {confs.map((c) => (
-            <div key={c._id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fff' }}>
-              {editing === c._id ? (
+            <div key={c._id} style={{ 
+              border: `1px solid ${colors.gray200}`, 
+              borderRadius: borderRadius.xl, 
+              padding: spacing.lg, 
+              background: colors.white,
+              boxShadow: shadows.md,
+              transition: transitions.normal,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = shadows.lg;
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = shadows.md;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            >
+              {editing !== c._id && (
                 <div>
-                  <input className="input" style={{ marginBottom: 8 }} value={editData.title} onChange={e=>setEditData({ ...editData, title: e.target.value })} placeholder="Title" />
-                  <input className="input" style={{ marginBottom: 8 }} value={editData.shortDescription} onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} placeholder="Short description" />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" placeholder=" " value={editData.startDate} onChange={e=>setEditData({ ...editData, startDate: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" value={editData.endDate} onChange={e=>setEditData({ ...editData, endDate: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" placeholder=" " value={editData.registrationDeadline} onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="url" placeholder="Website" value={editData.websiteLink} onChange={e=>setEditData({ ...editData, websiteLink: e.target.value })} />
-                  <textarea className="input" style={{ marginBottom: 8, minHeight: 80 }} placeholder="Full agenda" value={editData.agenda} onChange={e=>setEditData({ ...editData, agenda: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="number" min="0" placeholder="Required budget" value={editData.requiredBudget} onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} />
-                  <select className="input" style={{ marginBottom: 8 }} value={editData.fundingSource} onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}>
-                    <option value="internal">Internal</option>
-                    <option value="external">External</option>
-                  </select>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <input type="checkbox" checked={!!editData.extraRequiredResourses} onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })} />
-                    <span>Extra Required Resources</span>
-                  </label>
-                  <button className="submit" onClick={() => onSave(c._id)} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>Save</button>
-                  <button className="submit" onClick={() => setEditing(null)} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontWeight: 800, color: '#003366' }}>{c.title}</div>
-                  <div style={{ color: '#374151', fontSize: 14 }}>{c.shortDescription || '-'}</div>
-                  <div style={{ color: '#6b7280', fontSize: 12 }}>From {c.startDate ? new Date(c.startDate).toLocaleString() : '-'} to {c.endDate ? new Date(c.endDate).toLocaleString() : '-'}</div>
+                  <div style={{ 
+                    fontWeight: typography.fontWeight.extrabold, 
+                    color: colors.primary,
+                    fontSize: typography.fontSize.lg,
+                    marginBottom: spacing.sm,
+                  }}>
+                    {c.title}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray700, 
+                    fontSize: typography.fontSize.sm,
+                    marginBottom: spacing.xs,
+                  }}>
+                    {c.shortDescription || '-'}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray500, 
+                    fontSize: typography.fontSize.xs,
+                    marginBottom: spacing.xs,
+                  }}>
+                    From {c.startDate ? new Date(c.startDate).toLocaleString() : '-'} to {c.endDate ? new Date(c.endDate).toLocaleString() : '-'}
+                  </div>
                   {c.websiteLink && (
-                    <div style={{ color: '#003366', fontSize: 12, marginTop: 6 }}>
-                      <a href={c.websiteLink} target="_blank" rel="noreferrer" style={{ color: '#003366', textDecoration: 'underline' }}>Website</a>
+                    <div style={{ 
+                      color: colors.primary, 
+                      fontSize: typography.fontSize.xs, 
+                      marginTop: spacing.sm,
+                      marginBottom: spacing.xs,
+                    }}>
+                      <a 
+                        href={c.websiteLink} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        style={{ 
+                          color: colors.primary, 
+                          textDecoration: 'underline',
+                          transition: transitions.fast,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.color = colors.primaryLight;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.color = colors.primary;
+                        }}
+                      >
+                        Website
+                      </a>
                     </div>
                   )}
                   {(c.requiredBudget || c.fundingSource) && (
-                    <div style={{ color: '#6b7280', fontSize: 12, marginTop: 6 }}>
+                    <div style={{ 
+                      color: colors.gray500, 
+                      fontSize: typography.fontSize.xs, 
+                      marginTop: spacing.sm,
+                      marginBottom: spacing.xs,
+                    }}>
                       {c.requiredBudget ? `Budget: $${c.requiredBudget}` : ''} {c.fundingSource ? ` | Source: ${c.fundingSource}` : ''}
                     </div>
                   )}
                   {c.extraRequiredResourses && (
-                    <div style={{ color: '#6b7280', fontSize: 12 }}>Extra resources required</div>
+                    <div style={{ 
+                      color: colors.gray500, 
+                      fontSize: typography.fontSize.xs,
+                      marginBottom: spacing.md,
+                    }}>
+                      Extra resources required
+                    </div>
                   )}
-                  <button className="submit" onClick={() => startEdit(c)} style={{ marginTop: 8, backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>Edit</button>
+                  <button 
+                    className="submit" 
+                    onClick={() => navigate(`/events-office/conferences/edit/${c._id}`)} 
+                    style={{ 
+                      ...buttonStyles.primary,
+                      width: '100%',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.boxShadow = shadows.accentHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.boxShadow = shadows.accent;
+                    }}
+                  >
+                    Edit
+                  </button>
                 </div>
               )}
             </div>
-          ))}
-        </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

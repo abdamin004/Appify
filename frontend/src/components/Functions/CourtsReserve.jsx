@@ -1,23 +1,49 @@
 import React from "react";
 import courtService from "../../services/courtService";
+import { showToast } from "../../utils/toast";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 function CourtsReserve({ courts, onReserved }) {
   if (!courts || !Array.isArray(courts)) {
     return (
-      <div style={{ background: "rgba(255,255,255,0.95)", padding: "60px 40px", borderRadius: "20px", textAlign: "center", boxShadow: "0 8px 25px rgba(0,0,0,0.3)" }}>
-        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>📦</div>
-        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>Loading...</h3>
-        <p style={{ color: "#6b7280" }}>Please wait while we fetch court information.</p>
+      <div style={{ 
+        background: colors.bgCard, 
+        padding: `${spacing['6xl']} ${spacing['2xl']}`, 
+        borderRadius: borderRadius['2xl'], 
+        textAlign: "center", 
+        boxShadow: shadows.lg,
+        border: `1px solid ${colors.gray200}`,
+      }}>
+        <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>📦</div>
+        <h3 style={{ 
+          fontSize: typography.fontSize.xl, 
+          color: colors.primary, 
+          marginBottom: spacing.md,
+          fontWeight: typography.fontWeight.bold,
+        }}>Loading...</h3>
+        <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>Please wait while we fetch court information.</p>
       </div>
     );
   }
 
   if (courts.length === 0) {
     return (
-      <div style={{ background: "rgba(255,255,255,0.95)", padding: "60px 40px", borderRadius: "20px", textAlign: "center", boxShadow: "0 8px 25px rgba(0,0,0,0.3)" }}>
-        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>🏟️</div>
-        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>No courts available</h3>
-        <p style={{ color: "#6b7280" }}>There are no courts listed at the moment.</p>
+      <div style={{ 
+        background: colors.bgCard, 
+        padding: `${spacing['6xl']} ${spacing['2xl']}`, 
+        borderRadius: borderRadius['2xl'], 
+        textAlign: "center", 
+        boxShadow: shadows.lg,
+        border: `1px solid ${colors.gray200}`,
+      }}>
+        <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏟️</div>
+        <h3 style={{ 
+          fontSize: typography.fontSize.xl, 
+          color: colors.primary, 
+          marginBottom: spacing.md,
+          fontWeight: typography.fontWeight.bold,
+        }}>No courts available</h3>
+        <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>There are no courts listed at the moment.</p>
       </div>
     );
   }
@@ -37,35 +63,118 @@ function CourtsReserve({ courts, onReserved }) {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "30px" }}>
+    <div style={{ 
+      display: "grid", 
+      gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", 
+      gap: spacing['3xl'] 
+    }}>
       {courts.map((court) => (
-        <div key={court._id || court.id} style={{ background: "rgba(255,255,255,0.95)", borderRadius: "20px", overflow: "hidden", boxShadow: "0 8px 25px rgba(0,0,0,0.3)", transition: "all 0.3s" }}>
-          <div style={{ height: "200px", background: `linear-gradient(135deg, ${getCourtColor(court.type)} 0%, ${getCourtColorDark(court.type)} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5rem" }}>
+        <div 
+          key={court._id || court.id} 
+          style={{ 
+            background: colors.bgCard, 
+            borderRadius: borderRadius['2xl'], 
+            overflow: "hidden", 
+            boxShadow: shadows.lg, 
+            transition: transitions.normal,
+            border: `1px solid ${colors.gray200}`,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-5px)';
+            e.currentTarget.style.boxShadow = shadows.xl;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = shadows.lg;
+          }}
+        >
+          <div style={{ 
+            height: "200px", 
+            background: `linear-gradient(135deg, ${getCourtColor(court.type)} 0%, ${getCourtColorDark(court.type)} 100%)`, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            fontSize: typography.fontSize['5xl'] 
+          }}>
             {getCourtIcon(court.type)}
           </div>
-          <div style={{ padding: "25px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <span style={{ padding: "6px 12px", background: "rgba(212, 175, 55, 0.15)", color: "#d4af37", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase" }}>{court.type || "Court"}</span>
-              <span style={{ padding: "6px 12px", background: court.available ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: court.available ? "#22c55e" : "#ef4444", borderRadius: "8px", fontSize: "0.75rem", fontWeight: "700" }}>{court.available ? "Available" : "Occupied"}</span>
+          <div style={{ padding: spacing['3xl'] }}>
+            <div style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: spacing.md, 
+              marginBottom: spacing.lg 
+            }}>
+              <span style={{ 
+                padding: `${spacing.sm} ${spacing.lg}`, 
+                background: 'rgba(212, 175, 55, 0.15)', 
+                color: colors.accent, 
+                borderRadius: borderRadius.lg, 
+                fontSize: typography.fontSize.xs, 
+                fontWeight: typography.fontWeight.bold, 
+                textTransform: "uppercase" 
+              }}>{court.type || "Court"}</span>
+              <span style={{ 
+                padding: `${spacing.sm} ${spacing.lg}`, 
+                background: court.available ? colors.successLight : colors.errorLight, 
+                color: court.available ? colors.success : colors.error, 
+                borderRadius: borderRadius.lg, 
+                fontSize: typography.fontSize.xs, 
+                fontWeight: typography.fontWeight.bold 
+              }}>{court.available ? "Available" : "Occupied"}</span>
             </div>
-            <h3 style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#003366", marginBottom: "12px" }}>{court.name || `${court.type} Court`}</h3>
-            {court.description && <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: "15px", lineHeight: "1.5" }}>{court.description.substring(0, 100)}...</p>}
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.85rem", color: "#6b7280" }}>
+            <h3 style={{ 
+              fontSize: typography.fontSize.xl, 
+              fontWeight: typography.fontWeight.bold, 
+              color: colors.primary, 
+              marginBottom: spacing.lg 
+            }}>{court.name || `${court.type} Court`}</h3>
+            {court.description && (
+              <p style={{ 
+                color: colors.gray500, 
+                fontSize: typography.fontSize.sm, 
+                marginBottom: spacing.lg, 
+                lineHeight: typography.lineHeight.relaxed 
+              }}>{court.description.substring(0, 100)}...</p>
+            )}
+            <div style={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: spacing.lg, 
+              fontSize: typography.fontSize.sm, 
+              color: colors.gray500 
+            }}>
               {court.location && (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
                   <span>📍</span>
                   <span>{court.location}</span>
                 </div>
               )}
               {court.availabilityDates && court.availabilityDates.length > 0 ? (
-                <div style={{ marginTop: "10px" }}>
-                  <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#003366", marginBottom: "8px" }}>Available Dates & Times:</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ marginTop: spacing.md }}>
+                  <div style={{ 
+                    fontSize: typography.fontSize.sm, 
+                    fontWeight: typography.fontWeight.semibold, 
+                    color: colors.primary, 
+                    marginBottom: spacing.sm 
+                  }}>Available Dates & Times:</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: spacing.sm }}>
                     {court.availabilityDates.slice(0, 3).map((slot, idx) => (
-                      <div key={slot.slotId || idx} style={{ padding: "8px 12px", background: "rgba(0, 51, 102, 0.05)", borderRadius: "8px", fontSize: "0.8rem" }}>
-                        <div style={{ fontWeight: "600", color: "#003366" }}>📅 {new Date(slot.date).toLocaleDateString()}</div>
-                        <div style={{ color: "#6b7280", marginTop: "4px" }}>⏰ {slot.startTime} - {slot.endTime}</div>
-                        <div style={{ marginTop: 6 }}>
+                      <div key={slot.slotId || idx} style={{ 
+                        padding: `${spacing.sm} ${spacing.lg}`, 
+                        background: colors.gray50, 
+                        borderRadius: borderRadius.lg, 
+                        fontSize: typography.fontSize.xs 
+                      }}>
+                        <div style={{ 
+                          fontWeight: typography.fontWeight.semibold, 
+                          color: colors.primary 
+                        }}>📅 {new Date(slot.date).toLocaleDateString()}</div>
+                        <div style={{ 
+                          color: colors.gray500, 
+                          marginTop: spacing.xs 
+                        }}>⏰ {slot.startTime} - {slot.endTime}</div>
+                        <div style={{ marginTop: spacing.sm }}>
                           <button
                             onClick={async () => {
                               const cid = court._id || court.id;
@@ -83,15 +192,25 @@ function CourtsReserve({ courts, onReserved }) {
                                 const res = await courtService.reserveCourt(cid, sid);
                                 const apiMsg = res && res.message;
                                 const name = (res && res.booking && res.booking.studentName) || userName;
-                                alert(apiMsg || `Court reserved successfully. Reserved by ${name}.`);
+                                showToast.success(apiMsg || `Court reserved successfully. Reserved by ${name}.`);
                               } catch (err) {
-                                // Frontend-only fallback (no backend)
-                                alert(`Court reserved successfully. Reserved by ${userName}.`);
+                                const errorMsg = err?.message || 'Failed to reserve court';
+                                showToast.error(errorMsg);
                               } finally {
                                 if (typeof onReserved === 'function') onReserved(cid, sid);
                               }
                             }}
-                            style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', color: '#003366', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}
+                            style={{ 
+                              ...buttonStyles.primary,
+                              padding: `${spacing.sm} ${spacing.md}`,
+                              fontSize: typography.fontSize.xs,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.boxShadow = shadows.accentHover;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.boxShadow = shadows.accent;
+                            }}
                           >
                             Reserve
                           </button>
@@ -99,12 +218,24 @@ function CourtsReserve({ courts, onReserved }) {
                       </div>
                     ))}
                     {court.availabilityDates.length > 3 && (
-                      <div style={{ fontSize: "0.75rem", color: "#d4af37", fontWeight: "600", marginTop: "4px" }}>+{court.availabilityDates.length - 3} more slots</div>
+                      <div style={{ 
+                        fontSize: typography.fontSize.xs, 
+                        color: colors.accent, 
+                        fontWeight: typography.fontWeight.semibold, 
+                        marginTop: spacing.xs 
+                      }}>+{court.availabilityDates.length - 3} more slots</div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: "10px", background: "rgba(239, 68, 68, 0.1)", borderRadius: "8px", fontSize: "0.8rem", color: "#ef4444", textAlign: "center" }}>No availability slots at the moment</div>
+                <div style={{ 
+                  padding: spacing.md, 
+                  background: colors.errorLight, 
+                  borderRadius: borderRadius.lg, 
+                  fontSize: typography.fontSize.xs, 
+                  color: colors.error, 
+                  textAlign: "center" 
+                }}>No availability slots at the moment</div>
               )}
             </div>
           </div>

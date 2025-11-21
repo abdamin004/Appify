@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import EventCard from "./AdminEventCard";
+import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
 import { deleteEvent } from '../services/eventService';
+import { showToast, confirmDialog } from '../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, transitions, inputStyles, buttonStyles } from '../utils/designSystem';
 
-function EventsList({ filterByTypes = null, presetType = null }) {
+function EventsList({ filterByTypes = null, presetType = null, headerAction = null }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,20 +100,22 @@ function EventsList({ filterByTypes = null, presetType = null }) {
   const handleEventClick = (id) => (window.location.href = `/events/${id}`);
 
   const handleDeleteEvent = async (id) => {
-    if (!window.confirm('Delete this event? This cannot be undone.')) return;
+    const confirmed = await confirmDialog('Delete this event? This cannot be undone.', 'Delete Event');
+    if (!confirmed) return;
     try {
       await deleteEvent(id);
-      // refresh
+      showToast.success('Event deleted successfully');
       fetchEvents();
     } catch (err) {
       console.error('Failed to delete event', err);
-      alert(err.message || 'Failed to delete event');
+      showToast.error(err.message || 'Failed to delete event');
     }
   };
 
-  const handleArchiveEvent = (id, event) => {
+  const handleArchiveEvent = async (id, event) => {
     // Frontend-only archiving - no backend calls
-    if (!window.confirm('Archive this event? It will be hidden from the event list.')) return;
+    const confirmed = await confirmDialog('Archive this event? It will be hidden from the event list.', 'Archive Event');
+    if (!confirmed) return;
     
     // Add to archived set and save to localStorage
     const newArchived = new Set(archivedEvents);
@@ -126,7 +130,7 @@ function EventsList({ filterByTypes = null, presetType = null }) {
     }
     
     // Show success message
-    alert('Event archived successfully!');
+    showToast.success('Event archived successfully!');
     
     // The event will be automatically filtered out from the list
     // No need to refresh - the filteredEvents will update automatically
@@ -178,7 +182,17 @@ function EventsList({ filterByTypes = null, presetType = null }) {
       <div style={{ paddingTop: "120px", padding: "120px 40px 80px", position: "relative", zIndex: 1 }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
           {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: "50px" }}>
+          <div style={{ textAlign: "center", marginBottom: "50px", position: 'relative' }}>
+            {headerAction && (
+              <div style={{ 
+                position: 'absolute', 
+                left: 0, 
+                top: '50%', 
+                transform: 'translateY(-50%)' 
+              }}>
+                {headerAction}
+              </div>
+            )}
             <h1
               style={{
                 fontSize: "3rem",
@@ -330,7 +344,6 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                 <option value="/events-office/conferences">Conferences</option>
                 <option value="/events-office/gym-sessions">Gym Sessions</option>
                 <option value="/professor/workshops">Workshops</option>
-                <option value="/register-events">Register (Workshops/Trips)</option>
                 <option value="/gym-sessions">View Gym Sessions</option>
               </select>
 

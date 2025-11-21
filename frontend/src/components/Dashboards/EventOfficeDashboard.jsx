@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import EventsList from "../AdminEventList";
+import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import { showToast, confirmDialog } from "../../utils/toast";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -127,12 +129,13 @@ function EventOfficeDashboard() {
 
   const handleApproveWorkshop = async (workshopId) => {
     // Frontend-only approval - no backend calls
-    if (!window.confirm("Are you sure you want to approve and publish this workshop?")) return;
+    const confirmed = await confirmDialog("Are you sure you want to approve and publish this workshop?", "Approve Workshop");
+    if (!confirmed) return;
     
     // Find the workshop to get its details
     const workshop = pendingWorkshops.find(w => w._id === workshopId);
     if (!workshop) {
-      alert("Workshop not found");
+      showToast.error("Workshop not found");
       return;
     }
     
@@ -167,16 +170,17 @@ function EventOfficeDashboard() {
     notifyAllUsersAboutNewEvent(publishedWorkshop);
     
     // Show success message
-    alert("Workshop approved and published successfully!");
+    showToast.success("Workshop approved and published successfully!");
   };
 
   const handleRejectWorkshop = async (workshopId) => {
-    if (!window.confirm("Are you sure you want to reject this workshop?")) return;
+    const confirmed = await confirmDialog("Are you sure you want to reject this workshop?", "Reject Workshop");
+    if (!confirmed) return;
     try {
       // Find the workshop to get its details
       const workshop = pendingWorkshops.find(w => w._id === workshopId);
       if (!workshop) {
-        alert("Workshop not found");
+        showToast.error("Workshop not found");
         return;
       }
       
@@ -195,10 +199,10 @@ function EventOfficeDashboard() {
         });
       }
       
-      alert("Workshop rejected successfully!");
+      showToast.success("Workshop rejected successfully!");
     } catch (err) {
       console.error("Error rejecting workshop:", err);
-      alert(err?.message || "Error rejecting workshop");
+      showToast.error(err?.message || "Error rejecting workshop");
       // Re-fetch to restore the list if rejection failed
       fetchPendingWorkshops();
     }
@@ -210,13 +214,13 @@ function EventOfficeDashboard() {
 
   const handleSubmitEditRequest = async () => {
     if (!editRequestModal.editRequest.trim()) {
-      alert("Please enter edit requests");
+      showToast.warning("Please enter edit requests");
       return;
     }
     try {
       const workshop = pendingWorkshops.find(w => w._id === editRequestModal.workshopId);
       if (!workshop) {
-        alert("Workshop not found");
+        showToast.error("Workshop not found");
         return;
       }
       
@@ -226,12 +230,12 @@ function EventOfficeDashboard() {
       const updatedDescription = currentDescription + editRequestNote;
       
       await updateEvent(editRequestModal.workshopId, { description: updatedDescription });
-      alert("Edit request sent successfully! The professor will see your request in the workshop details.");
+      showToast.success("Edit request sent successfully! The professor will see your request in the workshop details.");
       setEditRequestModal({ open: false, workshopId: null, editRequest: "" });
       fetchPendingWorkshops();
     } catch (err) {
       console.error("Error sending edit request:", err);
-      alert(err?.message || "Error sending edit request");
+      showToast.error(err?.message || "Error sending edit request");
     }
   };
 
@@ -246,10 +250,26 @@ function EventOfficeDashboard() {
             Authorization: `Bearer ${token}`,
           },
         });
-        const data = await res.json();
-        backendNotifications = Array.isArray(data) ? data : [];
+        if (res.ok) {
+          const data = await res.json();
+          backendNotifications = Array.isArray(data) ? data : [];
+        } else if (res.status === 404) {
+          // Backend route not implemented yet - gracefully handle
+          backendNotifications = [];
+        } else {
+          // Other error - try to parse JSON, but handle HTML responses
+          try {
+            const data = await res.json();
+            backendNotifications = Array.isArray(data) ? data : [];
+          } catch (parseErr) {
+            // Response is not JSON (probably HTML error page) - just use empty array
+            backendNotifications = [];
+          }
+        }
       } catch (err) {
+        // Network error or other issue - gracefully handle
         console.error("Error fetching backend notifications:", err);
+        backendNotifications = [];
       }
       
       // Fetch frontend Events Office notifications
@@ -441,23 +461,24 @@ function EventOfficeDashboard() {
     try {
       const notes = window.prompt('Optional notes (press Enter to skip)') || undefined;
       await adminService.reviewVendorApplication(requestId, action, notes);
-      alert(`Vendor request ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      showToast.success(`Vendor request ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
       fetchVendorRequests();
     } catch (err) {
       console.error("Error updating vendor request:", err);
-      alert(err?.message || "Error updating vendor request");
+      showToast.error(err?.message || "Error updating vendor request");
     }
   };
 
   const handleDeleteGymSession = async (sessionId) => {
-    if (!window.confirm("Are you sure you want to cancel this gym session?")) return;
+    const confirmed = await confirmDialog("Are you sure you want to cancel this gym session?", "Cancel Gym Session");
+    if (!confirmed) return;
     try {
       await cancelGymSession(sessionId);
-      alert("Gym session cancelled successfully!");
+      showToast.success("Gym session cancelled successfully!");
       fetchGymSessions();
     } catch (err) {
       console.error("Error cancelling gym session:", err);
-      alert(err?.message || "Error cancelling gym session");
+      showToast.error(err?.message || "Error cancelling gym session");
     }
   };
 
@@ -496,33 +517,34 @@ function EventOfficeDashboard() {
           {/* Header + Stats + Create Button */}
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "35px 40px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "40px",
+              background: colors.bgCard,
+              padding: `${spacing['3xl']} ${spacing['2xl']}`,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               flexWrap: "wrap",
-              gap: "20px",
+              gap: spacing.xl,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
             <div>
               <h1
                 style={{
-                  fontSize: "2.2rem",
-                  fontWeight: "bold",
-                  color: "#003366",
-                  marginBottom: "8px",
+                  fontSize: typography.fontSize['3xl'],
+                  fontWeight: typography.fontWeight.bold,
+                  color: colors.primary,
+                  marginBottom: spacing.sm,
                 }}
               >
                 Welcome, Event Office {user.firstName}! 👋
               </h1>
               <p
                 style={{
-                  fontSize: "1.1rem",
-                  color: "#6b7280",
+                  fontSize: typography.fontSize.lg,
+                  color: colors.gray500,
                   margin: 0,
                 }}
               >
@@ -532,105 +554,29 @@ function EventOfficeDashboard() {
             <div
               style={{
                 display: "flex",
-                gap: "15px",
+                gap: spacing.lg,
                 alignItems: "center",
                 flexWrap: "wrap",
               }}
             >
-              <div
-                style={{
-                  padding: "12px 20px",
-                  background: "rgba(212, 175, 55, 0.15)",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                  position: "relative",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#003366",
-                  }}
-                >
-                  {vendorRequests.length}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "#6b7280",
-                  }}
-                >
-                  Pending Requests
-                </div>
-                {unreadNotifications > 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "-5px",
-                      right: "-5px",
-                      background: "#ef4444",
-                      color: "white",
-                      borderRadius: "50%",
-                      width: "24px",
-                      height: "24px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {unreadNotifications}
-                  </div>
-                )}
-              </div>
-              <div
-                style={{
-                  padding: "12px 20px",
-                  background: "rgba(212, 175, 55, 0.15)",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#003366",
-                  }}
-                >
-                  {gymSessions.length}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "#6b7280",
-                  }}
-                >
-                  Gym Sessions
-                </div>
-              </div>
               <div style={{ position: "relative" }}>
                 <button
                   style={{
-                    padding: "14px 28px",
-                    background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                    color: "#003366",
-                    border: "none",
-                    borderRadius: "12px",
-                    fontSize: "1rem",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    transition: "all 0.3s",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    ...buttonStyles.primary,
+                    padding: `${spacing.md} ${spacing['2xl']}`,
                   }}
                   onClick={() => {
                     const dropdown = document.getElementById("create-dropdown");
                     dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
                   }}
+                  onMouseEnter={(e) => {
+                    e.target.style.boxShadow = shadows.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.boxShadow = shadows.accent;
+                  }}
                 >
-                  + Create/edit Event ▼
+                  + Create Event ▼
                 </button>
                 <div
                   id="create-dropdown"
@@ -638,77 +584,137 @@ function EventOfficeDashboard() {
                     display: "none",
                     position: "absolute",
                     top: "100%",
-                    right: 0,
-                    marginTop: "8px",
-                    background: "white",
-                    borderRadius: "12px",
-                    boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
+                    left: 0,
+                    marginTop: spacing.sm,
+                    background: colors.white,
+                    borderRadius: borderRadius.xl,
+                    boxShadow: shadows.lg,
                     minWidth: "200px",
                     zIndex: 1000,
+                    border: `1px solid ${colors.gray200}`,
                   }}
                 >
                   <button
                     onClick={() => handleCreateEvent("bazaar")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
-                      borderRadius: "12px 12px 0 0",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      borderRadius: `${borderRadius.xl} ${borderRadius.xl} 0 0`,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    🏪 Create/edit Bazaar
+                    🏪 Create Bazaar
                   </button>
                   <button
                     onClick={() => handleCreateEvent("trip")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    🚌 Create/edit Trip
+                    🚌 Create Trip
                   </button>
                   <button
                     onClick={() => handleCreateEvent("conference")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    🎤 Create/edit Conference
+                    🎤 Create Conference
                   </button>
                   <button
                     onClick={() => handleCreateEvent("gym")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
-                      borderRadius: "0 0 12px 12px",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      borderRadius: `0 0 ${borderRadius.xl} ${borderRadius.xl}`,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    💪 Create/edit Gym Session
+                    💪 Create Gym Session
                   </button>
+                </div>
+              </div>
+              <div
+                style={{
+                  padding: `${spacing.md} ${spacing.xl}`,
+                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
+                  borderRadius: borderRadius.xl,
+                  textAlign: "center",
+                  border: `1px solid ${colors.primary}`,
+                  position: "relative",
+                  boxShadow: shadows.md,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: typography.fontSize['2xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.white,
+                  }}
+                >
+                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
+                </div>
+                <div
+                  style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.accent,
+                    marginTop: spacing.xs,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  Notifications
                 </div>
               </div>
             </div>
@@ -717,33 +723,32 @@ function EventOfficeDashboard() {
           {/* Tabs */}
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "10px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "30px",
+              background: colors.bgCard,
+              padding: spacing.md,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
               display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
+              gap: spacing.md,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
             <button
               onClick={() => setActiveTab("browse")}
               style={{
                 flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "browse"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "browse" ? "#003366" : "#6b7280",
+                color: activeTab === "browse" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               🎯 Browse Events
@@ -752,19 +757,18 @@ function EventOfficeDashboard() {
               onClick={() => setActiveTab("vendor-requests")}
               style={{
                 flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "vendor-requests"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "vendor-requests" ? "#003366" : "#6b7280",
+                color: activeTab === "vendor-requests" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -773,18 +777,18 @@ function EventOfficeDashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {vendorRequests.length}
@@ -795,19 +799,18 @@ function EventOfficeDashboard() {
               onClick={() => setActiveTab("gym-sessions")}
               style={{
                 flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "gym-sessions"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "gym-sessions" ? "#003366" : "#6b7280",
+                color: activeTab === "gym-sessions" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               💪 Gym Sessions
@@ -816,19 +819,18 @@ function EventOfficeDashboard() {
               onClick={() => setActiveTab("workshop-approvals")}
               style={{
                 flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "workshop-approvals"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "workshop-approvals" ? "#003366" : "#6b7280",
+                color: activeTab === "workshop-approvals" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -837,18 +839,18 @@ function EventOfficeDashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {pendingWorkshops.length}
@@ -862,19 +864,18 @@ function EventOfficeDashboard() {
               }}
               style={{
                 flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "notifications"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "notifications" ? "#003366" : "#6b7280",
+                color: activeTab === "notifications" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -883,18 +884,18 @@ function EventOfficeDashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
@@ -909,18 +910,18 @@ function EventOfficeDashboard() {
               }}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "reminders"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "reminders" ? "#003366" : "#6b7280",
+                color: activeTab === "reminders" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -929,79 +930,122 @@ function EventOfficeDashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {reminders.filter(n => !n.isRead).length}
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab("archived")}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "archived"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "archived" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              📦 Archived Events
+            </button>
           </div>
 
           {/* Content */}
-          {activeTab === "browse" && <EventsList />}
+          {activeTab === "browse" && <EventList enableFavorites={false} hideArchived={true} />}
+          {activeTab === "archived" && <EventList enableFavorites={false} showArchivedOnly={true} />}
 
           {activeTab === "vendor-requests" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ color: "#003366", marginBottom: "20px" }}>
+              <h2 style={{ 
+                color: colors.primary, 
+                marginBottom: spacing.xl,
+                fontSize: typography.fontSize['2xl'],
+                fontWeight: typography.fontWeight.bold,
+              }}>
                 Pending Vendor Requests
               </h2>
               {vendorRequests.length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No pending vendor requests</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No pending vendor requests</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {vendorRequests.map((request) => (
                     <div
                       key={request._id}
                       style={{
-                        padding: "20px",
-                        background: "rgba(212, 175, 55, 0.1)",
-                        borderRadius: "12px",
+                        padding: spacing.xl,
+                        background: colors.white,
+                        borderRadius: borderRadius.xl,
+                        border: `1px solid ${colors.gray200}`,
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
+                        boxShadow: shadows.sm,
                       }}
                     >
                       <div>
-                        <h3 style={{ color: "#003366", marginBottom: "8px" }}>
+                        <h3 style={{ 
+                          color: colors.primary, 
+                          marginBottom: spacing.sm,
+                          fontSize: typography.fontSize.lg,
+                          fontWeight: typography.fontWeight.bold,
+                        }}>
                           {request.organizationName || "Vendor"}
                         </h3>
-                        <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                        <p style={{ 
+                          color: colors.gray500, 
+                          margin: `${spacing.xs} 0`,
+                          fontSize: typography.fontSize.base,
+                        }}>
                           Event: {request.eventTitle || "N/A"}
                         </p>
-                        <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                        <p style={{ 
+                          color: colors.gray500, 
+                          margin: `${spacing.xs} 0`,
+                          fontSize: typography.fontSize.base,
+                        }}>
                           Status: {request.status}
                         </p>
                       </div>
-                      <div style={{ display: "flex", gap: "10px" }}>
+                      <div style={{ display: "flex", gap: spacing.md }}>
                         <button
                           onClick={() => handleVendorRequestAction(request._id, "approve")}
                           style={{
-                            padding: "10px 20px",
-                            background: "#10b981",
-                            color: "white",
+                            padding: `${spacing.sm} ${spacing.lg}`,
+                            background: colors.success,
+                            color: colors.white,
                             border: "none",
-                            borderRadius: "8px",
+                            borderRadius: borderRadius.md,
                             cursor: "pointer",
-                            fontWeight: "600",
+                            fontWeight: typography.fontWeight.semibold,
+                            fontSize: typography.fontSize.sm,
                           }}
                         >
                           Approve
@@ -1009,13 +1053,14 @@ function EventOfficeDashboard() {
                         <button
                           onClick={() => handleVendorRequestAction(request._id, "reject")}
                           style={{
-                            padding: "10px 20px",
-                            background: "#ef4444",
-                            color: "white",
+                            padding: `${spacing.sm} ${spacing.lg}`,
+                            background: colors.error,
+                            color: colors.white,
                             border: "none",
-                            borderRadius: "8px",
+                            borderRadius: borderRadius.md,
                             cursor: "pointer",
-                            fontWeight: "600",
+                            fontWeight: typography.fontWeight.semibold,
+                            fontSize: typography.fontSize.sm,
                           }}
                         >
                           Reject
@@ -1031,58 +1076,79 @@ function EventOfficeDashboard() {
           {activeTab === "workshop-approvals" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ color: "#003366", marginBottom: "20px" }}>
+              <h2 style={{ 
+                color: colors.primary, 
+                marginBottom: spacing.xl,
+                fontSize: typography.fontSize['2xl'],
+                fontWeight: typography.fontWeight.bold,
+              }}>
                 Pending Workshop Approvals
               </h2>
               {pendingWorkshops.length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No pending workshops for approval</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No pending workshops for approval</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.xl }}>
                   {pendingWorkshops.map((workshop) => (
                     <div
                       key={workshop._id}
                       style={{
-                        padding: "25px",
-                        background: "rgba(212, 175, 55, 0.1)",
-                        borderRadius: "12px",
-                        border: "1px solid rgba(212, 175, 55, 0.3)",
+                        padding: spacing['2xl'],
+                        background: colors.white,
+                        borderRadius: borderRadius.xl,
+                        border: `1px solid ${colors.gray200}`,
+                        boxShadow: shadows.sm,
                       }}
                     >
-                      <div style={{ marginBottom: "15px" }}>
-                        <h3 style={{ color: "#003366", marginBottom: "10px", fontSize: "1.3rem" }}>
+                      <div style={{ marginBottom: spacing.lg }}>
+                        <h3 style={{ 
+                          color: colors.primary, 
+                          marginBottom: spacing.md, 
+                          fontSize: typography.fontSize.xl,
+                          fontWeight: typography.fontWeight.bold,
+                        }}>
                           {workshop.title}
                         </h3>
                         {workshop.shortDescription && (
-                          <p style={{ color: "#6b7280", marginBottom: "8px" }}>
+                          <p style={{ 
+                            color: colors.gray500, 
+                            marginBottom: spacing.sm,
+                            fontSize: typography.fontSize.base,
+                          }}>
                             {workshop.shortDescription}
                           </p>
                         )}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginTop: "12px" }}>
+                        <div style={{ 
+                          display: "grid", 
+                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
+                          gap: spacing.md, 
+                          marginTop: spacing.md 
+                        }}>
                           <div>
-                            <strong style={{ color: "#003366" }}>Location:</strong>{" "}
-                            <span style={{ color: "#6b7280" }}>{workshop.location}</span>
+                            <strong style={{ color: colors.primary }}>Location:</strong>{" "}
+                            <span style={{ color: colors.gray500 }}>{workshop.location}</span>
                           </div>
                           <div>
-                            <strong style={{ color: "#003366" }}>Faculty:</strong>{" "}
-                            <span style={{ color: "#6b7280" }}>{workshop.facultyName || "N/A"}</span>
+                            <strong style={{ color: colors.primary }}>Faculty:</strong>{" "}
+                            <span style={{ color: colors.gray500 }}>{workshop.facultyName || "N/A"}</span>
                           </div>
                           <div>
-                            <strong style={{ color: "#003366" }}>Start Date:</strong>{" "}
-                            <span style={{ color: "#6b7280" }}>
+                            <strong style={{ color: colors.primary }}>Start Date:</strong>{" "}
+                            <span style={{ color: colors.gray500 }}>
                               {workshop.startDate
                                 ? new Date(workshop.startDate).toLocaleString()
                                 : "N/A"}
                             </span>
                           </div>
                           <div>
-                            <strong style={{ color: "#003366" }}>End Date:</strong>{" "}
-                            <span style={{ color: "#6b7280" }}>
+                            <strong style={{ color: colors.primary }}>End Date:</strong>{" "}
+                            <span style={{ color: colors.gray500 }}>
                               {workshop.endDate
                                 ? new Date(workshop.endDate).toLocaleString()
                                 : "N/A"}
@@ -1090,23 +1156,23 @@ function EventOfficeDashboard() {
                           </div>
                           {workshop.requiredBudget && (
                             <div>
-                              <strong style={{ color: "#003366" }}>Budget:</strong>{" "}
-                              <span style={{ color: "#6b7280" }}>
+                              <strong style={{ color: colors.primary }}>Budget:</strong>{" "}
+                              <span style={{ color: colors.gray500 }}>
                                 {workshop.requiredBudget} ({workshop.fundingSource || "N/A"})
                               </span>
                             </div>
                           )}
                           {workshop.capacity && (
                             <div>
-                              <strong style={{ color: "#003366" }}>Capacity:</strong>{" "}
-                              <span style={{ color: "#6b7280" }}>{workshop.capacity}</span>
+                              <strong style={{ color: colors.primary }}>Capacity:</strong>{" "}
+                              <span style={{ color: colors.gray500 }}>{workshop.capacity}</span>
                             </div>
                           )}
                         </div>
                         {workshop.professors && workshop.professors.length > 0 && (
-                          <div style={{ marginTop: "12px" }}>
-                            <strong style={{ color: "#003366" }}>Professors:</strong>
-                            <ul style={{ color: "#6b7280", margin: "4px 0 0 20px" }}>
+                          <div style={{ marginTop: spacing.md }}>
+                            <strong style={{ color: colors.primary }}>Professors:</strong>
+                            <ul style={{ color: colors.gray500, margin: `${spacing.xs} 0 0 ${spacing.xl}` }}>
                               {workshop.professors.map((prof, idx) => (
                                 <li key={idx}>
                                   {prof.name}
@@ -1117,26 +1183,26 @@ function EventOfficeDashboard() {
                           </div>
                         )}
                         {workshop.description && (
-                          <div style={{ marginTop: "12px" }}>
-                            <strong style={{ color: "#003366" }}>Agenda:</strong>
-                            <p style={{ color: "#6b7280", margin: "4px 0 0 0" }}>
+                          <div style={{ marginTop: spacing.md }}>
+                            <strong style={{ color: colors.primary }}>Agenda:</strong>
+                            <p style={{ color: colors.gray500, margin: `${spacing.xs} 0 0 0` }}>
                               {workshop.description}
                             </p>
                           </div>
                         )}
                       </div>
-                      <div style={{ display: "flex", gap: "10px", marginTop: "15px", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: spacing.md, marginTop: spacing.lg, flexWrap: "wrap" }}>
                         <button
                           onClick={() => handleApproveWorkshop(workshop._id)}
                           style={{
-                            padding: "10px 20px",
-                            background: "#10b981",
-                            color: "white",
+                            padding: `${spacing.sm} ${spacing.lg}`,
+                            background: colors.success,
+                            color: colors.white,
                             border: "none",
-                            borderRadius: "8px",
+                            borderRadius: borderRadius.md,
                             cursor: "pointer",
-                            fontWeight: "600",
-                            fontSize: "0.95rem",
+                            fontWeight: typography.fontWeight.semibold,
+                            fontSize: typography.fontSize.sm,
                           }}
                         >
                           ✓ Approve & Publish
@@ -1144,14 +1210,14 @@ function EventOfficeDashboard() {
                         <button
                           onClick={() => handleRequestEdits(workshop._id)}
                           style={{
-                            padding: "10px 20px",
-                            background: "#f59e0b",
-                            color: "white",
+                            padding: `${spacing.sm} ${spacing.lg}`,
+                            background: colors.warning,
+                            color: colors.white,
                             border: "none",
-                            borderRadius: "8px",
+                            borderRadius: borderRadius.md,
                             cursor: "pointer",
-                            fontWeight: "600",
-                            fontSize: "0.95rem",
+                            fontWeight: typography.fontWeight.semibold,
+                            fontSize: typography.fontSize.sm,
                           }}
                         >
                           ✏️ Request Edits
@@ -1159,14 +1225,14 @@ function EventOfficeDashboard() {
                         <button
                           onClick={() => handleRejectWorkshop(workshop._id)}
                           style={{
-                            padding: "10px 20px",
-                            background: "#ef4444",
-                            color: "white",
+                            padding: `${spacing.sm} ${spacing.lg}`,
+                            background: colors.error,
+                            color: colors.white,
                             border: "none",
-                            borderRadius: "8px",
+                            borderRadius: borderRadius.md,
                             cursor: "pointer",
-                            fontWeight: "600",
-                            fontSize: "0.95rem",
+                            fontWeight: typography.fontWeight.semibold,
+                            fontSize: typography.fontSize.sm,
                           }}
                         >
                           ✗ Reject
@@ -1182,14 +1248,20 @@ function EventOfficeDashboard() {
           {activeTab === "reminders" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ color: "#003366", margin: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  margin: 0,
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold,
+                }}>
                   Event Reminders
                 </h2>
                 {reminders.filter(n => !n.isRead).length > 0 && (
@@ -1201,14 +1273,9 @@ function EventOfficeDashboard() {
                       fetchReminders();
                     }}
                     style={{
-                      padding: "8px 16px",
-                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                      color: "#003366",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      cursor: "pointer",
+                      ...buttonStyles.primary,
+                      padding: `${spacing.sm} ${spacing.md}`,
+                      fontSize: typography.fontSize.sm,
                     }}
                   >
                     Mark All as Read
@@ -1216,39 +1283,40 @@ function EventOfficeDashboard() {
                 )}
               </div>
               {reminders.length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No reminders at this time.</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {reminders.map((reminder) => {
                     const isRead = reminder.read || reminder.isRead;
                     return (
                       <div
                         key={reminder.id}
                         style={{
-                          padding: "20px",
-                          background: isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(245, 158, 11, 0.15)",
-                          borderRadius: "12px",
-                          border: isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(245, 158, 11, 0.4)",
+                          padding: spacing.xl,
+                          background: isRead ? colors.gray50 : colors.white,
+                          borderRadius: borderRadius.xl,
+                          border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.warning}`,
                           position: "relative",
+                          boxShadow: isRead ? shadows.sm : shadows.md,
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                              <span style={{ fontSize: "1.5rem" }}>⏰</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
+                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
                               <h3 style={{ 
-                                color: "#003366", 
+                                color: colors.primary, 
                                 margin: 0, 
-                                fontSize: "1.1rem",
-                                fontWeight: isRead ? "500" : "700",
+                                fontSize: typography.fontSize.lg,
+                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
                                 Event Reminder
                               </h3>
                               {!isRead && (
                                 <span style={{
-                                  background: "#ef4444",
-                                  color: "white",
-                                  borderRadius: "50%",
+                                  background: colors.error,
+                                  color: colors.white,
+                                  borderRadius: borderRadius.full,
                                   width: "10px",
                                   height: "10px",
                                   display: "inline-block",
@@ -1256,17 +1324,18 @@ function EventOfficeDashboard() {
                               )}
                             </div>
                             <p style={{ 
-                              color: "#6b7280", 
-                              margin: "8px 0",
-                              fontWeight: isRead ? "400" : "500",
+                              color: colors.gray500, 
+                              margin: `${spacing.sm} 0`,
+                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                              fontSize: typography.fontSize.base,
                             }}>
                               {reminder.message}
                             </p>
                             {reminder.eventStartDate && (
                               <p style={{ 
-                                color: "#9ca3af", 
-                                fontSize: "0.85rem",
-                                margin: "4px 0",
+                                color: colors.gray400, 
+                                fontSize: typography.fontSize.sm,
+                                margin: `${spacing.xs} 0`,
                               }}>
                                 Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
                               </p>
@@ -1277,29 +1346,24 @@ function EventOfficeDashboard() {
                                   window.location.href = `/events/${reminder.eventId}`;
                                 }}
                                 style={{
-                                  marginTop: "10px",
-                                  padding: "8px 16px",
-                                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                                  color: "#003366",
-                                  border: "none",
-                                  borderRadius: "8px",
-                                  fontSize: "0.9rem",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
+                                  marginTop: spacing.md,
+                                  ...buttonStyles.primary,
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  fontSize: typography.fontSize.sm,
                                 }}
                               >
                                 View Event
                               </button>
                             )}
                             <p style={{ 
-                              color: "#9ca3af", 
-                              fontSize: "0.85rem",
-                              margin: "8px 0 0 0",
+                              color: colors.gray400, 
+                              fontSize: typography.fontSize.sm,
+                              margin: `${spacing.sm} 0 0 0`,
                             }}>
                               {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
                             </p>
                           </div>
-                          <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                             {!isRead && (
                               <button
                                 onClick={() => {
@@ -1307,13 +1371,13 @@ function EventOfficeDashboard() {
                                   fetchReminders();
                                 }}
                                 style={{
-                                  padding: "6px 12px",
-                                  background: "#10b981",
-                                  color: "white",
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  background: colors.success,
+                                  color: colors.white,
                                   border: "none",
-                                  borderRadius: "6px",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "600",
+                                  borderRadius: borderRadius.md,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
                                   cursor: "pointer",
                                 }}
                               >
@@ -1326,17 +1390,29 @@ function EventOfficeDashboard() {
                                 fetchReminders();
                               }}
                               style={{
-                                padding: "6px 12px",
-                                background: "#ef4444",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                fontSize: "0.85rem",
-                                fontWeight: "600",
-                                cursor: "pointer",
+                                padding: `${spacing.xs} ${spacing.md}`,
+                                background: colors.error,
+                                color: colors.white,
+                                border: 'none',
+                                borderRadius: borderRadius.lg,
+                                fontSize: typography.fontSize.sm,
+                                fontWeight: typography.fontWeight.semibold,
+                                cursor: 'pointer',
+                                transition: transitions.fast,
+                                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.transform = 'translateY(-1px)';
+                                e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                                e.target.style.background = '#b91c1c';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                                e.target.style.background = colors.error;
                               }}
                             >
-                              Delete
+                              🗑️ Delete
                             </button>
                           </div>
                         </div>
@@ -1351,14 +1427,20 @@ function EventOfficeDashboard() {
           {activeTab === "notifications" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ color: "#003366", margin: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  margin: 0,
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold,
+                }}>
                   Notifications
                 </h2>
                 {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
@@ -1369,28 +1451,19 @@ function EventOfficeDashboard() {
                       fetchNotifications();
                     }}
                     style={{
-                      padding: "8px 16px",
-                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                      color: "#003366",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
+                      ...buttonStyles.primary,
+                      padding: `${spacing.sm} ${spacing.md}`,
+                      fontSize: typography.fontSize.sm,
                     }}
                   >
                     Mark All as Read
-                    <span style={{ color: "#10b981", fontSize: "1.1rem" }}>✓</span>
                   </button>
                 )}
               </div>
               {notifications.length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No notifications at this time.</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {notifications.map((notif) => {
                     const isRead = notif.read || notif.isRead;
                     const isFrontend = notif.id && !notif._id; // Frontend notifications have id but not _id
@@ -1398,27 +1471,28 @@ function EventOfficeDashboard() {
                       <div
                         key={notif.id || notif._id}
                         style={{
-                          padding: "20px",
-                          background: isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(212, 175, 55, 0.15)",
-                          borderRadius: "12px",
-                          border: isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(212, 175, 55, 0.4)",
+                          padding: spacing.xl,
+                          background: notif.isRead ? colors.gray50 : colors.white,
+                          borderRadius: borderRadius.xl,
+                          border: notif.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
                           position: "relative",
+                          boxShadow: notif.isRead ? shadows.sm : shadows.md,
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                               {notif.type === 'WorkshopSubmitted' && (
-                                <span style={{ fontSize: "1.5rem" }}>📝</span>
+                                <span style={{ fontSize: typography.fontSize['2xl'] }}>📝</span>
                               )}
                               {notif.type === 'NewEvent' && (
-                                <span style={{ fontSize: "1.5rem" }}>🎉</span>
+                                <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                               )}
                               <h3 style={{ 
-                                color: "#003366", 
+                                color: colors.primary, 
                                 margin: 0, 
-                                fontSize: "1.1rem",
-                                fontWeight: isRead ? "500" : "700",
+                                fontSize: typography.fontSize.lg,
+                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
                                 {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' : 
                                  notif.type === 'NewEvent' ? 'New Event Available' : 
@@ -1426,60 +1500,49 @@ function EventOfficeDashboard() {
                               </h3>
                               {!isRead && (
                                 <span style={{
-                                  background: "#ef4444",
-                                  color: "white",
-                                  borderRadius: "50%",
+                                  background: colors.error,
+                                  color: colors.white,
+                                  borderRadius: borderRadius.full,
                                   width: "10px",
                                   height: "10px",
                                   display: "inline-block",
                                 }} />
                               )}
-                              {isRead && (
-                                <span style={{ color: "#10b981", fontSize: "1.2rem", fontWeight: "bold" }}>✓</span>
-                              )}
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                              <p style={{ 
-                                color: "#6b7280", 
-                                margin: "8px 0",
-                                fontWeight: isRead ? "400" : "500",
-                                flex: 1,
-                              }}>
-                                {notif.type === 'WorkshopSubmitted' 
-                                  ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
-                                  : notif.message || 'No message'}
-                              </p>
-                              {notif.eventId && (
-                                <button
-                                  onClick={() => {
-                                    window.location.href = `/events/${notif.eventId}`;
-                                  }}
-                                  style={{
-                                    alignSelf: "flex-start",
-                                    padding: "8px 16px",
-                                    background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                                    color: "#003366",
-                                    border: "none",
-                                    borderRadius: "8px",
-                                    fontSize: "0.9rem",
-                                    fontWeight: "600",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  View Event
-                                </button>
-                              )}
                             </div>
                             <p style={{ 
-                              color: "#9ca3af", 
-                              fontSize: "0.85rem",
-                              margin: "8px 0 0 0",
+                              color: colors.gray500, 
+                              margin: `${spacing.sm} 0`,
+                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                              fontSize: typography.fontSize.base,
                             }}>
-                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : 
-                               notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                              {notif.type === 'WorkshopSubmitted' 
+                                ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
+                                : notif.message || 'No message'}
+                            </p>
+                            {notif.eventId && (
+                              <button
+                                onClick={() => {
+                                  window.location.href = `/events/${notif.eventId}`;
+                                }}
+                                style={{
+                                  marginTop: spacing.md,
+                                  ...buttonStyles.primary,
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  fontSize: typography.fontSize.sm,
+                                }}
+                              >
+                                View Event
+                              </button>
+                            )}
+                            <p style={{ 
+                              color: colors.gray400, 
+                              fontSize: typography.fontSize.sm,
+                              margin: `${spacing.sm} 0 0 0`,
+                            }}>
+                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
                             </p>
                           </div>
-                          <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                             {!isRead && isFrontend && (
                               <button
                                 onClick={() => {
@@ -1487,13 +1550,13 @@ function EventOfficeDashboard() {
                                   fetchNotifications();
                                 }}
                                 style={{
-                                  padding: "6px 12px",
-                                  background: "#10b981",
-                                  color: "white",
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  background: colors.success,
+                                  color: colors.white,
                                   border: "none",
-                                  borderRadius: "6px",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "600",
+                                  borderRadius: borderRadius.md,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
                                   cursor: "pointer",
                                 }}
                               >
@@ -1507,17 +1570,29 @@ function EventOfficeDashboard() {
                                   fetchNotifications();
                                 }}
                                 style={{
-                                  padding: "6px 12px",
-                                  background: "#ef4444",
-                                  color: "white",
-                                  border: "none",
-                                  borderRadius: "6px",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
+                                  padding: `${spacing.xs} ${spacing.md}`,
+                                  background: colors.error,
+                                  color: colors.white,
+                                  border: 'none',
+                                  borderRadius: borderRadius.lg,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
+                                  cursor: 'pointer',
+                                  transition: transitions.fast,
+                                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.transform = 'translateY(-1px)';
+                                  e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                                  e.target.style.background = '#b91c1c';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.transform = 'translateY(0)';
+                                  e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                                  e.target.style.background = colors.error;
                                 }}
                               >
-                                Delete
+                                🗑️ Delete
                               </button>
                             )}
                           </div>
@@ -1533,17 +1608,32 @@ function EventOfficeDashboard() {
           {activeTab === "gym-sessions" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ color: "#003366", marginBottom: "20px" }}>
+              <h2 style={{ 
+                color: colors.primary, 
+                marginBottom: spacing.xl,
+                fontSize: typography.fontSize['2xl'],
+                fontWeight: typography.fontWeight.bold,
+              }}>
                 Gym Sessions
               </h2>
               {(!gymSessions || gymSessions.length === 0) ? (
-                <p style={{ color: "#6b7280" }}>No gym sessions scheduled</p>
+                <div style={{ 
+                  textAlign: "center",
+                  padding: `${spacing['6xl']} ${spacing.xl}`,
+                }}>
+                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
+                  <p style={{ 
+                    color: colors.gray500,
+                    fontSize: typography.fontSize.base,
+                  }}>No gym sessions scheduled</p>
+                </div>
               ) : (
                 (() => {
                   const typeMap = {
@@ -1561,7 +1651,7 @@ function EventOfficeDashboard() {
                   });
 
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing['2xl'] }}>
                       {monthKeys.map((month) => {
                         const items = byMonth[month] || [];
                         const byType = items.reduce((acc, s) => {
@@ -1572,29 +1662,105 @@ function EventOfficeDashboard() {
                         const typeKeys = Object.keys(byType).sort();
                         return (
                           <div key={month}>
-                            <div style={{ background: 'rgba(255,255,255,0.95)', padding: '18px 20px', borderRadius: 16, boxShadow: '0 6px 18px rgba(0,0,0,0.2)' }}>
-                              <h3 style={{ margin: 0, color: '#003366' }}>{month}</h3>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 12 }}>
+                            <div style={{ 
+                              background: colors.bgCard, 
+                              padding: `${spacing.lg} ${spacing.xl}`, 
+                              borderRadius: borderRadius.xl, 
+                              boxShadow: shadows.md,
+                              border: `1px solid ${colors.gray200}`,
+                            }}>
+                              <h3 style={{ 
+                                margin: 0, 
+                                color: colors.primary,
+                                fontSize: typography.fontSize.xl,
+                                fontWeight: typography.fontWeight.bold,
+                              }}>{month}</h3>
+                              <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+                                gap: spacing.lg, 
+                                marginTop: spacing.lg 
+                              }}>
                                 {typeKeys.map((tk) => (
-                                  <div key={tk} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-                                    <div style={{ fontWeight: 800, color: '#003366', marginBottom: 6 }}>{tk}</div>
-                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#374151' }}>
+                                  <div key={tk} style={{ 
+                                    background: colors.white, 
+                                    border: `1px solid ${colors.gray200}`, 
+                                    borderRadius: borderRadius.xl, 
+                                    padding: spacing.lg 
+                                  }}>
+                                    <div style={{ 
+                                      fontWeight: typography.fontWeight.extrabold, 
+                                      color: colors.primary, 
+                                      marginBottom: spacing.sm,
+                                      fontSize: typography.fontSize.base,
+                                    }}>{tk}</div>
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: colors.gray700 }}>
                                       {byType[tk]
                                         .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-                                        .map((s) => (
-                                          <li key={s._id || s.id} style={{ padding: '8px 0', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                                            <div>
-                                              <div>{s.startDate ? new Date(s.startDate).toLocaleDateString() + ' • ' + new Date(s.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}</div>
-                                              <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                                Instructor: {s.instructor || 'TBA'} {s.capacity ? ` • Capacity: ${s.capacity}` : ''}
+                                        .map((s) => {
+                                          const fmtDateTime = (date) => {
+                                            if (!date) return 'TBA';
+                                            const d = new Date(date);
+                                            return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                          };
+                                          return (
+                                            <li key={s._id || s.id} style={{ 
+                                              padding: `${spacing.sm} 0`, 
+                                              borderTop: `1px solid ${colors.gray100}`, 
+                                              display: 'flex', 
+                                              justifyContent: 'space-between', 
+                                              alignItems: 'center', 
+                                              gap: spacing.md 
+                                            }}>
+                                              <div>
+                                                <div style={{
+                                                  fontSize: typography.fontSize.sm,
+                                                  fontWeight: typography.fontWeight.medium,
+                                                  color: colors.gray700,
+                                                }}>{fmtDateTime(s.startDate)}</div>
+                                                <div style={{ 
+                                                  fontSize: typography.fontSize.xs, 
+                                                  color: colors.gray500,
+                                                  marginTop: spacing.xs,
+                                                }}>
+                                                  Instructor: {s.instructor || 'TBA'} {s.capacity ? ` • Capacity: ${s.capacity}` : ''}
+                                                </div>
                                               </div>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                              <button onClick={() => navigate(`/events-office/gym-sessions?edit=${s._id}` , { state: { edit: s._id } })} style={{ padding: '6px 10px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Edit</button>
-                                              <button onClick={() => handleDeleteGymSession(s._id)} style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
-                                            </div>
-                                          </li>
-                                        ))}
+                                              <div style={{ display: 'flex', gap: spacing.sm }}>
+                                                <button 
+                                                  onClick={() => navigate(`/events-office/gym-sessions/edit/${s._id}`)} 
+                                                  style={{ 
+                                                    padding: `${spacing.xs} ${spacing.md}`, 
+                                                    background: colors.info, 
+                                                    color: colors.white, 
+                                                    border: 'none', 
+                                                    borderRadius: borderRadius.md, 
+                                                    cursor: 'pointer',
+                                                    fontSize: typography.fontSize.sm,
+                                                    fontWeight: typography.fontWeight.semibold,
+                                                  }}
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button 
+                                                  onClick={() => handleDeleteGymSession(s._id)} 
+                                                  style={{ 
+                                                    padding: `${spacing.xs} ${spacing.md}`, 
+                                                    background: colors.error, 
+                                                    color: colors.white, 
+                                                    border: 'none', 
+                                                    borderRadius: borderRadius.md, 
+                                                    cursor: 'pointer',
+                                                    fontSize: typography.fontSize.sm,
+                                                    fontWeight: typography.fontWeight.semibold,
+                                                  }}
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </div>
+                                            </li>
+                                          );
+                                        })}
                                     </ul>
                                   </div>
                                 ))}
@@ -1631,21 +1797,31 @@ function EventOfficeDashboard() {
         >
           <div
             style={{
-              background: "white",
-              borderRadius: "20px",
-              padding: "30px",
+              background: colors.white,
+              borderRadius: borderRadius['2xl'],
+              padding: spacing['3xl'],
               maxWidth: "600px",
               width: "90%",
               maxHeight: "80vh",
               overflow: "auto",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+              boxShadow: shadows.lg,
+              border: `1px solid ${colors.gray200}`,
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ color: "#003366", marginBottom: "20px" }}>
+            <h2 style={{ 
+              color: colors.primary, 
+              marginBottom: spacing.xl,
+              fontSize: typography.fontSize['2xl'],
+              fontWeight: typography.fontWeight.bold,
+            }}>
               Request Edits for Workshop
             </h2>
-            <p style={{ color: "#6b7280", marginBottom: "15px" }}>
+            <p style={{ 
+              color: colors.gray500, 
+              marginBottom: spacing.lg,
+              fontSize: typography.fontSize.base,
+            }}>
               Please specify what changes you'd like the professor to make:
             </p>
             <textarea
@@ -1655,29 +1831,25 @@ function EventOfficeDashboard() {
               }
               placeholder="Example: Please update the budget amount, add more details to the agenda, change the location to..."
               style={{
+                ...inputStyles.base,
                 width: "100%",
                 minHeight: "150px",
-                padding: "12px",
-                borderRadius: "8px",
-                border: "1px solid #e5e7eb",
-                fontSize: "1rem",
-                fontFamily: "inherit",
                 resize: "vertical",
-                marginBottom: "20px",
+                marginBottom: spacing.xl,
               }}
             />
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: spacing.md, justifyContent: "flex-end" }}>
               <button
                 onClick={() => setEditRequestModal({ open: false, workshopId: null, editRequest: "" })}
                 style={{
-                  padding: "10px 20px",
-                  background: "#e5e7eb",
-                  color: "#374151",
+                  padding: `${spacing.sm} ${spacing.lg}`,
+                  background: colors.gray200,
+                  color: colors.gray700,
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: borderRadius.md,
                   cursor: "pointer",
-                  fontWeight: "600",
-                  fontSize: "0.95rem",
+                  fontWeight: typography.fontWeight.semibold,
+                  fontSize: typography.fontSize.sm,
                 }}
               >
                 Cancel
@@ -1685,14 +1857,14 @@ function EventOfficeDashboard() {
               <button
                 onClick={handleSubmitEditRequest}
                 style={{
-                  padding: "10px 20px",
-                  background: "#f59e0b",
-                  color: "white",
+                  padding: `${spacing.sm} ${spacing.lg}`,
+                  background: colors.warning,
+                  color: colors.white,
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: borderRadius.md,
                   cursor: "pointer",
-                  fontWeight: "600",
-                  fontSize: "0.95rem",
+                  fontWeight: typography.fontWeight.semibold,
+                  fontSize: typography.fontSize.sm,
                 }}
               >
                 Send Edit Request

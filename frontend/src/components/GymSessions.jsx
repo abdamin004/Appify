@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 import { listGymSessions, registerForEvent } from "../services/eventService";
+import { showToast } from "../utils/toast";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../utils/designSystem";
 
 const typeMap = {
   yoga: "Yoga",
@@ -92,10 +94,12 @@ export default function GymSessions() {
     setStatus(prev => ({ ...prev, [id]: { ok: false, msg: '' } }));
     try {
       const res = await registerForEvent(id);
+      showToast.success(res.message || 'Registered successfully');
       setStatus(prev => ({ ...prev, [id]: { ok: true, msg: res.message || 'Registered successfully' } }));
       try { const rows = await listGymSessions(); setSessions(Array.isArray(rows) ? rows : []); } catch(_) {}
     } catch (err) {
       const msg = (err && err.message) || 'Failed to register';
+      showToast.error(msg);
       setStatus(prev => ({ ...prev, [id]: { ok: false, msg } }));
     } finally {
       setBusyId(null);
@@ -106,37 +110,68 @@ export default function GymSessions() {
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
+        background: colors.bgPrimary,
         position: "relative",
         overflow: "hidden",
       }}
     >
       <Navbar />
-      <div style={{ paddingTop: "120px", padding: "120px 40px 80px", position: "relative", zIndex: 1 }}>
+      <div style={{ 
+        paddingTop: spacing['8xl'], 
+        padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, 
+        position: "relative", 
+        zIndex: 1 
+      }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "28px 32px",
-              borderRadius: 20,
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: 30,
+              background: colors.bgCard,
+              padding: `${spacing['3xl']} ${spacing['3xl']}`,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['3xl'],
+              border: `1px solid ${colors.gray200}`,
             }}
           >
-            <h1 style={{ margin: 0, color: "#003366" }}>Gym Sessions</h1>
-            <p style={{ marginTop: 8, color: "#6b7280" }}>
+            <h1 style={{ 
+              margin: 0, 
+              color: colors.primary,
+              fontSize: typography.fontSize['2xl'],
+              fontWeight: typography.fontWeight.bold,
+            }}>Gym Sessions</h1>
+            <p style={{ 
+              marginTop: spacing.sm, 
+              color: colors.gray500,
+              fontSize: typography.fontSize.base,
+            }}>
               View monthly schedules for Yoga, Pilates, Aerobics, Zumba, Cross Circuit, and Kick-boxing.
             </p>
           </div>
 
           {loading && (
-            <div style={{ color: "white" }}>Loading sessions…</div>
+            <div style={{ 
+              color: colors.white,
+              fontSize: typography.fontSize.lg,
+              textAlign: 'center',
+              padding: spacing['3xl'],
+            }}>Loading sessions…</div>
           )}
           {error && (
-            <div style={{ color: "#fecaca", background: "#7f1d1d", padding: 12, borderRadius: 12 }}>{error}</div>
+            <div style={{ 
+              color: colors.error, 
+              background: colors.errorLight, 
+              padding: spacing.lg, 
+              borderRadius: borderRadius.xl,
+              marginBottom: spacing.lg,
+            }}>{error}</div>
           )}
           {!loading && !error && monthKeys.length === 0 && (
-            <div style={{ color: "white" }}>No sessions found.</div>
+            <div style={{ 
+              color: colors.white,
+              fontSize: typography.fontSize.lg,
+              textAlign: 'center',
+              padding: spacing['3xl'],
+            }}>No sessions found.</div>
           )}
 
           {monthKeys.map((month) => {
@@ -150,21 +185,42 @@ export default function GymSessions() {
             const typeKeys = Object.keys(byType).sort();
 
             return (
-              <div key={month} style={{ marginBottom: 28 }}>
+              <div key={month} style={{ marginBottom: spacing['3xl'] }}>
                 <div
                   style={{
-                    background: "rgba(255,255,255,0.95)",
-                    padding: "18px 20px",
-                    borderRadius: 16,
-                    boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+                    background: colors.bgCard,
+                    padding: `${spacing.lg} ${spacing.xl}`,
+                    borderRadius: borderRadius.xl,
+                    boxShadow: shadows.md,
+                    border: `1px solid ${colors.gray200}`,
                   }}
                 >
-                  <h2 style={{ margin: 0, color: "#003366" }}>{month}</h2>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 12 }}>
+                  <h2 style={{ 
+                    margin: 0, 
+                    color: colors.primary,
+                    fontSize: typography.fontSize.xl,
+                    fontWeight: typography.fontWeight.bold,
+                  }}>{month}</h2>
+                  <div style={{ 
+                    display: "grid", 
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", 
+                    gap: spacing.lg, 
+                    marginTop: spacing.lg 
+                  }}>
                     {typeKeys.map((tk) => (
-                      <div key={tk} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 14 }}>
-                        <div style={{ fontWeight: 800, color: "#003366", marginBottom: 6 }}>{tk}</div>
-                        <ul style={{ listStyle: "none", padding: 0, margin: 0, color: "#374151" }}>
+                      <div key={tk} style={{ 
+                        background: colors.white, 
+                        border: `1px solid ${colors.gray200}`, 
+                        borderRadius: borderRadius.xl, 
+                        padding: spacing.lg 
+                      }}>
+                        <div style={{ 
+                          fontWeight: typography.fontWeight.extrabold, 
+                          color: colors.primary, 
+                          marginBottom: spacing.sm,
+                          fontSize: typography.fontSize.base,
+                        }}>{tk}</div>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, color: colors.gray700 }}>
                           {byType[tk]
                             .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
                             .map((s) => {
@@ -175,11 +231,27 @@ export default function GymSessions() {
                               const disabled = started || full || mine || busyId === id;
                               const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (busyId === id ? 'Registering...' : 'Register');
                               return (
-                                <li key={id} style={{ padding: "8px 0", borderTop: "1px solid #f3f4f6" }}>
-                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                                <li key={id} style={{ 
+                                  padding: `${spacing.sm} 0`, 
+                                  borderTop: `1px solid ${colors.gray100}` 
+                                }}>
+                                  <div style={{ 
+                                    display:'flex', 
+                                    justifyContent:'space-between', 
+                                    alignItems:'center', 
+                                    gap: spacing.lg 
+                                  }}>
                                     <div>
-                                      <div>{fmtDateTime(s.startDate)}</div>
-                                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                      <div style={{ 
+                                        fontSize: typography.fontSize.sm,
+                                        fontWeight: typography.fontWeight.medium,
+                                        color: colors.gray700,
+                                      }}>{fmtDateTime(s.startDate)}</div>
+                                      <div style={{ 
+                                        fontSize: typography.fontSize.xs, 
+                                        color: colors.gray500,
+                                        marginTop: spacing.xs,
+                                      }}>
                                         Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
                                       </div>
                                     </div>
@@ -188,19 +260,36 @@ export default function GymSessions() {
                                         disabled={disabled}
                                         onClick={() => !disabled && handleRegister(id)}
                                         style={{
-                                          padding: '8px 12px',
-                                          background: disabled ? '#e5e7eb' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                                          color: disabled ? '#6b7280' : '#003366',
+                                          ...(disabled ? {} : buttonStyles.primary),
+                                          padding: `${spacing.sm} ${spacing.lg}`,
+                                          background: disabled ? colors.gray200 : undefined,
+                                          color: disabled ? colors.gray500 : colors.primary,
                                           border: 'none',
-                                          borderRadius: 8,
-                                          fontWeight: 700,
+                                          borderRadius: borderRadius.lg,
+                                          fontWeight: typography.fontWeight.bold,
+                                          fontSize: typography.fontSize.sm,
                                           cursor: disabled ? 'not-allowed' : 'pointer',
+                                          opacity: disabled ? 0.7 : 1,
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!disabled) {
+                                            e.target.style.boxShadow = shadows.accentHover;
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!disabled) {
+                                            e.target.style.boxShadow = shadows.accent;
+                                          }
                                         }}
                                       >{label}</button>
                                     </div>
                                   </div>
                                   {status[id] && status[id].msg && (
-                                    <div style={{ marginTop:6, fontSize:12, color: status[id].ok ? '#065f46' : '#b91c1c' }}>
+                                    <div style={{ 
+                                      marginTop: spacing.sm, 
+                                      fontSize: typography.fontSize.xs, 
+                                      color: status[id].ok ? colors.success : colors.error 
+                                    }}>
                                       {status[id].msg}
                                     </div>
                                   )}
