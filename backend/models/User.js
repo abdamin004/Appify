@@ -15,7 +15,29 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
   registeredEvents: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Event' 
-  }]
+  }],
+  notifications: [
+  {
+    message: { type: String, required: true },
+    read: { type: Boolean, default: false },
+    date: { type: Date, default: Date.now },
+    workshop: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'Workshop' 
+    },
+    type: {
+      type: String,
+      enum: [
+        'WorkshopSubmitted',
+        'WorkshopAccepted',
+        'WorkshopRejected',
+        'WorkshopEditRequested',
+        'General'
+      ],
+      default: 'General'
+    }
+  }
+],
 });
 
 // Password hashing middleware
