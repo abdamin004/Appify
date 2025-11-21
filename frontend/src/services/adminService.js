@@ -6,7 +6,13 @@ async function fetchJson(url, opts = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, Object.assign({}, opts, { headers }));
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) {
+    // Include status code in error for better handling
+    const error = new Error(data.message || data.error || `Request failed with status ${res.status}`);
+    error.status = res.status;
+    error.response = data;
+    throw error;
+  }
   return data;
 }
 

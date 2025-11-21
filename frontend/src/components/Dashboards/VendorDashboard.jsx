@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import Navbar from "../Navbar";
 import vendorService from "../../services/vendorService";
 import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
 import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
+import { showToast, confirmDialog } from "../../utils/toast";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
@@ -179,16 +182,17 @@ function VendorDashboard() {
   };
 
   const handleCancelApplication = async (applicationId) => {
-    if (!window.confirm('Are you sure you want to cancel this application? You will be able to apply again to this event if needed.')) {
+    const confirmed = await confirmDialog('Are you sure you want to cancel this application? You will be able to apply again to this event if needed.', 'Cancel Application');
+    if (!confirmed) {
       return;
     }
 
     try {
       await vendorService.cancelVendorApplication(applicationId);
-      alert('Application cancelled successfully');
+      showToast.success('Application cancelled successfully');
       fetchApplications(activeApplicationTab);
     } catch (err) {
-      alert(err.message || 'Failed to cancel application. Make sure payment has not been completed.');
+      showToast.error(err.message || 'Failed to cancel application. Make sure payment has not been completed.');
     }
   };
 
@@ -197,15 +201,16 @@ function VendorDashboard() {
   };
 
   const handleDeleteApplication = async (applicationId) => {
-    if (!window.confirm('Delete this cancelled application permanently? This cannot be undone.')) {
+    const confirmed = await confirmDialog('Delete this cancelled application permanently? This cannot be undone.', 'Delete Application');
+    if (!confirmed) {
       return;
     }
     try {
       await vendorService.deleteVendorApplication(applicationId);
-      alert('Application deleted');
+      showToast.success('Application deleted');
       fetchApplications(activeApplicationTab);
     } catch (err) {
-      alert(err.message || 'Failed to delete application');
+      showToast.error(err.message || 'Failed to delete application');
     }
   };
 
@@ -220,6 +225,8 @@ function VendorDashboard() {
         overflow: "hidden",
       }}
     >
+      <Navbar />
+
       <div
         style={{
           paddingTop: "120px",
@@ -229,36 +236,37 @@ function VendorDashboard() {
         }}
       >
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header */}
+          {/* Header + Stats */}
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "35px 40px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "40px",
+              background: colors.bgCard,
+              padding: `${spacing['3xl']} ${spacing['2xl']}`,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               flexWrap: "wrap",
-              gap: "20px",
+              gap: spacing.xl,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
             <div>
               <h1
                 style={{
-                  fontSize: "2.2rem",
-                  fontWeight: "bold",
-                  color: "#003366",
-                  marginBottom: "8px",
+                  fontSize: typography.fontSize['3xl'],
+                  fontWeight: typography.fontWeight.bold,
+                  color: colors.primary,
+                  marginBottom: spacing.sm,
                 }}
               >
-                Welcome, {displayName}! 👋
+                Welcome back, {displayName}! 👋
               </h1>
               <p
                 style={{
-                  fontSize: "1.1rem",
-                  color: "#6b7280",
+                  fontSize: typography.fontSize.lg,
+                  color: colors.gray500,
                   margin: 0,
                 }}
               >
@@ -269,7 +277,7 @@ function VendorDashboard() {
             <div
               style={{
                 display: "flex",
-                gap: "15px",
+                gap: spacing.lg,
                 alignItems: "center",
                 flexWrap: "wrap",
               }}
@@ -277,16 +285,14 @@ function VendorDashboard() {
               <button
                 onClick={handleRequestBooth}
                 style={{
-                  padding: "14px 28px",
-                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                  color: "#003366",
-                  border: "none",
-                  borderRadius: "12px",
-                  fontSize: "1rem",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  ...buttonStyles.primary,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.boxShadow = shadows.accentHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.boxShadow = shadows.accent;
                 }}
               >
                 + Request Booth/Bazaar
@@ -297,33 +303,32 @@ function VendorDashboard() {
           {/* Tabs */}
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "10px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "30px",
+              background: colors.bgCard,
+              padding: spacing.md,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
               display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
+              gap: spacing.md,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
             <button
               onClick={() => setActiveTab("browse")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "browse"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "browse" ? "#003366" : "#6b7280",
+                color: activeTab === "browse" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
+                transition: transitions.normal,
               }}
             >
               🏪 Browse Bazaars & Booths
@@ -332,19 +337,18 @@ function VendorDashboard() {
               onClick={() => setActiveTab("upcoming")}
               style={{
                 flex: 1,
-                padding: "15px 20px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "upcoming"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "upcoming" ? "#003366" : "#6b7280",
+                color: activeTab === "upcoming" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
+                transition: transitions.normal,
               }}
             >
               📅 Upcoming Events
@@ -353,19 +357,18 @@ function VendorDashboard() {
               onClick={() => setActiveTab("my-applications")}
               style={{
                 flex: 1,
-                padding: "15px 20px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "my-applications"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "my-applications" ? "#003366" : "#6b7280",
+                color: activeTab === "my-applications" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
+                transition: transitions.normal,
               }}
             >
               📋 My Applications
@@ -374,19 +377,18 @@ function VendorDashboard() {
               onClick={() => setActiveTab("loyalty")}
               style={{
                 flex: 1,
-                padding: "15px 20px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "loyalty"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
+                transition: transitions.normal,
               }}
             >
               ⭐ Loyalty Program
@@ -397,32 +399,32 @@ function VendorDashboard() {
           {activeTab === "upcoming" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "8px",
-                borderRadius: "15px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                marginBottom: "30px",
+                background: colors.bgCard,
+                padding: spacing.md,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                marginBottom: spacing['2xl'],
                 display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
+                gap: spacing.md,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <button
                 onClick={() => setActiveUpcomingTab("bazaars")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeUpcomingTab === "bazaars"
-                      ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeUpcomingTab === "bazaars" ? "white" : "#6b7280",
+                  color: activeUpcomingTab === "bazaars" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 🗓️ Bazaars
@@ -430,19 +432,19 @@ function VendorDashboard() {
               <button
                 onClick={() => setActiveUpcomingTab("booths")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeUpcomingTab === "booths"
-                      ? "linear-gradient(135deg, #ec4899 0%, #be185d 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeUpcomingTab === "booths" ? "white" : "#6b7280",
+                  color: activeUpcomingTab === "booths" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 🛒 Booths
@@ -454,32 +456,32 @@ function VendorDashboard() {
           {activeTab === "my-applications" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "8px",
-                borderRadius: "15px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                marginBottom: "30px",
+                background: colors.bgCard,
+                padding: spacing.md,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                marginBottom: spacing['2xl'],
                 display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
+                gap: spacing.md,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <button
                 onClick={() => setActiveApplicationTab("all")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeApplicationTab === "all"
-                      ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeApplicationTab === "all" ? "white" : "#6b7280",
+                  color: activeApplicationTab === "all" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 All Applications
@@ -487,19 +489,19 @@ function VendorDashboard() {
               <button
                 onClick={() => setActiveApplicationTab("approved")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeApplicationTab === "approved"
-                      ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeApplicationTab === "approved" ? "white" : "#6b7280",
+                  color: activeApplicationTab === "approved" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 Approved
@@ -507,19 +509,19 @@ function VendorDashboard() {
               <button
                 onClick={() => setActiveApplicationTab("pending")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeApplicationTab === "pending"
-                      ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeApplicationTab === "pending" ? "white" : "#6b7280",
+                  color: activeApplicationTab === "pending" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 Pending
@@ -527,19 +529,19 @@ function VendorDashboard() {
               <button
                 onClick={() => setActiveApplicationTab("rejected")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeApplicationTab === "rejected"
-                      ? "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeApplicationTab === "rejected" ? "white" : "#6b7280",
+                  color: activeApplicationTab === "rejected" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 Rejected
@@ -547,19 +549,19 @@ function VendorDashboard() {
               <button
                 onClick={() => setActiveApplicationTab("cancelled")}
                 style={{
-                  padding: "12px 16px",
+                  flex: 1,
+                  padding: `${spacing.md} ${spacing['2xl']}`,
                   background:
                     activeApplicationTab === "cancelled"
-                      ? "linear-gradient(135deg, #6b7280 0%, #374151 100%)"
+                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                       : "transparent",
-                  color: activeApplicationTab === "cancelled" ? "white" : "#6b7280",
+                  color: activeApplicationTab === "cancelled" ? colors.primary : colors.gray500,
                   border: "none",
-                  borderRadius: "12px",
-                  fontSize: "0.9rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.xl,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  minWidth: "120px",
+                  transition: transitions.normal,
                 }}
               >
                 Cancelled
@@ -587,77 +589,95 @@ function VendorDashboard() {
             <div>
               {loadingApplications ? (
                 <div style={{ 
-                  background: "rgba(255,255,255,0.95)", 
-                  padding: "60px 40px", 
-                  borderRadius: "20px", 
+                  background: colors.bgCard, 
+                  padding: `${spacing['6xl']} ${spacing.xl}`, 
+                  borderRadius: borderRadius['2xl'], 
                   textAlign: "center", 
-                  boxShadow: "0 8px 25px rgba(0,0,0,0.3)" 
+                  boxShadow: shadows.lg,
+                  border: `1px solid ${colors.gray200}`,
                 }}>
-                  <div style={{ fontSize: "3rem", marginBottom: "20px" }}>⏳</div>
-                  <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>Loading Applications...</h3>
-                  <p style={{ color: "#6b7280" }}>Please wait while we fetch your {activeApplicationTab} applications.</p>
+                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
+                  <h3 style={{ 
+                    fontSize: typography.fontSize['2xl'], 
+                    color: colors.primary, 
+                    marginBottom: spacing.sm,
+                    fontWeight: typography.fontWeight.bold,
+                  }}>Loading Applications...</h3>
+                  <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>Please wait while we fetch your {activeApplicationTab} applications.</p>
                 </div>
               ) : (
                 <div>
                   <div style={{ 
-                    background: "rgba(255,255,255,0.95)", 
-                    padding: "30px", 
-                    borderRadius: "20px", 
-                    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-                    marginBottom: "30px"
+                    background: colors.bgCard, 
+                    padding: spacing['3xl'], 
+                    borderRadius: borderRadius['2xl'], 
+                    boxShadow: shadows.lg,
+                    marginBottom: spacing['2xl'],
+                    border: `1px solid ${colors.gray200}`,
                   }}>
                     {applications.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "40px" }}>
-                        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>📭</div>
-                        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>No Applications</h3>
-                        <p style={{ color: "#6b7280" }}>You don't have any {activeApplicationTab} applications yet.</p>
+                      <div style={{ textAlign: "center", padding: `${spacing['6xl']} ${spacing.xl}` }}>
+                        <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>📭</div>
+                        <h3 style={{ 
+                          fontSize: typography.fontSize['2xl'], 
+                          color: colors.primary, 
+                          marginBottom: spacing.sm,
+                          fontWeight: typography.fontWeight.bold,
+                        }}>No Applications</h3>
+                        <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>You don't have any {activeApplicationTab} applications yet.</p>
                       </div>
                     ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "30px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: spacing['2xl'] }}>
                         {applications.map((app) => (
                           <div key={app._id} style={{ 
-                            background: "#f9fafb", 
-                            borderRadius: "15px", 
-                            padding: "20px",
-                            border: "2px solid #e5e7eb"
+                            background: colors.white, 
+                            borderRadius: borderRadius.xl, 
+                            padding: spacing.xl,
+                            border: `1px solid ${colors.gray200}`,
+                            boxShadow: shadows.md,
                           }}>
-                            <div style={{ marginBottom: "15px" }}>
-                              <h4 style={{ fontSize: "1.2rem", color: "#003366", marginBottom: "10px" }}>
+                            <div style={{ marginBottom: spacing.lg }}>
+                              <h4 style={{ 
+                                fontSize: typography.fontSize.lg, 
+                                color: colors.primary, 
+                                marginBottom: spacing.md,
+                                fontWeight: typography.fontWeight.bold,
+                              }}>
                                 {app.event?.title || "Event"}
                               </h4>
-                              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+                              <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.md }}>
                                 <span style={{
-                                  padding: "6px 12px",
-                                  background: app.status === "approved" ? "rgba(34, 197, 94, 0.15)" : 
-                                             app.status === "pending" ? "rgba(251, 191, 36, 0.15)" :
-                                             app.status === "cancelled" ? "rgba(107, 114, 128, 0.15)" :
-                                             "rgba(239, 68, 68, 0.15)",
-                                  color: app.status === "approved" ? "#22c55e" : 
-                                         app.status === "pending" ? "#fbbf24" :
-                                         app.status === "cancelled" ? "#6b7280" :
-                                         "#ef4444",
-                                  borderRadius: "6px",
-                                  fontSize: "0.85rem",
-                                  fontWeight: "600",
+                                  padding: `${spacing.sm} ${spacing.md}`,
+                                  background: app.status === "approved" ? colors.successLight : 
+                                             app.status === "pending" ? colors.warningLight :
+                                             app.status === "cancelled" ? colors.gray100 :
+                                             colors.errorLight,
+                                  color: app.status === "approved" ? colors.success : 
+                                         app.status === "pending" ? colors.warning :
+                                         app.status === "cancelled" ? colors.gray600 :
+                                         colors.error,
+                                  borderRadius: borderRadius.md,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
                                   textTransform: "capitalize"
                                 }}>
                                   {app.status}
                                 </span>
                                 {app.paid && (
                                   <span style={{
-                                    padding: "6px 12px",
-                                    background: "rgba(59, 130, 246, 0.15)",
-                                    color: "#3b82f6",
-                                    borderRadius: "6px",
-                                    fontSize: "0.85rem",
-                                    fontWeight: "600"
+                                    padding: `${spacing.sm} ${spacing.md}`,
+                                    background: colors.infoLight,
+                                    color: colors.info,
+                                    borderRadius: borderRadius.md,
+                                    fontSize: typography.fontSize.sm,
+                                    fontWeight: typography.fontWeight.semibold
                                   }}>
                                     Paid
                                   </span>
                                 )}
                               </div>
                               {app.event?.startDate && (
-                                <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+                                <p style={{ color: colors.gray600, fontSize: typography.fontSize.sm }}>
                                   📅 {new Date(app.event.startDate).toLocaleDateString()}
                                 </p>
                               )}
@@ -667,21 +687,24 @@ function VendorDashboard() {
                                 onClick={() => handleCancelApplication(app._id)}
                                 style={{
                                   width: "100%",
-                                  padding: "10px",
-                                  background: "#fee2e2",
-                                  color: "#dc2626",
-                                  border: "1px solid #fecaca",
-                                  borderRadius: "8px",
-                                  fontSize: "0.9rem",
-                                  fontWeight: "600",
-                                  cursor: "pointer"
+                                  ...buttonStyles.outline,
+                                  padding: spacing.md,
+                                  fontSize: typography.fontSize.sm,
+                                  color: colors.error,
+                                  borderColor: colors.error,
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = colors.errorLight;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = "transparent";
                                 }}
                               >
                                 Cancel Application
                               </button>
                             )}
                             {app.paid && (
-                              <p style={{ color: "#6b7280", fontSize: "0.85rem", fontStyle: "italic" }}>
+                              <p style={{ color: colors.gray500, fontSize: typography.fontSize.sm, fontStyle: "italic" }}>
                                 Cannot cancel: Payment completed
                               </p>
                             )}
@@ -690,15 +713,17 @@ function VendorDashboard() {
                                 onClick={() => handleDeleteApplication(app._id)}
                                 style={{
                                   width: "100%",
-                                  padding: "10px",
-                                  background: "#f3f4f6",
-                                  color: "#374151",
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: "8px",
-                                  fontSize: "0.9rem",
-                                  fontWeight: "600",
-                                  cursor: "pointer",
-                                  marginTop: "8px"
+                                  ...buttonStyles.outline,
+                                  padding: spacing.md,
+                                  fontSize: typography.fontSize.sm,
+                                  color: colors.gray700,
+                                  borderColor: colors.gray300,
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = colors.gray100;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = "transparent";
                                 }}
                               >
                                 Delete Application
@@ -720,41 +745,44 @@ function VendorDashboard() {
                   onSuccess={() => {
                     setShowLoyaltyForm(false);
                     setLoyaltyRefreshKey(prev => prev + 1); // Trigger refresh
-                    alert('Loyalty program application submitted successfully!');
+                    showToast.success('Loyalty program application submitted successfully!');
                   }}
                   onCancel={() => setShowLoyaltyForm(false)}
                 />
               ) : (
                 <div>
                   <div style={{
-                    background: "rgba(255,255,255,0.95)",
-                    padding: "30px",
-                    borderRadius: "20px",
-                    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-                    marginBottom: "30px",
+                    background: colors.bgCard,
+                    padding: spacing['3xl'],
+                    borderRadius: borderRadius['2xl'],
+                    boxShadow: shadows.lg,
+                    marginBottom: spacing['2xl'],
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center"
+                    alignItems: "center",
+                    border: `1px solid ${colors.gray200}`,
                   }}>
                     <div>
-                      <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "8px" }}>
+                      <h3 style={{ 
+                        fontSize: typography.fontSize.xl, 
+                        color: colors.primary, 
+                        marginBottom: spacing.sm,
+                        fontWeight: typography.fontWeight.bold,
+                      }}>
                         GUC Loyalty Program
                       </h3>
-                      <p style={{ color: "#6b7280" }}>
+                      <p style={{ 
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.base,
+                      }}>
                         Apply to join the GUC loyalty program and offer discounts to students
                       </p>
                     </div>
                     <button
                       onClick={() => setShowLoyaltyForm(true)}
                       style={{
-                        padding: "14px 28px",
-                        background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                        color: "#003366",
-                        border: "none",
-                        borderRadius: "12px",
-                        fontSize: "1rem",
-                        fontWeight: "700",
-                        cursor: "pointer"
+                        ...buttonStyles.primary,
+                        padding: `${spacing.md} ${spacing['2xl']}`,
                       }}
                     >
                       + Apply to Loyalty Program

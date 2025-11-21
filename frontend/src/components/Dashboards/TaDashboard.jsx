@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import EventList from "../EventList"; // Import the EventList component
+import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
-import { API_BASE } from "../../services/eventService";
+import Navbar from "../Navbar";
+import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
+import { showToast } from "../../utils/toast";
 import { 
   getStudentNotifications, 
   createStudentNotification, 
@@ -17,26 +19,26 @@ import {
   markReminderSent,
   createReminderNotification
 } from "../../services/notificationService";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, upcoming, allevents, favourites
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("browse");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [gymSessions, setGymSessions] = useState([]);
+  const [gymSessionsLoading, setGymSessionsLoading] = useState(false);
+  const [gymSessionsError, setGymSessionsError] = useState("");
+  const [gymBusyId, setGymBusyId] = useState(null);
+  const [gymStatus, setGymStatus] = useState({});
 
-  // Mock user data - in production this would come from auth context/props
-  const user = { 
-    firstName: "Guest", 
-    lastName: "", 
-    email: "guest@guc.edu.eg",
-    role: "ta",
-    staffId: "TA12345"
-  };
+  const storedUser = typeof localStorage !== 'undefined' ? localStorage.getItem("user") : null;
+  const user = storedUser ? JSON.parse(storedUser) : { firstName: "Guest", role: "ta" };
 
   useEffect(() => {
     fetchRegisteredEvents();
@@ -55,6 +57,18 @@ function TADashboard() {
       clearInterval(reminderInterval);
     };
   }, []);
+
+  // Fetch data when switching tabs
+  useEffect(() => {
+    if (activeTab === 'gym-sessions') {
+      setGymSessionsLoading(true);
+      fetchGymSessions();
+    } else if (activeTab === 'notifications') {
+      fetchNotifications();
+    } else if (activeTab === 'reminders') {
+      fetchReminders();
+    }
+  }, [activeTab]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -123,11 +137,47 @@ function TADashboard() {
     })();
   }, []);
 
+  const fetchGymSessions = async () => {
+    try {
+      setGymSessionsLoading(true);
+      setGymSessionsError("");
+      const rows = await listGymSessions();
+      setGymSessions(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      console.error("Error fetching gym sessions:", err);
+      setGymSessions([]);
+      setGymSessionsError(err.message || "Failed to load gym sessions");
+    } finally {
+      setGymSessionsLoading(false);
+    }
+  };
+
+  const handleGymRegister = async (sessionId) => {
+    setGymBusyId(sessionId);
+    setGymStatus(prev => ({ ...prev, [sessionId]: { ok: false, msg: '' } }));
+    try {
+      const res = await registerForEvent(sessionId);
+      showToast.success(res.message || 'Registered successfully');
+      setGymStatus(prev => ({ ...prev, [sessionId]: { ok: true, msg: res.message || 'Registered successfully' } }));
+      await fetchGymSessions();
+    } catch (err) {
+      const msg = (err && err.message) || 'Failed to register';
+      showToast.error(msg);
+      setGymStatus(prev => ({ ...prev, [sessionId]: { ok: false, msg } }));
+    } finally {
+      setGymBusyId(null);
+    }
+  };
+
   useEffect(() => {
-    if (filter === 'favourites') fetchFavourites();
-    else if (filter === 'notifications') fetchNotifications();
-    else if (filter === 'reminders') fetchReminders();
-  }, [filter]);
+    if (activeTab === 'favourites') fetchFavourites();
+    else if (activeTab === 'notifications') fetchNotifications();
+    else if (activeTab === 'reminders') fetchReminders();
+    else if (activeTab === 'gym-sessions') {
+      setGymSessionsLoading(true);
+      fetchGymSessions();
+    }
+  }, [activeTab]);
 
   const fetchNotifications = () => {
     try {
@@ -303,6 +353,16 @@ function TADashboard() {
     }
   };
 
+  const fetchWallet = async () => {
+    try {
+      const res = await apiGetWalletBalance();
+      const balance = (res && typeof res.balance === 'number') ? res.balance : undefined;
+      setWalletBalance(balance);
+    } catch (_) {
+      setWalletBalance(undefined);
+    }
+  };
+
   const fetchRegisteredEvents = async () => {
     setLoading(true);
     try {
@@ -350,12 +410,7 @@ function TADashboard() {
     return new Date(event.startDate) > new Date();
   };
 
-  const filteredEvents = registeredEvents.filter((event) => {
-    if (filter === "upcoming") return isUpcoming(event);
-    return true;
-  });
-
-  const upcomingCount = registeredEvents.filter(isUpcoming).length;
+  // Removed filteredEvents - using activeTab instead
 
   const fetchFavourites = async () => {
     try {
@@ -377,38 +432,43 @@ function TADashboard() {
     return (
       <div
         style={{
-          background: "white",
-          borderRadius: "16px",
-          padding: "24px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          transition: "all 0.3s",
+          background: colors.white,
+          borderRadius: borderRadius.xl,
+          padding: spacing['3xl'],
+          boxShadow: shadows.md,
+          transition: transitions.normal,
           cursor: "pointer",
-          border: upcoming ? "2px solid #d4af37" : "2px solid #e5e7eb",
+          border: upcoming ? `2px solid ${colors.accent}` : `2px solid ${colors.gray200}`,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.15)";
+          e.currentTarget.style.boxShadow = shadows.lg;
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+          e.currentTarget.style.boxShadow = shadows.md;
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: spacing.lg }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: "1.3rem", fontWeight: "700", color: "#003366", marginBottom: "8px" }}>
+            <h3 style={{ 
+              fontSize: typography.fontSize.xl, 
+              fontWeight: typography.fontWeight.bold, 
+              color: colors.primary, 
+              marginBottom: spacing.sm 
+            }}>
               {event.title}
             </h3>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap" }}>
               <span
                 style={{
                   display: "inline-block",
-                  padding: "4px 12px",
-                  background: upcoming ? "rgba(34, 197, 94, 0.15)" : "rgba(107, 114, 128, 0.15)",
-                  color: upcoming ? "#16a34a" : "#6b7280",
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontWeight: "600",
+                  padding: `${spacing.xs} ${spacing.lg}`,
+                  background: upcoming ? colors.successLight : colors.gray100,
+                  color: upcoming ? colors.success : colors.gray500,
+                  borderRadius: borderRadius.md,
+                  fontSize: typography.fontSize.xs,
+                  fontWeight: typography.fontWeight.semibold,
                 }}
               >
                 {upcoming ? "UPCOMING" : "PAST"}
@@ -416,12 +476,12 @@ function TADashboard() {
               <span
                 style={{
                   display: "inline-block",
-                  padding: "4px 12px",
-                  background: "rgba(212, 175, 55, 0.15)",
-                  color: "#d4af37",
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontWeight: "600",
+                  padding: `${spacing.xs} ${spacing.lg}`,
+                  background: 'rgba(212, 175, 55, 0.15)',
+                  color: colors.accent,
+                  borderRadius: borderRadius.md,
+                  fontSize: typography.fontSize.xs,
+                  fontWeight: typography.fontWeight.semibold,
                 }}
               >
                 {event.type || "Event"}
@@ -430,34 +490,39 @@ function TADashboard() {
           </div>
         </div>
 
-        <p style={{ color: "#6b7280", fontSize: "0.95rem", marginBottom: "20px", lineHeight: "1.6" }}>
+        <p style={{ 
+          color: colors.gray500, 
+          fontSize: typography.fontSize.sm, 
+          marginBottom: spacing.xl, 
+          lineHeight: typography.lineHeight.relaxed 
+        }}>
           {event.shortDescription || event.description?.substring(0, 120) + "..."}
         </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#374151", fontSize: "0.9rem" }}>
-            <span style={{ color: "#d4af37", fontWeight: "bold" }}>📅</span>
-            <span style={{ fontWeight: "500" }}>{formatDate(event.startDate)}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: spacing.md, marginBottom: spacing.lg }}>
+          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
+            <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>📅</span>
+            <span style={{ fontWeight: typography.fontWeight.medium }}>{formatDate(event.startDate)}</span>
           </div>
           
           {event.startDate && (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#374151", fontSize: "0.9rem" }}>
-              <span style={{ color: "#d4af37", fontWeight: "bold" }}>🕐</span>
-              <span style={{ fontWeight: "500" }}>{formatTime(event.startDate)}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
+              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>🕐</span>
+              <span style={{ fontWeight: typography.fontWeight.medium }}>{formatTime(event.startDate)}</span>
             </div>
           )}
 
           {event.location && (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#374151", fontSize: "0.9rem" }}>
-              <span style={{ color: "#d4af37", fontWeight: "bold" }}>📍</span>
-              <span style={{ fontWeight: "500" }}>{event.location}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
+              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>📍</span>
+              <span style={{ fontWeight: typography.fontWeight.medium }}>{event.location}</span>
             </div>
           )}
 
           {event.capacity && (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#374151", fontSize: "0.9rem" }}>
-              <span style={{ color: "#d4af37", fontWeight: "bold" }}>👥</span>
-              <span style={{ fontWeight: "500" }}>Capacity: {event.capacity}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
+              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>👥</span>
+              <span style={{ fontWeight: typography.fontWeight.medium }}>Capacity: {event.capacity}</span>
             </div>
           )}
         </div>
@@ -465,19 +530,19 @@ function TADashboard() {
         <button
           style={{
             width: "100%",
-            padding: "12px",
-            background: upcoming ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "#f3f4f6",
-            color: upcoming ? "#003366" : "#6b7280",
+            padding: spacing.lg,
+            background: upcoming ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)` : colors.gray100,
+            color: upcoming ? colors.primary : colors.gray500,
             border: "none",
-            borderRadius: "10px",
-            fontSize: "0.95rem",
-            fontWeight: "600",
+            borderRadius: borderRadius.lg,
+            fontSize: typography.fontSize.sm,
+            fontWeight: typography.fontWeight.semibold,
             cursor: "pointer",
-            transition: "all 0.3s",
+            transition: transitions.normal,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "8px",
+            gap: spacing.sm,
           }}
         >
           View Details →
@@ -491,199 +556,271 @@ function TADashboard() {
       style={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* Navbar placeholder */}
+      <Navbar />
+
       <div
         style={{
-          background: "rgba(0, 51, 102, 0.95)",
-          padding: "20px 40px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-          backdropFilter: "blur(10px)",
+          paddingTop: "120px",
+          padding: "120px 40px 80px",
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        <h2 style={{ color: "white", margin: 0, fontSize: "1.5rem" }}>GUC Events Platform</h2>
-      </div>
-
-      <div style={{ padding: "80px 40px 80px" }}>
         {Boolean(bannerMsg) && (
-          <div style={{ position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)', background: '#10b981', color: '#fff', borderRadius: 12, padding: '12px 18px', boxShadow: '0 10px 25px rgba(0,0,0,0.25)', zIndex: 9999, fontWeight: 800, letterSpacing: 0.3 }}>
+          <div style={{
+            position: 'fixed',
+            top: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: colors.success,
+            color: colors.white,
+            borderRadius: borderRadius.lg,
+            padding: `${spacing.md} ${spacing.lg}`,
+            boxShadow: shadows.xl,
+            zIndex: 9999,
+            fontWeight: typography.fontWeight.extrabold,
+            letterSpacing: 0.3,
+            fontSize: typography.fontSize.sm,
+          }}>
             {bannerMsg}
           </div>
         )}
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header */}
+          {/* Header + Stats */}
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "40px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "40px",
+              background: colors.bgCard,
+              padding: `${spacing['3xl']} ${spacing['2xl']}`,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: spacing.xl,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div style={{ marginBottom: "20px" }}>
-              <h1 style={{ fontSize: "2.5rem", fontWeight: "bold", color: "#003366", marginBottom: "8px" }}>
-                My Registered Events
+            <div>
+              <h1
+                style={{
+                  fontSize: typography.fontSize['3xl'],
+                  fontWeight: typography.fontWeight.bold,
+                  color: colors.primary,
+                  marginBottom: spacing.sm,
+                }}
+              >
+                Welcome back, {user.firstName}! 👋
               </h1>
-              <p style={{ fontSize: "1.1rem", color: "#6b7280", margin: 0 }}>
-                View all workshops and trips you've registered for
+              <p
+                style={{
+                  fontSize: typography.fontSize.lg,
+                  color: colors.gray500,
+                  margin: 0,
+                }}
+              >
+                Discover and register for amazing events
               </p>
             </div>
 
-            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: spacing.lg,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
               <div
                 style={{
-                  flex: "1",
-                  minWidth: "250px",
-                  padding: "20px",
-                  background: "linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.05) 100%)",
-                  borderRadius: "12px",
-                  border: "2px solid rgba(212, 175, 55, 0.3)",
+                  padding: `${spacing.md} ${spacing.xl}`,
+                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
+                  borderRadius: borderRadius.xl,
+                  textAlign: "center",
+                  border: `1px solid ${colors.primary}`,
+                  boxShadow: shadows.md,
                 }}
               >
-                <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#003366", marginBottom: "4px" }}>
+                <div
+                  style={{
+                    fontSize: typography.fontSize['2xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.white,
+                  }}
+                >
                   {registeredEvents.length}
                 </div>
-                <div style={{ fontSize: "0.9rem", color: "#6b7280", fontWeight: "500" }}>Total Registered</div>
+                <div
+                  style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.accent,
+                    marginTop: spacing.xs,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  Registered Events
+                </div>
               </div>
 
               <div
                 style={{
-                  flex: "1",
-                  minWidth: "250px",
-                  padding: "20px",
-                  background: "linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%)",
-                  borderRadius: "12px",
-                  border: "2px solid rgba(34, 197, 94, 0.3)",
+                  padding: `${spacing.md} ${spacing.xl}`,
+                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
+                  borderRadius: borderRadius.xl,
+                  textAlign: "center",
+                  border: `1px solid ${colors.primary}`,
+                  boxShadow: shadows.md,
+                  position: "relative",
                 }}
               >
-                <div style={{ fontSize: "2rem", fontWeight: "bold", color: "#003366", marginBottom: "4px" }}>
-                  {upcomingCount}
+                <div
+                  style={{
+                    fontSize: typography.fontSize['2xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.white,
+                  }}
+                >
+                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
                 </div>
-                <div style={{ fontSize: "0.9rem", color: "#6b7280", fontWeight: "500" }}>Upcoming Events</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-            <div style={{ padding: '10px 16px', background: 'rgba(212, 175, 55, 0.15)', borderRadius: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#003366' }}>{typeof walletBalance === 'number' ? `${walletBalance} EGP` : '—'}</div>
-              <div style={{ fontSize: '.85rem', color: '#6b7280' }}>Wallet Balance</div>
-              <div style={{ marginTop: 6 }}>
-                <button type='button' onClick={() => setTopUpOpen(true)} style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', color: '#003366', border: 'none', borderRadius: 8, fontWeight: 800, cursor: 'pointer' }}>Add Funds</button>
+                <div
+                  style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.accent,
+                    marginTop: spacing.xs,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  Notifications
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Filter Tabs */}
+          {/* Tabs */}
           <div
             style={{
+              background: colors.bgCard,
+              padding: spacing.md,
+              borderRadius: borderRadius['2xl'],
+              boxShadow: shadows.lg,
+              marginBottom: spacing['2xl'],
               display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              marginBottom: "30px",
-              background: "rgba(255,255,255,0.95)",
-              padding: "8px",
-              borderRadius: "12px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              gap: spacing.md,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
-            {[
-              { key: "upcoming", label: "Upcoming", count: upcomingCount },
-              { key: "allevents", label: "Browse All Events" },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                style={{
-                  flex: 1,
-                  padding: "14px 24px",
-                  background: filter === tab.key ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
-                  color: filter === tab.key ? "#003366" : "#6b7280",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "1rem",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  transition: "all 0.3s",
-                }}
-              >
-                {tab.label} {tab.count !== undefined ? `(${tab.count})` : ''}
-              </button>
-            ))}
-
             <button
-              onClick={() => setFilter('favourites')}
+              onClick={() => setActiveTab("browse")}
               style={{
                 flex: 1,
-                padding: "14px 24px",
-                background: filter === 'favourites' ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
-                color: filter === 'favourites' ? "#003366" : "#6b7280",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "browse"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "browse" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
-              ♥ Favourites
+              🎯 Browse Events
             </button>
 
             <button
-              onClick={() => (window.location.href = "/register-events")}
-              style={{
-                flex: 1,
-                padding: "14px 24px",
-                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                color: "#003366",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+              onClick={() => {
+                setActiveTab("gym-sessions");
+                setGymSessionsLoading(true);
+                fetchGymSessions();
               }}
-            >
-              Register Events
-            </button>
-
-            <button
-              onClick={() => (window.location.href = "/gym-sessions")}
               style={{
                 flex: 1,
-                padding: "14px 24px",
-                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                color: "#003366",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "gym-sessions"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "gym-sessions" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
-                boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+                transition: transitions.normal,
               }}
             >
               🏋️ Gym Sessions
             </button>
 
             <button
+              onClick={() => setActiveTab("registered")}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "registered"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "registered" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              ✓ My Registered Events
+            </button>
+
+            <button
+              onClick={() => setActiveTab("favourites")}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "favourites"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "favourites" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              ❤️ Favourites
+            </button>
+
+            <button
               onClick={() => {
-                setFilter("notifications");
+                setActiveTab("notifications");
                 fetchNotifications();
               }}
               style={{
                 flex: 1,
-                padding: "14px 24px",
-                background: filter === "notifications" ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
-                color: filter === "notifications" ? "#003366" : "#6b7280",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "notifications"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "notifications" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -692,18 +829,18 @@ function TADashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
@@ -713,20 +850,23 @@ function TADashboard() {
 
             <button
               onClick={() => {
-                setFilter("reminders");
+                setActiveTab("reminders");
                 fetchReminders();
               }}
               style={{
                 flex: 1,
-                padding: "14px 24px",
-                background: filter === "reminders" ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
-                color: filter === "reminders" ? "#003366" : "#6b7280",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "reminders"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "reminders" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
                 position: "relative",
               }}
             >
@@ -735,18 +875,18 @@ function TADashboard() {
                 <span
                   style={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
-                    background: "#ef4444",
-                    color: "white",
-                    borderRadius: "50%",
+                    top: spacing.sm,
+                    right: spacing.sm,
+                    background: colors.error,
+                    color: colors.white,
+                    borderRadius: borderRadius.full,
                     width: "20px",
                     height: "20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "0.7rem",
-                    fontWeight: "bold",
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
                   }}
                 >
                   {reminders.filter(n => !n.isRead).length}
@@ -755,22 +895,49 @@ function TADashboard() {
             </button>
           </div>
 
-          {/* Events List */}
-          {filter === "allevents" ? (
-            <EventList enableFavorites={true} />
-          ) : filter === 'favourites' ? (
-            <MyEventsList events={favouriteEvents} />
-          ) : filter === 'reminders' ? (
+          {/* Content */}
+          {activeTab === "browse" && <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />}
+          {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
+          {activeTab === "registered" && (
+            loading ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: `${spacing['6xl']} ${spacing.xl}`,
+                  background: colors.bgCard,
+                  borderRadius: borderRadius.xl,
+                  boxShadow: shadows.md,
+                }}
+              >
+                <div style={{ 
+                  fontSize: typography.fontSize.lg, 
+                  color: colors.gray500, 
+                  fontWeight: typography.fontWeight.medium 
+                }}>
+                  Loading your registered events...
+                </div>
+              </div>
+            ) : (
+              <MyEventsList events={registeredEvents} showRefundButton />
+            )
+          )}
+          
+          {activeTab === "reminders" && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ color: "#003366", margin: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  margin: 0,
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold
+                }}>
                   Event Reminders
                 </h2>
                 {reminders.filter(n => !n.isRead).length > 0 && (
@@ -782,14 +949,9 @@ function TADashboard() {
                       fetchReminders();
                     }}
                     style={{
-                      padding: "8px 16px",
-                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                      color: "#003366",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      cursor: "pointer",
+                      ...buttonStyles.primary,
+                      padding: `${spacing.md} ${spacing.lg}`,
+                      fontSize: typography.fontSize.sm
                     }}
                   >
                     Mark All as Read
@@ -797,37 +959,38 @@ function TADashboard() {
                 )}
               </div>
               {reminders.length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No reminders at this time.</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {reminders.map((reminder) => (
                     <div
                       key={reminder.id}
                       style={{
-                        padding: "20px",
-                        background: reminder.isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(245, 158, 11, 0.15)",
-                        borderRadius: "12px",
-                        border: reminder.isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(245, 158, 11, 0.4)",
+                        padding: spacing.xl,
+                        background: reminder.isRead ? colors.gray50 : colors.white,
+                        borderRadius: borderRadius.xl,
+                        border: reminder.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.warning}`,
                         position: "relative",
+                        boxShadow: reminder.isRead ? shadows.sm : shadows.md,
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                            <span style={{ fontSize: "1.5rem" }}>⏰</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
+                            <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
                             <h3 style={{ 
-                              color: "#003366", 
+                              color: colors.primary, 
                               margin: 0, 
-                              fontSize: "1.1rem",
-                              fontWeight: reminder.isRead ? "500" : "700",
+                              fontSize: typography.fontSize.lg,
+                              fontWeight: reminder.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
                               Event Reminder
                             </h3>
                             {!reminder.isRead && (
                               <span style={{
-                                background: "#ef4444",
-                                color: "white",
-                                borderRadius: "50%",
+                                background: colors.error,
+                                color: colors.white,
+                                borderRadius: borderRadius.full,
                                 width: "10px",
                                 height: "10px",
                                 display: "inline-block",
@@ -835,17 +998,18 @@ function TADashboard() {
                             )}
                           </div>
                           <p style={{ 
-                            color: "#6b7280", 
-                            margin: "8px 0",
-                            fontWeight: reminder.isRead ? "400" : "500",
+                            color: colors.gray500, 
+                            margin: `${spacing.sm} 0`,
+                            fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                            fontSize: typography.fontSize.base
                           }}>
                             {reminder.message}
                           </p>
                           {reminder.eventStartDate && (
                             <p style={{ 
-                              color: "#9ca3af", 
-                              fontSize: "0.85rem",
-                              margin: "4px 0",
+                              color: colors.gray400, 
+                              fontSize: typography.fontSize.sm,
+                              margin: `${spacing.xs} 0`,
                             }}>
                               Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
                             </p>
@@ -856,29 +1020,24 @@ function TADashboard() {
                                 window.location.href = `/events/${reminder.eventId}`;
                               }}
                               style={{
-                                marginTop: "10px",
-                                padding: "8px 16px",
-                                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                                color: "#003366",
-                                border: "none",
-                                borderRadius: "8px",
-                                fontSize: "0.9rem",
-                                fontWeight: "600",
-                                cursor: "pointer",
+                                marginTop: spacing.md,
+                                ...buttonStyles.primary,
+                                padding: `${spacing.sm} ${spacing.lg}`,
+                                fontSize: typography.fontSize.sm
                               }}
                             >
                               View Event
                             </button>
                           )}
                           <p style={{ 
-                            color: "#9ca3af", 
-                            fontSize: "0.85rem",
-                            margin: "8px 0 0 0",
+                            color: colors.gray400, 
+                            fontSize: typography.fontSize.sm,
+                            margin: `${spacing.sm} 0 0 0`,
                           }}>
                             {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
                           </p>
                         </div>
-                        <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
@@ -886,13 +1045,13 @@ function TADashboard() {
                                 fetchReminders();
                               }}
                               style={{
-                                padding: "6px 12px",
-                                background: "#10b981",
-                                color: "white",
+                                padding: `${spacing.sm} ${spacing.lg}`,
+                                background: colors.success,
+                                color: colors.white,
                                 border: "none",
-                                borderRadius: "6px",
-                                fontSize: "0.85rem",
-                                fontWeight: "600",
+                                borderRadius: borderRadius.md,
+                                fontSize: typography.fontSize.sm,
+                                fontWeight: typography.fontWeight.semibold,
                                 cursor: "pointer",
                               }}
                             >
@@ -905,17 +1064,29 @@ function TADashboard() {
                               fetchReminders();
                             }}
                             style={{
-                              padding: "6px 12px",
-                              background: "#ef4444",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "0.85rem",
-                              fontWeight: "600",
-                              cursor: "pointer",
+                              padding: `${spacing.xs} ${spacing.md}`,
+                              background: colors.error,
+                              color: colors.white,
+                              border: 'none',
+                              borderRadius: borderRadius.lg,
+                              fontSize: typography.fontSize.sm,
+                              fontWeight: typography.fontWeight.semibold,
+                              cursor: 'pointer',
+                              transition: transitions.fast,
+                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.transform = 'translateY(-1px)';
+                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                              e.target.style.background = '#b91c1c';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.transform = 'translateY(0)';
+                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                              e.target.style.background = colors.error;
                             }}
                           >
-                            Delete
+                            🗑️ Delete
                           </button>
                         </div>
                       </div>
@@ -924,17 +1095,255 @@ function TADashboard() {
                 </div>
               )}
             </div>
-          ) : filter === 'notifications' ? (
+          )}
+          
+          {activeTab === 'gym-sessions' && (
             <div
               style={{
-                background: "rgba(255,255,255,0.95)",
-                padding: "30px",
-                borderRadius: "20px",
-                boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+                background: colors.bgCard,
+                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h2 style={{ color: "#003366", margin: 0 }}>
+              <h2 style={{ 
+                color: colors.primary, 
+                marginBottom: spacing.xl,
+                fontSize: typography.fontSize['2xl'],
+                fontWeight: typography.fontWeight.bold,
+              }}>
+                Gym Sessions
+              </h2>
+              {gymSessionsLoading ? (
+                <div style={{ 
+                  textAlign: "center",
+                  padding: `${spacing['6xl']} ${spacing.xl}`,
+                }}>
+                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
+                  <p style={{ 
+                    color: colors.gray500,
+                    fontSize: typography.fontSize.base,
+                  }}>Loading sessions...</p>
+                </div>
+              ) : gymSessionsError ? (
+                <div style={{ 
+                  color: colors.error, 
+                  background: colors.errorLight, 
+                  padding: spacing.lg, 
+                  borderRadius: borderRadius.xl,
+                  marginBottom: spacing.lg,
+                }}>{gymSessionsError}</div>
+              ) : (!gymSessions || gymSessions.length === 0) ? (
+                <div style={{ 
+                  textAlign: "center",
+                  padding: `${spacing['6xl']} ${spacing.xl}`,
+                }}>
+                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
+                  <p style={{ 
+                    color: colors.gray500,
+                    fontSize: typography.fontSize.base,
+                  }}>No gym sessions scheduled</p>
+                </div>
+              ) : (() => {
+                const typeMap = {
+                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba', 
+                  crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
+                };
+                const byMonth = (gymSessions || []).reduce((acc, s) => {
+                  const d = s.startDate ? new Date(s.startDate) : null;
+                  const key = d ? d.toLocaleString(undefined, { month: 'long', year: 'numeric' }) : 'Scheduled';
+                  (acc[key] ||= []).push(s);
+                  return acc;
+                }, {});
+                const monthKeys = Object.keys(byMonth).sort((a, b) => {
+                  const da = new Date(a); const db = new Date(b);
+                  return (!isNaN(da) && !isNaN(db)) ? (da - db) : a.localeCompare(b);
+                });
+
+                const currentUserId = (() => {
+                  try {
+                    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+                    if (!raw) return null;
+                    const u = JSON.parse(raw);
+                    return u && (u._id || u.id) ? String(u._id || u.id) : null;
+                  } catch (_) { return null; }
+                })();
+
+                const isStarted = (s) => {
+                  try { return new Date(s.startDate) <= new Date(); } catch { return false; }
+                };
+
+                const isFull = (s) => {
+                  try {
+                    const reg = Array.isArray(s.registeredUsers) ? s.registeredUsers.length : (s.registeredCount || 0);
+                    return Number(s.capacity || 0) > 0 && reg >= Number(s.capacity || 0);
+                  } catch { return false; }
+                };
+
+                const alreadyRegistered = (s) => {
+                  try {
+                    if (!currentUserId) return false;
+                    const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
+                    return arr.map(String).includes(String(currentUserId));
+                  } catch { return false; }
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing['2xl'] }}>
+                    {monthKeys.map((month) => {
+                      const items = byMonth[month] || [];
+                      const byType = items.reduce((acc, s) => {
+                        const label = typeMap[s.sessionType] || s.sessionType || 'Session';
+                        (acc[label] ||= []).push(s);
+                        return acc;
+                      }, {});
+                      const typeKeys = Object.keys(byType).sort();
+                      return (
+                        <div key={month}>
+                          <div style={{ 
+                            background: colors.bgCard, 
+                            padding: `${spacing.lg} ${spacing.xl}`, 
+                            borderRadius: borderRadius.xl, 
+                            boxShadow: shadows.md,
+                            border: `1px solid ${colors.gray200}`,
+                          }}>
+                            <h3 style={{ 
+                              margin: 0, 
+                              color: colors.primary,
+                              fontSize: typography.fontSize.xl,
+                              fontWeight: typography.fontWeight.bold,
+                            }}>{month}</h3>
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+                              gap: spacing.lg, 
+                              marginTop: spacing.lg 
+                            }}>
+                              {typeKeys.map((tk) => (
+                                <div key={tk} style={{ 
+                                  background: colors.white, 
+                                  border: `1px solid ${colors.gray200}`, 
+                                  borderRadius: borderRadius.xl, 
+                                  padding: spacing.lg 
+                                }}>
+                                  <div style={{ 
+                                    fontWeight: typography.fontWeight.extrabold, 
+                                    color: colors.primary, 
+                                    marginBottom: spacing.sm,
+                                    fontSize: typography.fontSize.base,
+                                  }}>{tk}</div>
+                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: colors.gray700 }}>
+                                    {byType[tk]
+                                      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                                      .map((s) => {
+                                        const id = s._id || s.id;
+                                        const started = isStarted(s);
+                                        const full = isFull(s);
+                                        const mine = alreadyRegistered(s);
+                                        const disabled = started || full || mine || gymBusyId === id;
+                                        const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (gymBusyId === id ? 'Registering...' : 'Register');
+                                        const fmtDateTime = (date) => {
+                                          if (!date) return 'TBA';
+                                          const d = new Date(date);
+                                          return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                        };
+                                        return (
+                                          <li key={id} style={{ 
+                                            padding: `${spacing.sm} 0`, 
+                                            borderTop: `1px solid ${colors.gray100}` 
+                                          }}>
+                                            <div style={{ 
+                                              display:'flex', 
+                                              justifyContent:'space-between', 
+                                              alignItems:'center', 
+                                              gap: spacing.lg 
+                                            }}>
+                                              <div>
+                                                <div style={{ 
+                                                  fontSize: typography.fontSize.sm,
+                                                  fontWeight: typography.fontWeight.medium,
+                                                  color: colors.gray700,
+                                                }}>{fmtDateTime(s.startDate)}</div>
+                                                <div style={{ 
+                                                  fontSize: typography.fontSize.xs, 
+                                                  color: colors.gray500,
+                                                  marginTop: spacing.xs,
+                                                }}>
+                                                  Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <button
+                                                  disabled={disabled}
+                                                  onClick={() => !disabled && handleGymRegister(id)}
+                                                  style={{
+                                                    ...(disabled ? {} : buttonStyles.primary),
+                                                    padding: `${spacing.sm} ${spacing.lg}`,
+                                                    background: disabled ? colors.gray200 : undefined,
+                                                    color: disabled ? colors.gray500 : colors.primary,
+                                                    border: 'none',
+                                                    borderRadius: borderRadius.lg,
+                                                    fontWeight: typography.fontWeight.bold,
+                                                    fontSize: typography.fontSize.sm,
+                                                    cursor: disabled ? 'not-allowed' : 'pointer',
+                                                    opacity: disabled ? 0.7 : 1,
+                                                  }}
+                                                  onMouseEnter={(e) => {
+                                                    if (!disabled) {
+                                                      e.target.style.boxShadow = shadows.accentHover;
+                                                    }
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    if (!disabled) {
+                                                      e.target.style.boxShadow = shadows.accent;
+                                                    }
+                                                  }}
+                                                >{label}</button>
+                                              </div>
+                                            </div>
+                                            {gymStatus[id] && gymStatus[id].msg && (
+                                              <div style={{ 
+                                                marginTop: spacing.sm, 
+                                                fontSize: typography.fontSize.xs, 
+                                                color: gymStatus[id].ok ? colors.success : colors.error 
+                                              }}>
+                                                {gymStatus[id].msg}
+                                              </div>
+                                            )}
+                                          </li>
+                                        );
+                                      })}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          
+          {activeTab === 'notifications' && (
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  margin: 0,
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold
+                }}>
                   Notifications
                 </h2>
                 {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
@@ -944,14 +1353,9 @@ function TADashboard() {
                       fetchNotifications();
                     }}
                     style={{
-                      padding: "8px 16px",
-                      background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                      color: "#003366",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "0.9rem",
-                      fontWeight: "600",
-                      cursor: "pointer",
+                      ...buttonStyles.primary,
+                      padding: `${spacing.md} ${spacing.lg}`,
+                      fontSize: typography.fontSize.sm
                     }}
                   >
                     Mark All as Read
@@ -959,39 +1363,40 @@ function TADashboard() {
                 )}
               </div>
               {notifications.filter(n => n.type !== 'EventReminder').length === 0 ? (
-                <p style={{ color: "#6b7280" }}>No notifications at this time.</p>
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {notifications.filter(n => n.type !== 'EventReminder').map((notif) => (
                     <div
                       key={notif.id}
                       style={{
-                        padding: "20px",
-                        background: notif.isRead ? "rgba(212, 175, 55, 0.05)" : "rgba(212, 175, 55, 0.15)",
-                        borderRadius: "12px",
-                        border: notif.isRead ? "1px solid rgba(212, 175, 55, 0.2)" : "2px solid rgba(212, 175, 55, 0.4)",
+                        padding: spacing.xl,
+                        background: notif.isRead ? colors.gray50 : colors.white,
+                        borderRadius: borderRadius.xl,
+                        border: notif.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
                         position: "relative",
+                        boxShadow: notif.isRead ? shadows.sm : shadows.md,
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "15px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                             {notif.type === 'NewEvent' && (
-                              <span style={{ fontSize: "1.5rem" }}>🎉</span>
+                              <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                             )}
                             <h3 style={{ 
-                              color: "#003366", 
+                              color: colors.primary, 
                               margin: 0, 
-                              fontSize: "1.1rem",
-                              fontWeight: notif.isRead ? "500" : "700",
+                              fontSize: typography.fontSize.lg,
+                              fontWeight: notif.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
                               {notif.type === 'NewEvent' ? 'New Event Available' : 'Notification'}
                             </h3>
                             {!notif.isRead && (
                               <span style={{
-                                background: "#ef4444",
-                                color: "white",
-                                borderRadius: "50%",
+                                background: colors.error,
+                                color: colors.white,
+                                borderRadius: borderRadius.full,
                                 width: "10px",
                                 height: "10px",
                                 display: "inline-block",
@@ -999,9 +1404,10 @@ function TADashboard() {
                             )}
                           </div>
                           <p style={{ 
-                            color: "#6b7280", 
-                            margin: "8px 0",
-                            fontWeight: notif.isRead ? "400" : "500",
+                            color: colors.gray500, 
+                            margin: `${spacing.sm} 0`,
+                            fontWeight: notif.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                            fontSize: typography.fontSize.base
                           }}>
                             {notif.message}
                           </p>
@@ -1011,29 +1417,24 @@ function TADashboard() {
                                 window.location.href = `/events/${notif.eventId}`;
                               }}
                               style={{
-                                marginTop: "10px",
-                                padding: "8px 16px",
-                                background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                                color: "#003366",
-                                border: "none",
-                                borderRadius: "8px",
-                                fontSize: "0.9rem",
-                                fontWeight: "600",
-                                cursor: "pointer",
+                                marginTop: spacing.md,
+                                ...buttonStyles.primary,
+                                padding: `${spacing.sm} ${spacing.lg}`,
+                                fontSize: typography.fontSize.sm
                               }}
                             >
                               View Event
                             </button>
                           )}
                           <p style={{ 
-                            color: "#9ca3af", 
-                            fontSize: "0.85rem",
-                            margin: "8px 0 0 0",
+                            color: colors.gray400, 
+                            fontSize: typography.fontSize.sm,
+                            margin: `${spacing.sm} 0 0 0`,
                           }}>
                             {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
                           </p>
                         </div>
-                        <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                           {!notif.isRead && (
                             <button
                               onClick={() => {
@@ -1041,13 +1442,13 @@ function TADashboard() {
                                 fetchNotifications();
                               }}
                               style={{
-                                padding: "6px 12px",
-                                background: "#10b981",
-                                color: "white",
+                                padding: `${spacing.sm} ${spacing.lg}`,
+                                background: colors.success,
+                                color: colors.white,
                                 border: "none",
-                                borderRadius: "6px",
-                                fontSize: "0.85rem",
-                                fontWeight: "600",
+                                borderRadius: borderRadius.md,
+                                fontSize: typography.fontSize.sm,
+                                fontWeight: typography.fontWeight.semibold,
                                 cursor: "pointer",
                               }}
                             >
@@ -1060,17 +1461,29 @@ function TADashboard() {
                               fetchNotifications();
                             }}
                             style={{
-                              padding: "6px 12px",
-                              background: "#ef4444",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "0.85rem",
-                              fontWeight: "600",
-                              cursor: "pointer",
+                              padding: `${spacing.xs} ${spacing.md}`,
+                              background: colors.error,
+                              color: colors.white,
+                              border: 'none',
+                              borderRadius: borderRadius.lg,
+                              fontSize: typography.fontSize.sm,
+                              fontWeight: typography.fontWeight.semibold,
+                              cursor: 'pointer',
+                              transition: transitions.fast,
+                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.transform = 'translateY(-1px)';
+                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                              e.target.style.background = '#b91c1c';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.transform = 'translateY(0)';
+                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                              e.target.style.background = colors.error;
                             }}
                           >
-                            Delete
+                            🗑️ Delete
                           </button>
                         </div>
                       </div>
@@ -1079,28 +1492,6 @@ function TADashboard() {
                 </div>
               )}
             </div>
-          ) : loading ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "80px 20px",
-                background: "rgba(255,255,255,0.95)",
-                borderRadius: "16px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "1.2rem",
-                  color: "#6b7280",
-                  fontWeight: "500",
-                }}
-              >
-                Loading your registered events...
-              </div>
-            </div>
-          ) : (
-            <MyEventsList events={filteredEvents} showRefundButton />
           )}
         </div>
       </div>
@@ -1115,10 +1506,3 @@ function TADashboard() {
 }
 
 export default TADashboard;
-  const fetchWallet = async () => {
-    try {
-      const res = await apiGetWalletBalance();
-      const balance = (res && typeof res.balance === 'number') ? res.balance : undefined;
-      setWalletBalance(balance);
-    } catch (_) { setWalletBalance(undefined); }
-  };

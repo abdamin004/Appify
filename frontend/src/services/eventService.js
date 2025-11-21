@@ -132,7 +132,11 @@ export function deleteEvent(id) {
 
 // Event details + comments/ratings
 export async function getEventById(id) {
-  const res = await fetch(`${API_BASE}/events/${id}`);
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  const res = await fetch(`${API_BASE}/events/${id}`, { headers });
   if (!res.ok) {
     const text = await res.text();
     let errorMsg = `Failed to load event (${res.status})`;
