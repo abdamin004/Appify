@@ -1,10 +1,12 @@
 const mongoose = require('mongoose');
 const Event = require('../models/Event');       // base model with discriminators
+const Booth = require('../models/Booth');       // Booth discriminator
 const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
 const LoyaltyApplication = require('../models/LoyaltyApplication');
-
+const Vendor = require('../models/Vendor');
+const path = require('path');
 function isValidId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
@@ -109,17 +111,21 @@ exports.applyToEvent = async (req, res, next) => {
 
     // Normalize input - if it's an id-like string we'll try by id first, otherwise try title
     let ev = null;
+    
+    // Find existing event - vendors must apply to existing events created by EventOffice
     if (isValidId(eventId)) {
-      ev = await Event.findById(eventId).select('type status startDate title');
+      ev = await Event.findById(eventId).select('type status startDate title location');
     }
     if (!ev) {
       // Treat eventId as title (exact match) or eventName provided
       const titleToFind = body.eventName || eventId;
       if (titleToFind && typeof titleToFind === 'string') {
-        ev = await Event.findOne({ title: titleToFind, status: 'published' }).select('type status startDate title');
+        ev = await Event.findOne({ title: titleToFind, status: 'published' }).select('type status startDate title location');
       }
     }
-    if (!ev) return res.status(404).json({ success: false, message: 'Event not found' });
+    if (!ev) {
+      return res.status(404).json({ success: false, message: 'Event not found. Please select an existing event.' });
+    }
 
     /*
     // Organization must exist
@@ -129,19 +135,31 @@ exports.applyToEvent = async (req, res, next) => {
     if (!['2x2', '4x4'].includes(boothSize)) {
       return badReq(res, 'Invalid booth size (allowed: 2x2, 4x4)');
     }
-    if (attendees.length > 5) {
-      return badReq(res, 'Maximum 5 attendees allowed');
-    }
+      // Validate attendees (max 5, and must include ID number)
+      if (attendees.length > 5) {
+          return badReq(res, 'Maximum 5 attendees allowed');
+      }
 
-    // Booth-only rules
+      for (const a of attendees) {
+          if (!a.name || !a.email || !a.idNumber) {
+              return badReq(res,
+                  'Each attendee must have name, email, and idNumber'
+              );
+          }
+      }
+
+
+    // Booth-only rules - setupDurationWeeks and setupLocation are optional for Booth events
+    // Location is already set by EventOffice when creating the Booth event
     if (ev.type === 'Booth') {
-      const okInt = Number.isInteger(setupDurationWeeks);
-      if (!okInt || setupDurationWeeks < 1 || setupDurationWeeks > 4) {
-        return badReq(res, 'setupDurationWeeks must be an integer between 1 and 4');
+      // setupDurationWeeks and setupLocation are optional - can be provided by vendor or set by EventOffice
+      if (setupDurationWeeks !== undefined) {
+        const okInt = Number.isInteger(setupDurationWeeks);
+        if (!okInt || setupDurationWeeks < 1 || setupDurationWeeks > 4) {
+          return badReq(res, 'setupDurationWeeks must be an integer between 1 and 4');
+        }
       }
-      if (!setupLocation || typeof setupLocation !== 'string') {
-        return badReq(res, 'setupLocation is required (map slot id/code)');
-      }
+      // setupLocation is optional - vendor can specify preferred location or use event location
     }
 
     // Check if there's an existing application (including cancelled ones)
@@ -171,7 +189,7 @@ exports.applyToEvent = async (req, res, next) => {
       attendees,
       boothSize,
       setupDurationWeeks: ev.type === 'Booth' ? setupDurationWeeks : undefined,
-      setupLocation:      ev.type === 'Booth' ? setupLocation      : undefined,
+      setupLocation:      ev.type === 'Booth' ? (setupLocation || ev.location) : undefined,
       notes
     });
 
@@ -451,3 +469,73 @@ exports.deleteVendorApplication = async (req, res, next) => {
     return res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 };
+
+exports.uploadVendorDocuments = async (req, res, next) => {
+    try {
+        const vendorId = req.user._id;
+
+        const vendor = await Vendor.findById(vendorId);
+        if (!vendor) {
+            return res.status(404).json({ success: false, message: 'Vendor not found' });
+        }
+
+        // req.files is populated by multer.fields(...)
+        if (req.files && req.files.taxCard && req.files.taxCard[0]) {
+            const file = req.files.taxCard[0];
+            vendor.taxCardUrl = `/uploads/vendors/${file.filename}`;
+        }
+
+        if (req.files && req.files.logo && req.files.logo[0]) {
+            const file = req.files.logo[0];
+            vendor.logoUrl = `/uploads/vendors/${file.filename}`;
+        }
+
+        await vendor.save();
+
+        return res.json({
+            success: true,
+            message: 'Vendor documents uploaded successfully',
+            vendor: {
+                _id: vendor._id,
+                companyName: vendor.companyName,
+                taxCardUrl: vendor.taxCardUrl,
+                logoUrl: vendor.logoUrl
+            }
+        });
+    } catch (err) {
+        console.error('uploadVendorDocuments error:', err);
+        return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+};
+
+// List all loyalty program partners with discount info, all parties are able to view
+exports.listLoyaltyPartners = async (req, res, next) => {
+    try {
+        const apps = await LoyaltyApplication.find({ status: 'approved' })
+            .populate('vendorUser', 'companyName email') // adjust fields based on Vendor model
+            .sort({ createdAt: -1 });
+
+        const partners = apps.map(app => ({
+            loyaltyApplicationId: app._id,
+            vendorId: app.vendorUser ? app.vendorUser._id : undefined,
+            vendorName: app.vendorUser?.companyName || app.organization,
+            discountRate: app.discountRate,
+            promoCode: app.promoCode,
+            termsAndConditions: app.termsAndConditions
+        }));
+
+        return res.status(200).json({
+            success: true,
+            count: partners.length,
+            partners
+        });
+    } catch (err) {
+        console.error('listLoyaltyPartners error:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Error retrieving loyalty partners',
+            error: err.message
+        });
+    }
+};
+

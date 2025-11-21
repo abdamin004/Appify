@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import EventCard from "./EventCard";
 import Navbar from "./Navbar";
 import { API_BASE } from "../services/eventService";
-import { deleteEvent } from '../services/eventService';
+import { deleteEvent, getApprovedWorkshops } from '../services/eventService';
+import { FaHeart } from 'react-icons/fa';
+import favourites from "../services/favoritesService";
 
-function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false }) {
+function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,9 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     endDate: "",
     professorName: "",
   });
+
+  // Favourites (per-user, frontend)
+  const [favIds, setFavIds] = useState(() => new Set(favourites.getFavouriteIds().map(String)));
 
   useEffect(() => {
     fetchEvents();
@@ -59,7 +64,31 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
       
       const response = await fetch(`${endpoint}?${queryParams}`, { headers });
       const data = await response.json();
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      let list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      
+      // Add frontend-approved workshops (draft workshops that were approved)
+      try {
+        const approvedSet = getApprovedWorkshops();
+        if (approvedSet.size > 0) {
+          // Fetch all workshops including drafts
+          const sortRes = await fetch(`${API_BASE}/events/sort`);
+          const sortData = await sortRes.json();
+          if (Array.isArray(sortData)) {
+            const approvedWorkshops = sortData.filter(
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'draft'
+            );
+            // Mark them as published for display
+            approvedWorkshops.forEach(w => { w.status = 'published'; });
+            // Merge with existing list, avoiding duplicates
+            const existingIds = new Set(list.map(e => e._id));
+            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
+            list = [...list, ...newWorkshops];
+          }
+        }
+      } catch (e) {
+        console.log('Error adding approved workshops:', e);
+      }
+      
       setEvents(list);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -88,6 +117,11 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     });
 
   const handleEventClick = (id) => (window.location.href = `/events/${id}`);
+
+  const toggleFav = (id) => {
+    const next = new Set(favourites.toggleFavourite(id).map(String));
+    setFavIds(next);
+  };
 
   return (
     <div
@@ -377,13 +411,44 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                 gap: "30px",
               }}
             >
-              {filteredEvents.map((e) => (
-                <EventCard
-                  key={e._id} 
-                  event={e}
-                  onClick={() => handleEventClick(e._id)}
-                />
-              ))}
+              {filteredEvents.map((e) => {
+                const id = e._id || e.id;
+                const isFav = favIds.has(String(id));
+                return (
+                  <div key={id} style={{ position: 'relative' }}>
+                    {enableFavorites && (
+                      <button
+                        type="button"
+                        onClick={(ev) => { ev.stopPropagation(); toggleFav(id); }}
+                        aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                        title={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          right: 10,
+                          zIndex: 2,
+                          background: 'rgba(255,255,255,0.95)',
+                          border: 'none',
+                          borderRadius: 9999,
+                          width: 36,
+                          height: 36,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <FaHeart size={18} color={isFav ? '#dc2626' : '#e5e7eb'} />
+                      </button>
+                    )}
+                    <EventCard
+                      event={e}
+                      onClick={() => handleEventClick(id)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -67,7 +67,7 @@ function ConferencesManager() {
     setLoading(true); setError(''); setSuccess('');
     try {
       const payload = { ...form, location: 'N/A' };
-      await createConference(payload);
+      const createdConference = await createConference(payload);
       setSuccess('Conference created');
       setForm({
         title: '',
@@ -82,6 +82,14 @@ function ConferencesManager() {
         fundingSource: 'internal', // Changed from 'GUC' to 'internal'
         extraRequiredResourses: false,
       });
+      
+      // Create notifications for all users if event is published
+      const conferenceEvent = createdConference?.event || createdConference;
+      if (conferenceEvent && (conferenceEvent.status === 'published' || payload.status === 'published')) {
+        const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
+        notifyAllUsersAboutNewEvent(conferenceEvent);
+      }
+      
       await refresh();
     } catch (err) {
       setError(err.message || 'Failed to create');

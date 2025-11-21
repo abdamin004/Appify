@@ -54,9 +54,17 @@ function BazaarsManager() {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
-      await createBazaar(form);
+      const createdBazaar = await createBazaar(form);
       setSuccess('Bazaar created');
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      
+      // Create notifications for all users if event is published
+      const bazaarEvent = createdBazaar?.event || createdBazaar;
+      if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
+        const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
+        notifyAllUsersAboutNewEvent(bazaarEvent);
+      }
+      
       await refresh();
     } catch (err) {
       setError(err.message || 'Failed to create');

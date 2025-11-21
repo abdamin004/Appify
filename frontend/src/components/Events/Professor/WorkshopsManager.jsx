@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createWorkshop, listWorkshopsByProfessor, updateEvent } from '../../../services/eventService';
+import { createWorkshop, listWorkshopsByProfessor, updateEvent, getEventById } from '../../../services/eventService';
+import { createEventOfficeNotification } from '../../../services/notificationService';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -22,6 +24,9 @@ const sectionTitle = { color: '#003366', fontWeight: 700, fontSize: 18, marginTo
 const yellow = '#d4af37';
 
 function WorkshopsManager() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  
   const [form, setForm] = useState({
     title: '',
     shortDescription: '',
@@ -47,6 +52,7 @@ function WorkshopsManager() {
   const [workshops, setWorkshops] = useState([]);
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({});
+  const [loadingWorkshop, setLoadingWorkshop] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!professorFilter) { setWorkshops([]); return; }
@@ -56,6 +62,69 @@ function WorkshopsManager() {
 
   // Auto-search as the user types in the search bar
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Load workshop for editing when edit parameter is in URL
+  useEffect(() => {
+    if (editId) {
+      loadWorkshopForEdit(editId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
+
+  const loadWorkshopForEdit = async (id) => {
+    setLoadingWorkshop(true);
+    try {
+      const workshop = await getEventById(id);
+      if (workshop) {
+        // Pre-fill the form with workshop data
+        setForm({
+          title: workshop.title || '',
+          shortDescription: workshop.shortDescription || '',
+          location: workshop.location || 'GUC Cairo',
+          startDate: workshop.startDate ? new Date(workshop.startDate).toISOString().slice(0, 16) : '',
+          endDate: workshop.endDate ? new Date(workshop.endDate).toISOString().slice(0, 16) : '',
+          registrationDeadline: workshop.registrationDeadline ? new Date(workshop.registrationDeadline).toISOString().slice(0, 16) : '',
+          facultyName: workshop.facultyName || '',
+          requiredBudget: workshop.requiredBudget || '',
+          fundingSource: workshop.fundingSource || 'Grant',
+          extraRequiredResourses: !!workshop.extraRequiredResourses,
+          agenda: workshop.description || '',
+          capacity: workshop.capacity || '',
+          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0) 
+            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' })) 
+            : [{ name: '', department: '' }],
+          status: workshop.status || 'draft',
+        });
+        // Set editing mode
+        setEditing(id);
+        setEditData({
+          title: workshop.title || '',
+          shortDescription: workshop.shortDescription || '',
+          location: workshop.location || 'GUC Cairo',
+          startDate: workshop.startDate ? new Date(workshop.startDate).toISOString().slice(0, 16) : '',
+          endDate: workshop.endDate ? new Date(workshop.endDate).toISOString().slice(0, 16) : '',
+          registrationDeadline: workshop.registrationDeadline ? new Date(workshop.registrationDeadline).toISOString().slice(0, 16) : '',
+          facultyName: workshop.facultyName || '',
+          requiredBudget: workshop.requiredBudget || 0,
+          fundingSource: workshop.fundingSource || 'Grant',
+          extraRequiredResourses: !!workshop.extraRequiredResourses,
+          capacity: workshop.capacity ?? 0,
+          agenda: workshop.description || '',
+          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0) 
+            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' })) 
+            : [{ name: '', department: '' }],
+        });
+        setSuccess('Workshop loaded for editing');
+        // Remove edit parameter from URL
+        setSearchParams({});
+      }
+    } catch (err) {
+      console.error('Error loading workshop:', err);
+      setError('Failed to load workshop for editing: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoadingWorkshop(false);
+    }
+  };
 
   
 
@@ -81,7 +150,7 @@ function WorkshopsManager() {
         startDate: form.startDate,
         endDate: form.endDate,
         registrationDeadline: form.registrationDeadline,
-        status: 'published',
+        status: 'draft',
         facultyName: form.facultyName,
         requiredBudget: Number(form.requiredBudget || 0),
         fundingSource: form.fundingSource,
@@ -93,7 +162,17 @@ function WorkshopsManager() {
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
         createdBy,
       };
-      await createWorkshop(payload);
+      const createdWorkshop = await createWorkshop(payload);
+      
+      // Create notification for Events Office
+      createEventOfficeNotification({
+        type: 'WorkshopSubmitted',
+        message: `A new workshop "${payload.title}" has been submitted by a professor and is pending approval.`,
+        workshopId: createdWorkshop?._id || createdWorkshop?.id,
+        workshopTitle: payload.title,
+        professorId: createdBy,
+      });
+      
       setSuccess('Workshop created successfully');
       setForm({
         title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
@@ -115,9 +194,22 @@ function WorkshopsManager() {
     agenda: row.description || '',
     professors: (Array.isArray(row.professors) && row.professors.length > 0) ? row.professors.map(p => ({ name: p.name || '', department: p.department || '' })) : [{ name: '', department: '' }],
   }); };
+  // Remove edit requests from description
+  const removeEditRequests = (description) => {
+    if (!description) return '';
+    // Remove all edit request blocks
+    return description.replace(
+      /--- EDIT REQUEST FROM EVENTS OFFICE \([^)]+\) ---[\s\S]*?--- END EDIT REQUEST ---/g,
+      ''
+    ).trim();
+  };
+
   const onSave = async (id) => {
     setLoading(true); setError(''); setSuccess('');
     try {
+      // Remove edit requests from the description when saving
+      const cleanedAgenda = removeEditRequests(editData.agenda || '');
+      
       const payload = {
         title: editData.title,
         shortDescription: editData.shortDescription,
@@ -130,16 +222,25 @@ function WorkshopsManager() {
         fundingSource: editData.fundingSource,
         extraRequiredResourses: !!editData.extraRequiredResourses,
         capacity: Number(editData.capacity || 0),
-        description: editData.agenda || '',
+        description: cleanedAgenda,
         professors: (editData.professors || [])
           .filter(p => (p?.name || '').trim().length > 0)
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
       };
       await updateEvent(id, payload);
-      setSuccess('Workshop updated');
-      setEditing(null); setEditData({});
+      setSuccess('Workshop updated successfully! Edit requests have been removed.');
+      setEditing(null); 
+      setEditData({});
+      // Reset form
+      setForm({
+        title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
+        facultyName: '', requiredBudget: '', fundingSource: 'Grant', extraRequiredResourses: false,
+        agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'draft'
+      });
       await refresh();
-    } catch (err) { setError(err.message || 'Failed to update'); }
+    } catch (err) { 
+      setError(err.message || 'Failed to update'); 
+    }
     finally { setLoading(false); }
   };
 
@@ -148,104 +249,221 @@ function WorkshopsManager() {
       <div style={panel}>
         <h1 style={h1Style}>Professor — Workshops</h1>
 
-        <h2 style={sectionTitle}>Create Workshop</h2>
-        <form className="form managerForm" onSubmit={onCreate}>
-          <label>
-            <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
-            <span>Workshop Title</span>
-          </label>
-          <label>
-            <input className="input" value={form.shortDescription} onChange={e=>setForm({ ...form, shortDescription: e.target.value })} />
-            <span>Short Description</span>
-          </label>
-          <div className="flex grid-4">
-            <label>
-              <select className="input" value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })}>
-                <option>GUC Cairo</option>
-                <option>GUC Berlin</option>
-              </select>
-              <span>Location</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e=>setForm({ ...form, startDate: e.target.value })} />
-              <span>Start Date/Time</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e=>setForm({ ...form, endDate: e.target.value })} />
-              <span>End Date/Time</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
-              <span>Registration Deadline</span>
-            </label>
+        {loadingWorkshop && (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#003366' }}>
+            Loading workshop for editing...
           </div>
-          <div className="flex grid-3">
-            <label>
-              <input className="input" required value={form.facultyName} onChange={e=>setForm({ ...form, facultyName: e.target.value })} />
-              <span>Faculty Name</span>
-            </label>
-            <label>
-              <input className="input" type="number" required value={form.requiredBudget} onChange={e=>setForm({ ...form, requiredBudget: e.target.value })} />
-              <span>Required Budget</span>
-            </label>
-            <label>
-              <input className="input" type="number" min="0" value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
-              <span>CAPACITY</span>
-            </label>
-          </div>
-          <label>
-            <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={form.agenda} onChange={e=>setForm({ ...form, agenda: e.target.value })} />
-            <span>Full Agenda</span>
-          </label>
-          <div className="flex">
-            <label>
-              <select className="input" value={form.fundingSource} onChange={e=>setForm({ ...form, fundingSource: e.target.value })}>
-                <option value="Grant">Grant</option>
-                <option value="Sponsor">Sponsor</option>
-                <option value="External">External</option>
-                <option value="Internal">Internal</option>
-              </select>
-              <span>Funding Source</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={form.extraRequiredResourses} onChange={e=>setForm({ ...form, extraRequiredResourses: e.target.checked })} />
-              <span>Extra Resources Required</span>
-            </label>
-          </div>
+        )}
+
+        {editing ? (
           <div>
-            <div style={{ color: '#003366', fontWeight: 700, margin: '8px 0' }}>Professor(s) Participating</div>
-            {(form.professors || []).map((p, idx) => (
-              <div key={idx} className="flex" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <label style={{ flex: 1 }}>
-                  <input className="input" value={p.name} onChange={e=>{
-                    const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setForm({ ...form, professors: arr });
-                  }} />
-                  <span>Professor Name</span>
+            <h2 style={sectionTitle}>Edit Workshop</h2>
+            <div style={{ marginBottom: '20px', padding: '15px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+              <p style={{ margin: 0, color: '#003366', fontWeight: '600' }}>
+                ✏️ Editing Workshop: {editData.title || 'Untitled'}
+              </p>
+            </div>
+            <div className="form managerForm">
+              <label>
+                <input className="input" required value={editData.title} onChange={e=>setEditData({ ...editData, title: e.target.value })} />
+                <span>Workshop Title</span>
+              </label>
+              <label>
+                <input className="input" value={editData.shortDescription} onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} />
+                <span>Short Description</span>
+              </label>
+              <div className="flex grid-4">
+                <label>
+                  <select className="input" value={editData.location} onChange={e=>setEditData({ ...editData, location: e.target.value })}>
+                    <option>GUC Cairo</option>
+                    <option>GUC Berlin</option>
+                  </select>
+                  <span>Location</span>
                 </label>
-                <label style={{ flex: 1 }}>
-                  <input className="input" value={p.department} onChange={e=>{
-                    const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setForm({ ...form, professors: arr });
-                  }} />
-                  <span>Department</span>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " required value={editData.startDate} onChange={e=>setEditData({ ...editData, startDate: e.target.value })} />
+                  <span>Start Date/Time</span>
                 </label>
-                <button type="button" className="submit" style={{ background: '#e5e7eb', color: '#111827' }}
-                  onClick={()=>{
-                    const arr = [...(form.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setForm({ ...form, professors: arr }); }
-                  }}
-                  disabled={(form.professors || []).length <= 1}
-                >Remove</button>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " required value={editData.endDate} onChange={e=>setEditData({ ...editData, endDate: e.target.value })} />
+                  <span>End Date/Time</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " value={editData.registrationDeadline} onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} />
+                  <span>Registration Deadline</span>
+                </label>
               </div>
-            ))}
-            <button type="button" className="submit" style={{ background: yellow, color: '#003366', fontWeight: 700 }}
-              onClick={()=> setForm({ ...form, professors: [...(form.professors || []), { name: '', department: '' }] })}
-            >Add Professor</button>
+              <div className="flex grid-3">
+                <label>
+                  <input className="input" required value={editData.facultyName} onChange={e=>setEditData({ ...editData, facultyName: e.target.value })} />
+                  <span>Faculty Name</span>
+                </label>
+                <label>
+                  <input className="input" type="number" required value={editData.requiredBudget} onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} />
+                  <span>Required Budget</span>
+                </label>
+                <label>
+                  <input className="input" type="number" min="0" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} />
+                  <span>CAPACITY</span>
+                </label>
+              </div>
+              <label>
+                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={editData.agenda} onChange={e=>setEditData({ ...editData, agenda: e.target.value })} />
+                <span>Full Agenda</span>
+              </label>
+              <div className="flex">
+                <label>
+                  <select className="input" value={editData.fundingSource} onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}>
+                    <option value="Grant">Grant</option>
+                    <option value="Sponsor">Sponsor</option>
+                    <option value="External">External</option>
+                    <option value="Internal">Internal</option>
+                  </select>
+                  <span>Funding Source</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={!!editData.extraRequiredResourses} onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })} />
+                  <span>Extra Resources Required</span>
+                </label>
+              </div>
+              <div>
+                <div style={{ color: '#003366', fontWeight: 700, margin: '8px 0' }}>Professor(s) Participating</div>
+                {(editData.professors || []).map((p, idx) => (
+                  <div key={idx} className="flex" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <label style={{ flex: 1 }}>
+                      <input className="input" value={p.name} onChange={e=>{
+                        const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setEditData({ ...editData, professors: arr });
+                      }} />
+                      <span>Professor Name</span>
+                    </label>
+                    <label style={{ flex: 1 }}>
+                      <input className="input" value={p.department} onChange={e=>{
+                        const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setEditData({ ...editData, professors: arr });
+                      }} />
+                      <span>Department</span>
+                    </label>
+                    <button type="button" className="submit" style={{ background: '#e5e7eb', color: '#111827' }}
+                      onClick={()=>{
+                        const arr = [...(editData.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setEditData({ ...editData, professors: arr }); }
+                      }}
+                      disabled={(editData.professors || []).length <= 1}
+                    >Remove</button>
+                  </div>
+                ))}
+                <button type="button" className="submit" style={{ background: yellow, color: '#003366', fontWeight: 700 }}
+                  onClick={()=> setEditData({ ...editData, professors: [...(editData.professors || []), { name: '', department: '' }] })}
+                >Add Professor</button>
+              </div>
+              <button className="submit" onClick={() => onSave(editing)} disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button className="submit" onClick={() => { setEditing(null); setEditData({}); setSearchParams({}); }} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
+              {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
+              {success && <p className="message" style={{ color: 'green' }}>{success}</p>}
+            </div>
           </div>
-          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
-            {loading ? 'Creating...' : 'Submit Workshop'}
-          </button>
-          {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
-          {success && <p className="message" style={{ color: 'green' }}>{success}</p>}
-        </form>
+        ) : (
+          <div>
+            <h2 style={sectionTitle}>Create Workshop</h2>
+            <form className="form managerForm" onSubmit={onCreate}>
+              <label>
+                <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
+                <span>Workshop Title</span>
+              </label>
+              <label>
+                <input className="input" value={form.shortDescription} onChange={e=>setForm({ ...form, shortDescription: e.target.value })} />
+                <span>Short Description</span>
+              </label>
+              <div className="flex grid-4">
+                <label>
+                  <select className="input" value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })}>
+                    <option>GUC Cairo</option>
+                    <option>GUC Berlin</option>
+                  </select>
+                  <span>Location</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e=>setForm({ ...form, startDate: e.target.value })} />
+                  <span>Start Date/Time</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e=>setForm({ ...form, endDate: e.target.value })} />
+                  <span>End Date/Time</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
+                  <span>Registration Deadline</span>
+                </label>
+              </div>
+              <div className="flex grid-3">
+                <label>
+                  <input className="input" required value={form.facultyName} onChange={e=>setForm({ ...form, facultyName: e.target.value })} />
+                  <span>Faculty Name</span>
+                </label>
+                <label>
+                  <input className="input" type="number" required value={form.requiredBudget} onChange={e=>setForm({ ...form, requiredBudget: e.target.value })} />
+                  <span>Required Budget</span>
+                </label>
+                <label>
+                  <input className="input" type="number" min="0" value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
+                  <span>CAPACITY</span>
+                </label>
+              </div>
+              <label>
+                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={form.agenda} onChange={e=>setForm({ ...form, agenda: e.target.value })} />
+                <span>Full Agenda</span>
+              </label>
+              <div className="flex">
+                <label>
+                  <select className="input" value={form.fundingSource} onChange={e=>setForm({ ...form, fundingSource: e.target.value })}>
+                    <option value="Grant">Grant</option>
+                    <option value="Sponsor">Sponsor</option>
+                    <option value="External">External</option>
+                    <option value="Internal">Internal</option>
+                  </select>
+                  <span>Funding Source</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={form.extraRequiredResourses} onChange={e=>setForm({ ...form, extraRequiredResourses: e.target.checked })} />
+                  <span>Extra Resources Required</span>
+                </label>
+              </div>
+              <div>
+                <div style={{ color: '#003366', fontWeight: 700, margin: '8px 0' }}>Professor(s) Participating</div>
+                {(form.professors || []).map((p, idx) => (
+                  <div key={idx} className="flex" style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <label style={{ flex: 1 }}>
+                      <input className="input" value={p.name} onChange={e=>{
+                        const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setForm({ ...form, professors: arr });
+                      }} />
+                      <span>Professor Name</span>
+                    </label>
+                    <label style={{ flex: 1 }}>
+                      <input className="input" value={p.department} onChange={e=>{
+                        const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setForm({ ...form, professors: arr });
+                      }} />
+                      <span>Department</span>
+                    </label>
+                    <button type="button" className="submit" style={{ background: '#e5e7eb', color: '#111827' }}
+                      onClick={()=>{
+                        const arr = [...(form.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setForm({ ...form, professors: arr }); }
+                      }}
+                      disabled={(form.professors || []).length <= 1}
+                    >Remove</button>
+                  </div>
+                ))}
+                <button type="button" className="submit" style={{ background: yellow, color: '#003366', fontWeight: 700 }}
+                  onClick={()=> setForm({ ...form, professors: [...(form.professors || []), { name: '', department: '' }] })}
+                >Add Professor</button>
+              </div>
+              <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+                {loading ? 'Creating...' : 'Submit Workshop'}
+              </button>
+              {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
+              {success && <p className="message" style={{ color: 'green' }}>{success}</p>}
+            </form>
+          </div>
+        )}
 
         <h2 style={sectionTitle}>My Workshops</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>

@@ -10,6 +10,7 @@ import Navbar from "./components/Navbar";
 import EventList from "./components/EventList";
 // Events management pages (role-based)
 import BazaarsManager from "./components/Events/EventsOffice/BazaarsManager";
+import BoothsManager from "./components/Events/EventsOffice/BoothsManager";
 import TripsManager from "./components/Events/EventsOffice/TripsManager";
 import WorkshopsManager from "./components/Events/Professor/WorkshopsManager";
 import ConferencesManager from "./components/Events/EventsOffice/ConferencesManager";
@@ -29,6 +30,10 @@ import CommentModeration from "./components/Admin/CommentModeration";
 import ViewEvents from "./components/Admin/ViewEvents";
 import RegisterEvents from "./components/RegisterEvents";
 import GymSessions from "./components/GymSessions";
+import EventDetails from "./components/EventDetails";
+import VendorDocuments from "./components/Admin/VendorDocuments";
+import AttendeesReport from "./components/Admin/AttendeesReport";
+import SalesReport from "./components/Admin/SalesReport";
 
 
 function App() {
@@ -67,6 +72,7 @@ function App() {
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
           {/* Events Office */}
           <Route path="/events-office/bazaars" element={<BazaarsManager />} />
+          <Route path="/events-office/booths" element={<BoothsManager />} />
           <Route path="/events-office/trips" element={<TripsManager />} />
           <Route path="/events-office/conferences" element={<ConferencesManager />} />
           <Route path="/events-office/gym-sessions" element={<GymSessionsManager />} />
@@ -75,6 +81,7 @@ function App() {
           <Route path="/professor/workshops" element={<WorkshopsManager />} />
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
+          <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/register-events" element={<RegisterEvents />} />
           <Route path="/gym-sessions" element={<GymSessions />} />
         
@@ -88,6 +95,9 @@ function App() {
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/comments" element={<CommentModeration />} />
           <Route path="/admin/view-events" element={<ViewEvents />} />
+          <Route path="/admin/vendor-documents" element={<VendorDocuments />} />
+          <Route path="/admin/attendees-report" element={<AttendeesReport />} />
+          <Route path="/admin/sales-report" element={<SalesReport />} />
         </Routes>
       </div>
     </>

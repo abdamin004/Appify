@@ -3,20 +3,20 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['VendorApplicationSubmitted', 'VendorApplicationApproved', 'VendorApplicationRejected'],
+        enum: ['VendorApplicationSubmitted', 'VendorApplicationApproved', 'VendorApplicationRejected', 'NewEventPublished','EventReminder1Day','EventReminder1Hour' ],
     required: true
   },
   message: { type: String, required: true },
 
   // Who should see it
-  recipientsRoles: [{ type: String, enum: ['Admin', 'EventOffice', 'Vendor'] }],
+    recipientsRoles: [{ type: String, enum: ['Admin', 'EventOffice', 'Vendor', 'Student', 'Staff', 'TA', 'Professor' ] }],
   recipientUser: { type: mongoose.Schema.Types.ObjectId, refPath: 'recipientModel' },
   recipientModel: { type: String, enum: ['User', 'Vendor'], default: 'User' },
 
   // Context
   application: { type: mongoose.Schema.Types.ObjectId, ref: 'VendorApplication' },
   event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
-  organization: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+  organization: { type: String, ref: 'Organization' },
 
   // State
   isRead: { type: Boolean, default: false, index: true },

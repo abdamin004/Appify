@@ -55,5 +55,20 @@ router.post('/workshops/:workshopId/request-edit', auth, roleCheck('Admin', 'Eve
 
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
+// Get single event by ID (must be before /:id/comments and /:id/ratings)
+router.get('/:id', eventController.getEventById);
+
+router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventComments);
+// View all ratings on an event
+router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
+
+// Add a rating on an event (ONLY after event has ended)
+router.post('/:id/ratings',auth,roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.addEventRating);
+
+// Add event to favorites
+router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
+
+// View my favorites list
+router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
 
 module.exports = router;

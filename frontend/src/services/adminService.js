@@ -17,5 +17,10 @@ export const reviewVendorApplication = (id, action, notes) => fetchJson(`${API_B
 export const listAdminNotifications = (unreadOnly = false) => fetchJson(`${API_BASE}/admin/notifications${unreadOnly ? '?unreadOnly=true' : ''}`);
 export const markNotificationRead = (id) => fetchJson(`${API_BASE}/admin/notifications/${id}/read`, { method: 'PATCH' });
 export const markAllNotificationsRead = () => fetchJson(`${API_BASE}/admin/notifications/read-all`, { method: 'PATCH' });
+export const getUnreadVendorNotificationsCount = (pendingOnly = true) => {
+  const query = pendingOnly ? '?pendingOnly=true' : '';
+  return fetchJson(`${API_BASE}/admin/notifications/unread-count${query}`);
+};
 
-export default { listAllComments,deleteComment, listPendingVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead };
+
+export default { listAllComments,deleteComment, listPendingVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead,getUnreadVendorNotificationsCount };

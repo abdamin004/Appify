@@ -5,11 +5,15 @@ const User = require('../models/User');
 const Workshop = require('../models/Workshop');
 const Trip = require('../models/Trip');
 const Bazaar = require('../models/Bazaar');
+const Booth = require('../models/Booth');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
+const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
+const Payment = require('../models/Payment');
 const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
+const Notification = require('../models/Notification');
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -49,6 +53,18 @@ async function attachApprovedParticipants(events) {
 }
 
 module.exports = {
+    // GET /events/:id - Get a single event by id
+    async getEventById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
+            const event = await Event.findById(id).populate({ path: 'vendors', options: { strictPopulate: false } });
+            if (!event) return res.status(404).json({ message: 'Event not found' });
+            res.json(event);
+        } catch (err) {
+            res.status(500).json({ message: err.message });
+        }
+    },
     // POST /events/create - Create a new event
     async createEvent(req, res) {
         try {
@@ -119,6 +135,9 @@ module.exports = {
                 case 'Bazaar':  
                     event = await Bazaar.create({...eventData, vendors});
                     break;
+                case 'Booth':
+                    event = await Booth.create({...eventData, vendors});
+                    break;
                 case 'Conference':
                     event = await Conference.create({...eventData, websiteLink, requiredBudget, fundingSource, extraRequiredResourses});
                     break;
@@ -127,6 +146,20 @@ module.exports = {
                     break;
                 default:
                     event = await Event.create(eventData);
+            }
+            //  NEW EVENT NOTIFICATION — ONLY if published
+            if (event.status === 'published') {
+                try {
+                    await Notification.create({
+                        type: 'NewEventPublished',
+                        message: `A new ${event.type || 'event'} has been added: ${event.title}`,
+                        event: event._id,
+                        recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+                    });
+                } catch (notifyErr) {
+                    console.error('Failed to create new event notification:', notifyErr);
+                    // do NOT fail the request
+                }
             }
 
             res.status(201).json({
@@ -141,24 +174,13 @@ module.exports = {
 
     async getAllEvents(req, res) {
         try {
-            const now = new Date();
-            let events;
-            try {
-                events = await Event.find({
-                    status: 'published',
-                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                })
+            // Show all published events (past and future)
+            const events = await Event.find({ status: 'published' })
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .sort({ startDate: 1 })
                 .exec();
-            } catch (e) {
-                // Fallback if $toDate not supported
-                events = await Event.find({ status: 'published', startDate: { $gte: now } })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } })
-                  .exec();
-            }
-
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -168,7 +190,6 @@ module.exports = {
         try {
             const { q } = req.query;
             const regex = new RegExp(q || '', 'i');
-            const now = new Date();
             const baseMatch = {
                 status: 'published',
                 $or: [
@@ -178,19 +199,12 @@ module.exports = {
                     { category: regex }
                 ]
             };
-            let events;
-            try {
-                events = await Event.find({
-                    ...baseMatch,
-                    $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } });
-            } catch (e) {
-                events = await Event.find({ ...baseMatch, startDate: { $gte: now } })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } });
-            }
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const events = await Event.find(baseMatch)
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .sort({ startDate: 1 })
+                .exec();
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -212,25 +226,15 @@ module.exports = {
                   .sort({ startDate: 1 })
                   .exec();
             } else {
-                const now = new Date();
-                try {
-                    events = await Event.find({
-                        ...base,
-                        $expr: { $gte: [ { $toDate: '$startDate' }, now ] }
-                    })
-                      .populate({ path: 'vendors', options: { strictPopulate: false } })
-                      .sort({ startDate: 1 })
-                      .exec();
-                } catch (e) {
-                    events = await Event.find({ ...base, startDate: { $gte: now } })
-                      .populate({ path: 'vendors', options: { strictPopulate: false } })
-                      .sort({ startDate: 1 })
-                      .exec();
-                }
+                // No startDate filter provided: include all published events (past and future)
+                events = await Event.find(base)
+                  .populate({ path: 'vendors', options: { strictPopulate: false } })
+                  .sort({ startDate: 1 })
+                  .exec();
             }
 
-            events = await attachApprovedParticipants(events);
-            res.json(events);
+            const enriched = await attachApprovedParticipants(events);
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -252,7 +256,23 @@ module.exports = {
                 path: 'registeredEvents',
                 populate: { path: 'vendors', options: { strictPopulate: false } }
             });
-            res.json(user.registeredEvents || []);
+            const events = Array.isArray(user?.registeredEvents) ? user.registeredEvents : [];
+            if (events.length === 0) return res.json([]);
+
+            const ids = events.map(e => e && e._id).filter(Boolean);
+            let paidSet = new Set();
+            try {
+                const payments = await Payment.find({ user: userId, event: { $in: ids }, status: 'paid' }).select('event');
+                paidSet = new Set(payments.map(p => String(p.event)));
+            } catch (_) { /* ignore payment lookup errors */ }
+
+            const enriched = events.map(e => {
+                if (!e) return e;
+                const obj = typeof e.toObject === 'function' ? e.toObject() : { ...e };
+                obj.paid = paidSet.has(String(e._id));
+                return obj;
+            });
+            res.json(enriched);
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -804,6 +824,18 @@ module.exports = {
         event.status = 'published';
         await event.save();
 
+        //  New Event Published notification
+        try {
+            await Notification.create({
+                type: 'NewEventPublished',
+                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                event: event._id,
+                recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+            });
+        } catch (notifyErr) {
+            console.error('Failed to create publish event notification:', notifyErr);
+            // don't fail the request because of a notification error
+        }
         res.status(200).json({
             success: true,
             message: 'Event published successfully',
@@ -846,5 +878,236 @@ module.exports = {
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
         }
+    },
+    async getEventComments(req, res) {
+        try {
+            const eventId  = req.params.id;
+
+            // Make sure event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const comments = await Comment.find({ event: eventId })
+                .populate('user', 'firstName lastName email') // adjust to your User fields
+                .sort({ createdAt: -1 }); // newest first
+
+            return res.status(200).json({
+                success: true,
+                count: comments.length,
+                comments
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getEventRatings(req, res) {
+        try {
+            const eventId  = req.params.id;
+
+            // Make sure event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const ratings = await Rating.find({ event: eventId })
+                .populate('user', 'firstName lastName email') // adjust to your User fields
+                .sort({ createdAt: -1 });
+
+            const count = ratings.length;
+            const average =
+                count === 0
+                    ? null
+                    : ratings.reduce((sum, r) => sum + (r.rating || 0), 0) / count;
+
+            return res.status(200).json({
+                success: true,
+                count,
+                averageRating: average,
+                ratings
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+   
+
+    // Wrapper function for route /:id/ratings (maps id to eventId)
+    async addEventRating(req, res) {
+        const eventId = req.params.id;
+        const { rating } = req.body;
+        const userId = req.user._id;
+
+        try {
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            const now = new Date();
+
+            if (!event.endDate || new Date(event.endDate) > now) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You can only rate this event after it has ended.'
+                });
+            }
+
+            if (!event.registeredUsers || !event.registeredUsers.some(u => u.toString() === userId.toString())) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You must be registered for this event to rate it.'
+                });
+            }
+
+            const numericRating = Number(rating);
+            if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Rating must be a number between 1 and 5.'
+                });
+            }
+
+            const existing = await Rating.findOne({ event: eventId, user: userId });
+            if (existing) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You have already rated this event.'
+                });
+            }
+
+            const newRating = await Rating.create({
+                event: eventId,
+                user: userId,
+                rating: numericRating
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Rating added successfully',
+                rating: newRating
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async addEventToFavorites(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // 1) Ensure event exists and is published (optional but makes sense)
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // 2) Load user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            user.favoriteEvents = user.favoriteEvents || [];
+
+            // 3) Prevent duplicates
+            const alreadyFav = user.favoriteEvents.some(
+                (id) => id.toString() === eventId.toString()
+            );
+            if (alreadyFav) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
+            }
+
+            // 4) Add to favorites and save
+            user.favoriteEvents.push(eventId);
+            await user.save();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event added to favorites successfully',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    type: event.type,
+                    startDate: event.startDate,
+                    location: event.location
+                }
+            });
+        } catch (err) {
+            console.error('addEventToFavorites error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getMyFavoriteEvents(req, res) {
+        try {
+            const userId = req.user._id;
+
+            const user = await User.findById(userId).populate({
+                path: 'favoriteEvents',
+                populate: { path: 'vendors', options: { strictPopulate: false } }
+            });
+
+            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+
+            if (events.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'No favorite events yet',
+                    events: []
+                });
+            }
+
+            const enriched = await attachApprovedParticipants(events);
+
+            return res.status(200).json({
+                success: true,
+                count: enriched.length,
+                events: enriched
+            });
+        } catch (err) {
+            console.error('getMyFavoriteEvents error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
     }
+
+
 };

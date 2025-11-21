@@ -9,6 +9,15 @@ function EventsList({ filterByTypes = null, presetType = null }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [archivedEvents, setArchivedEvents] = useState(() => {
+    // Load archived events from localStorage
+    try {
+      const stored = localStorage.getItem('archivedEvents');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [filters, setFilters] = useState({
     type: "",
     search: "",
@@ -65,6 +74,10 @@ function EventsList({ filterByTypes = null, presetType = null }) {
 
   const filteredEvents = events
     .filter((event) => {
+      // Filter out archived events (frontend-only archiving)
+      if (archivedEvents.has(event._id)) return false;
+      if (event.status === 'completed') return false; // Also filter backend-archived events
+      
       if (filterByTypes && !filterByTypes.includes(event.type)) return false;
       if (filters.type && event.type !== filters.type) return false;
       if (filters.search) {
@@ -94,6 +107,35 @@ function EventsList({ filterByTypes = null, presetType = null }) {
       console.error('Failed to delete event', err);
       alert(err.message || 'Failed to delete event');
     }
+  };
+
+  const handleArchiveEvent = (id, event) => {
+    // Frontend-only archiving - no backend calls
+    if (!window.confirm('Archive this event? It will be hidden from the event list.')) return;
+    
+    // Add to archived set and save to localStorage
+    const newArchived = new Set(archivedEvents);
+    newArchived.add(id);
+    setArchivedEvents(newArchived);
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem('archivedEvents', JSON.stringify(Array.from(newArchived)));
+    } catch (err) {
+      console.error('Failed to save archived events to localStorage', err);
+    }
+    
+    // Show success message
+    alert('Event archived successfully!');
+    
+    // The event will be automatically filtered out from the list
+    // No need to refresh - the filteredEvents will update automatically
+  };
+
+  const hasEventPassed = (event) => {
+    const eventEndDate = event.endDate || event.startDate;
+    if (!eventEndDate) return false;
+    return new Date(eventEndDate) < new Date();
   };
 
   return (
@@ -391,6 +433,8 @@ function EventsList({ filterByTypes = null, presetType = null }) {
                   event={e}
                   onClick={() => handleEventClick(e._id)}
                   onDelete={handleDeleteEvent}
+                  onArchive={handleArchiveEvent}
+                  hasEventPassed={hasEventPassed}
                 />
               ))}
             </div>

@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
   verificationToken: String,
   isVerified: { type: Boolean, default: false },
   isBlocked: { type: Boolean, default: false },
+  // Simple wallet balance for payments/refunds
+  walletBalance: { type: Number, default: 0 },
   
   registeredEvents: [{ 
     type: mongoose.Schema.Types.ObjectId, 
@@ -38,6 +40,12 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
     }
   }
 ],
+    }],
+
+    favoriteEvents: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event'
+    }]
 });
 
 // Password hashing middleware

@@ -1,12 +1,22 @@
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Prefer explicit SMTP host/port if provided; fallback to Gmail service
+let transporter;
+try {
+  const host = process.env.EMAIL_HOST;
+  const port = Number(process.env.EMAIL_PORT || 0);
+  const secure = String(process.env.EMAIL_SECURE || '').toLowerCase() === 'true' || port === 465;
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+
+  if (host && port) {
+    transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  } else {
+    transporter = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
+  }
+} catch (e) {
+  console.error('Failed to configure mail transporter:', e?.message || e);
+}
 
 const sendVerificationEmail = async (user, token) => {
   const frontendUrl =
@@ -169,11 +179,40 @@ const sendVendorApplicationRejectionEmail = async (vendor, application, event) =
   });
 };
 
+const sendPaymentReceiptEmail = async (user, event, details) => {
+  const amountLine = typeof details.amount === 'number' ? `${(details.amount || 0).toFixed(2)} ${String(details.currency || 'EGP').toUpperCase()}` : 'N/A';
+  const when = event && event.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
+  const ref = details.reference || details.sessionId || details.orderId || '';
+
+  await transporter.sendMail({
+    from: `"Appify Events" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: `Payment Receipt - ${event?.title || event?.name || 'Event'}`,
+    html: `
+      <h3 style="margin:0 0 8px 0;">Payment Receipt</h3>
+      <p>Dear ${user.firstName || 'User'},</p>
+      <p>Thank you for your payment. Your registration/payment details are below:</p>
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin:12px 0;">
+        <p><strong>Event:</strong> ${event?.title || event?.name || event?.type || 'Event'}</p>
+        ${event?.type ? `<p><strong>Type:</strong> ${event.type}</p>` : ''}
+        ${event?.location ? `<p><strong>Location:</strong> ${event.location}</p>` : ''}
+        <p><strong>Date:</strong> ${when}</p>
+        <p><strong>Amount:</strong> ${amountLine}</p>
+        <p><strong>Method:</strong> ${details.method || 'Card'}</p>
+        ${ref ? `<p><strong>Reference:</strong> ${ref}</p>` : ''}
+      </div>
+      <p>If you have any questions, reply to this email.</p>
+      <p>Best regards,<br/>Appify Events Team</p>
+    `,
+  });
+};
+
 module.exports = { 
   sendVerificationEmail, 
   sendWarningEmail,
   sendGymSessionCancellationEmail,
   sendGymSessionUpdateEmail,
   sendVendorApplicationApprovalEmail,
-  sendVendorApplicationRejectionEmail
+  sendVendorApplicationRejectionEmail,
+  sendPaymentReceiptEmail,
 };

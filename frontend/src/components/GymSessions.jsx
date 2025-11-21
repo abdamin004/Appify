@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "./Navbar";
-import { listGymSessions } from "../services/eventService";
+import { listGymSessions, registerForEvent } from "../services/eventService";
 
 const typeMap = {
   yoga: "Yoga",
@@ -17,6 +17,8 @@ export default function GymSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [status, setStatus] = useState({}); // { [id]: { ok:boolean, msg:string } }
 
   useEffect(() => {
     async function load() {
@@ -45,7 +47,6 @@ export default function GymSessions() {
   }, {});
 
   const monthKeys = Object.keys(byMonth).sort((a, b) => {
-    // Try to sort by actual date; fallback to string compare
     const da = new Date(a);
     const db = new Date(b);
     if (!isNaN(da) && !isNaN(db)) return da - db;
@@ -56,6 +57,49 @@ export default function GymSessions() {
     if (!s) return "TBA";
     const d = new Date(s);
     return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  }
+
+  const currentUserId = (() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      return u && (u._id || u.id) ? String(u._id || u.id) : null;
+    } catch (_) { return null; }
+  })();
+
+  function isStarted(s) {
+    try { return new Date(s.startDate) <= new Date(); } catch { return false; }
+  }
+
+  function isFull(s) {
+    try {
+      const reg = Array.isArray(s.registeredUsers) ? s.registeredUsers.length : (s.registeredCount || 0);
+      return Number(s.capacity || 0) > 0 && reg >= Number(s.capacity || 0);
+    } catch { return false; }
+  }
+
+  function alreadyRegistered(s) {
+    try {
+      if (!currentUserId) return false;
+      const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
+      return arr.map(String).includes(String(currentUserId));
+    } catch { return false; }
+  }
+
+  async function handleRegister(id) {
+    setBusyId(id);
+    setStatus(prev => ({ ...prev, [id]: { ok: false, msg: '' } }));
+    try {
+      const res = await registerForEvent(id);
+      setStatus(prev => ({ ...prev, [id]: { ok: true, msg: res.message || 'Registered successfully' } }));
+      try { const rows = await listGymSessions(); setSessions(Array.isArray(rows) ? rows : []); } catch(_) {}
+    } catch (err) {
+      const msg = (err && err.message) || 'Failed to register';
+      setStatus(prev => ({ ...prev, [id]: { ok: false, msg } }));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -79,7 +123,7 @@ export default function GymSessions() {
               marginBottom: 30,
             }}
           >
-            <h1 style={{ margin: 0, color: "#003366" }}>🏋️ Gym Sessions</h1>
+            <h1 style={{ margin: 0, color: "#003366" }}>Gym Sessions</h1>
             <p style={{ marginTop: 8, color: "#6b7280" }}>
               View monthly schedules for Yoga, Pilates, Aerobics, Zumba, Cross Circuit, and Kick-boxing.
             </p>
@@ -97,7 +141,6 @@ export default function GymSessions() {
 
           {monthKeys.map((month) => {
             const items = byMonth[month];
-            // Group by session type label
             const byType = items.reduce((acc, s) => {
               const label = typeMap[s.sessionType] || s.sessionType || "Session";
               if (!acc[label]) acc[label] = [];
@@ -124,14 +167,46 @@ export default function GymSessions() {
                         <ul style={{ listStyle: "none", padding: 0, margin: 0, color: "#374151" }}>
                           {byType[tk]
                             .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-                            .map((s) => (
-                              <li key={s._id || s.id} style={{ padding: "8px 0", borderTop: "1px solid #f3f4f6" }}>
-                                <div>{fmtDateTime(s.startDate)}</div>
-                                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                                  Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
-                                </div>
-                              </li>
-                            ))}
+                            .map((s) => {
+                              const id = s._id || s.id;
+                              const started = isStarted(s);
+                              const full = isFull(s);
+                              const mine = alreadyRegistered(s);
+                              const disabled = started || full || mine || busyId === id;
+                              const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (busyId === id ? 'Registering...' : 'Register');
+                              return (
+                                <li key={id} style={{ padding: "8px 0", borderTop: "1px solid #f3f4f6" }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                                    <div>
+                                      <div>{fmtDateTime(s.startDate)}</div>
+                                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                        Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <button
+                                        disabled={disabled}
+                                        onClick={() => !disabled && handleRegister(id)}
+                                        style={{
+                                          padding: '8px 12px',
+                                          background: disabled ? '#e5e7eb' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+                                          color: disabled ? '#6b7280' : '#003366',
+                                          border: 'none',
+                                          borderRadius: 8,
+                                          fontWeight: 700,
+                                          cursor: disabled ? 'not-allowed' : 'pointer',
+                                        }}
+                                      >{label}</button>
+                                    </div>
+                                  </div>
+                                  {status[id] && status[id].msg && (
+                                    <div style={{ marginTop:6, fontSize:12, color: status[id].ok ? '#065f46' : '#b91c1c' }}>
+                                      {status[id].msg}
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })}
                         </ul>
                       </div>
                     ))}
