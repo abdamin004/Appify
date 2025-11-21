@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createBazaar, listBazaars, updateEvent, getEventById } from '../../../services/eventService';
-import { showToast } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
+import { createBazaar, listBazaars, updateEvent } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
 
 function BazaarsManager({ editOnly = false }) {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ function BazaarsManager({ editOnly = false }) {
     registrationDeadline: '',
     status: 'published',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [bazaars, setBazaars] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
@@ -102,11 +103,19 @@ function BazaarsManager({ editOnly = false }) {
     setLoading(true);
     try {
       const createdBazaar = await createBazaar(form);
-      showToast.success('Bazaar created successfully');
+      setSuccess('Bazaar created');
+      
+      // Save user restrictions if any
+      const bazaarEvent = createdBazaar?.event || createdBazaar;
+      const eventId = bazaarEvent?._id || bazaarEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const bazaarEvent = createdBazaar?.event || createdBazaar;
       if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(bazaarEvent);
@@ -243,6 +252,12 @@ function BazaarsManager({ editOnly = false }) {
               <span>Registration Deadline</span>
             </label>
           </div>
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
+          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
           <button 
             className="submit" 
             type="submit" 

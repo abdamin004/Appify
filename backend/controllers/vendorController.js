@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Event = require('../models/Event');       // base model with discriminators
-const Booth = require('../models/Booth');       // Booth discriminator
+const Booth = require('../models/Booth');        // Register Booth discriminator
 const Organization = require('../models/Organization');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');

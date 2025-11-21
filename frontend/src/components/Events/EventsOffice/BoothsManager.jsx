@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createBooth, listBooths, updateEvent } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -37,6 +39,7 @@ function BoothsManager() {
     registrationDeadline: '',
     status: 'published',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -56,10 +59,18 @@ function BoothsManager() {
     try {
       const createdBooth = await createBooth(form);
       setSuccess('Booth created');
+      
+      // Save user restrictions if any
+      const boothEvent = createdBooth?.event || createdBooth;
+      const eventId = boothEvent?._id || boothEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const boothEvent = createdBooth?.event || createdBooth;
       if (boothEvent && (boothEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(boothEvent);
@@ -67,25 +78,22 @@ function BoothsManager() {
       
       await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to create');
+      setError(err.message || 'Failed to create booth');
     } finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { setEditing(row._id); setEditData({
-    title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || '',
-    startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
-    registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', status: row.status || 'published'
-  }); };
-  const onSave = async (id) => {
+  const onUpdate = async (e) => {
+    e.preventDefault();
+    if (!editing) return;
     setLoading(true); setError(''); setSuccess('');
     try {
-      const payload = { ...editData };
-      await updateEvent(id, payload);
+      await updateEvent(editing, editData);
       setSuccess('Booth updated');
-      setEditing(null); setEditData({});
+      setEditing(null);
+      setEditData({});
       await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to update');
+      setError(err.message || 'Failed to update booth');
     } finally { setLoading(false); }
   };
 
@@ -122,80 +130,97 @@ function BoothsManager() {
           <div className="flex grid-2">
             <label>
               <input className="input" required value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })} />
-              <span>Location (Booth Setup Location)</span>
+              <span>Location</span>
             </label>
             <label>
               <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
               <span>Registration Deadline</span>
             </label>
           </div>
-          <div className="flex grid-2">
-            <label>
-              <select className="input" value={form.status} onChange={e=>setForm({ ...form, status: e.target.value })}>
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-              <span>Status</span>
-            </label>
-          </div>
-          <button type="submit" disabled={loading} style={{ background: yellow, color: '#003366', fontWeight: 700, padding: '12px 24px', border: 'none', borderRadius: 8, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
+          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Booth'}
           </button>
         </form>
 
         {error && <div style={{ color: '#dc2626', marginTop: 12 }}>{error}</div>}
-        {success && <div style={{ color: '#065f46', marginTop: 12 }}>{success}</div>}
+        {success && <div style={{ color: '#059669', marginTop: 12 }}>{success}</div>}
 
-        <h2 style={sectionTitle}>Existing Booths</h2>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
-            <thead>
-              <tr style={{ background: '#f3f4f6' }}>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Title</th>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Location</th>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Start</th>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>End</th>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Status</th>
-                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {booths.map(row => (
-                <tr key={row._id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  {editing === row._id ? (
-                    <>
-                      <td><input className="input" value={editData.title} onChange={e=>setEditData({...editData, title: e.target.value})} style={{ width: '100%', padding: 6 }} /></td>
-                      <td><input className="input" value={editData.location} onChange={e=>setEditData({...editData, location: e.target.value})} style={{ width: '100%', padding: 6 }} /></td>
-                      <td><input className="input" type="datetime-local" value={editData.startDate} onChange={e=>setEditData({...editData, startDate: e.target.value})} style={{ width: '100%', padding: 6 }} /></td>
-                      <td><input className="input" type="datetime-local" value={editData.endDate} onChange={e=>setEditData({...editData, endDate: e.target.value})} style={{ width: '100%', padding: 6 }} /></td>
-                      <td>
-                        <select className="input" value={editData.status} onChange={e=>setEditData({...editData, status: e.target.value})} style={{ width: '100%', padding: 6 }}>
-                          <option value="draft">Draft</option>
-                          <option value="published">Published</option>
-                        </select>
-                      </td>
-                      <td>
-                        <button onClick={() => onSave(row._id)} style={{ background: yellow, color: '#003366', padding: '6px 12px', border: 'none', borderRadius: 4, marginRight: 8, cursor: 'pointer' }}>Save</button>
-                        <button onClick={() => { setEditing(null); setEditData({}); }} style={{ background: '#6b7280', color: '#fff', padding: '6px 12px', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={{ padding: 12 }}>{row.title}</td>
-                      <td style={{ padding: 12 }}>{row.location}</td>
-                      <td style={{ padding: 12 }}>{row.startDate ? new Date(row.startDate).toLocaleString() : ''}</td>
-                      <td style={{ padding: 12 }}>{row.endDate ? new Date(row.endDate).toLocaleString() : ''}</td>
-                      <td style={{ padding: 12 }}><span style={{ padding: '4px 8px', borderRadius: 4, background: row.status === 'published' ? '#d1fae5' : '#fef3c7', color: row.status === 'published' ? '#065f46' : '#92400e' }}>{row.status}</span></td>
-                      <td style={{ padding: 12 }}>
-                        <button onClick={() => startEdit(row)} style={{ background: yellow, color: '#003366', padding: '6px 12px', border: 'none', borderRadius: 4, marginRight: 8, cursor: 'pointer' }}>Edit</button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <h2 style={{ ...sectionTitle, marginTop: 40 }}>Existing Booths</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {booths.map(b => (
+            <div key={b._id || b.id} style={{ padding: 16, background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#003366' }}>{b.title}</h3>
+                  {b.shortDescription && <p style={{ margin: '4px 0', color: '#6b7280' }}>{b.shortDescription}</p>}
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 8 }}>
+                    <div>📍 {b.location}</div>
+                    <div>📅 {b.startDate ? new Date(b.startDate).toLocaleString() : 'N/A'} - {b.endDate ? new Date(b.endDate).toLocaleString() : 'N/A'}</div>
+                    <div>Status: <strong>{b.status || 'published'}</strong></div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditing(b._id || b.id);
+                    setEditData({ title: b.title, shortDescription: b.shortDescription, location: b.location, startDate: b.startDate ? new Date(b.startDate).toISOString().slice(0, 16) : '', endDate: b.endDate ? new Date(b.endDate).toISOString().slice(0, 16) : '', registrationDeadline: b.registrationDeadline ? new Date(b.registrationDeadline).toISOString().slice(0, 16) : '', status: b.status || 'published' });
+                  }}
+                  style={{ padding: '6px 12px', background: yellow, color: '#003366', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
+
+        {editing && (
+          <div style={{ marginTop: 24, padding: 20, background: '#fef3c7', borderRadius: 8, border: '2px solid #f59e0b' }}>
+            <h3 style={{ marginTop: 0, color: '#003366' }}>Edit Booth</h3>
+            <form className="form managerForm" onSubmit={onUpdate}>
+              <label>
+                <input className="input" required value={editData.title || ''} onChange={e=>setEditData({ ...editData, title: e.target.value })} />
+                <span>Title</span>
+              </label>
+              <label>
+                <input className="input" value={editData.shortDescription || ''} onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} />
+                <span>Short Description</span>
+              </label>
+              <div className="flex grid-2">
+                <label>
+                  <input className="input" type="datetime-local" required value={editData.startDate || ''} onChange={e=>setEditData({ ...editData, startDate: e.target.value })} />
+                  <span>Start Date/Time</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" required value={editData.endDate || ''} onChange={e=>setEditData({ ...editData, endDate: e.target.value })} />
+                  <span>End Date/Time</span>
+                </label>
+              </div>
+              <div className="flex grid-2">
+                <label>
+                  <input className="input" required value={editData.location || ''} onChange={e=>setEditData({ ...editData, location: e.target.value })} />
+                  <span>Location</span>
+                </label>
+                <label>
+                  <input className="input" type="datetime-local" value={editData.registrationDeadline || ''} onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} />
+                  <span>Registration Deadline</span>
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+                  {loading ? 'Updating...' : 'Update'}
+                </button>
+                <button type="button" onClick={() => { setEditing(null); setEditData({}); }} style={{ padding: '10px 20px', background: '#e5e7eb', color: '#003366', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

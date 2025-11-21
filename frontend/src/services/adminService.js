@@ -19,14 +19,15 @@ async function fetchJson(url, opts = {}) {
 export const deleteComment = (id) => fetchJson(`${API_BASE}/admin/delete-comment/${id}`, { method: 'DELETE' });
 export const listAllComments = () => fetchJson(`${API_BASE}/admin/comments`);
 export const listPendingVendorApplications = () => fetchJson(`${API_BASE}/admin/vendor-applications/pending`);
+export const listApprovedVendorApplications = () => fetchJson(`${API_BASE}/admin/vendor-documents`);
 export const reviewVendorApplication = (id, action, notes) => fetchJson(`${API_BASE}/admin/vendor-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ action, notes }) });
 export const listAdminNotifications = (unreadOnly = false) => fetchJson(`${API_BASE}/admin/notifications${unreadOnly ? '?unreadOnly=true' : ''}`);
 export const markNotificationRead = (id) => fetchJson(`${API_BASE}/admin/notifications/${id}/read`, { method: 'PATCH' });
 export const markAllNotificationsRead = () => fetchJson(`${API_BASE}/admin/notifications/read-all`, { method: 'PATCH' });
-export const getUnreadVendorNotificationsCount = (pendingOnly = true) => {
-  const query = pendingOnly ? '?pendingOnly=true' : '';
-  return fetchJson(`${API_BASE}/admin/notifications/unread-count${query}`);
+export const listLoyaltyApplications = (status = null) => {
+  const url = status ? `${API_BASE}/admin/loyalty-applications?status=${status}` : `${API_BASE}/admin/loyalty-applications`;
+  return fetchJson(url);
 };
+export const reviewLoyaltyApplication = (id, action, notes) => fetchJson(`${API_BASE}/admin/loyalty-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ action, notes }) });
 
-
-export default { listAllComments,deleteComment, listPendingVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead,getUnreadVendorNotificationsCount };
+export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, listLoyaltyApplications, reviewLoyaltyApplication };

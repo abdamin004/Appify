@@ -7,7 +7,7 @@ import { deleteEvent } from '../services/eventService';
 import { showToast, confirmDialog } from '../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, inputStyles, buttonStyles } from '../utils/designSystem';
 
-function EventsList({ filterByTypes = null, presetType = null, headerAction = null }) {
+function EventsList({ filterByTypes = null, presetType = null, onGenerateQR = null }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -448,6 +448,7 @@ function EventsList({ filterByTypes = null, presetType = null, headerAction = nu
                   onDelete={handleDeleteEvent}
                   onArchive={handleArchiveEvent}
                   hasEventPassed={hasEventPassed}
+                  onGenerateQR={onGenerateQR}
                 />
               ))}
             </div>

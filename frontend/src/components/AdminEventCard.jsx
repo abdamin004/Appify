@@ -1,6 +1,6 @@
 import React from 'react';
 
-const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed }) => {
+const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed, onGenerateQR }) => {
   const icons = { Workshop: '🛠️', Trip: '🚌', Bazaar: '🏪', Booth: '🎪', Conference: '🎤' };
   const typeColors = {
     Workshop: { bg: 'rgba(212, 175, 55, 0.15)', text: '#003366' },
@@ -26,6 +26,16 @@ const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed }) => {
   const handleArchiveClick = (e) => {
     e.stopPropagation();
     if (onArchive) onArchive(event._id, event);
+  };
+
+  const handleQRCodeClick = (e) => {
+    e.stopPropagation();
+    if (onGenerateQR) {
+      console.log('Generating QR code for event:', event.title, event.type);
+      onGenerateQR(event);
+    } else {
+      console.warn('onGenerateQR prop not provided');
+    }
   };
 
   const eventHasPassed = hasEventPassed ? hasEventPassed(event) : false;
@@ -108,6 +118,34 @@ const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed }) => {
           )}
           {/* Action buttons for admins */}
           <div style={{ marginTop: 12, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Show QR code button for Bazaar, Booth, Conference events when onGenerateQR is provided */}
+            {onGenerateQR && (
+              <button 
+                onClick={handleQRCodeClick} 
+                style={{ 
+                  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)', 
+                  color: '#003366', 
+                  border: 'none', 
+                  padding: '10px 16px', 
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '700',
+                  boxShadow: '0 2px 8px rgba(212, 175, 55, 0.3)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'scale(1.05)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'scale(1)';
+                  e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)';
+                }}
+              >
+                📱 Generate QR Code
+              </button>
+            )}
             {onDelete && !hasRegistrations && (
               <button 
                 onClick={handleDeleteClick} 

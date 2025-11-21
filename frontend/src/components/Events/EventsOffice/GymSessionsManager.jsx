@@ -2,9 +2,27 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createGymSession, listGymSessions, updateGymSession, cancelGymSession, getEventById } from '../../../services/eventService';
-import { showToast, confirmDialog } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
+import { createGymSession, listGymSessions, updateGymSession, cancelGymSession } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+
+const pageWrap = {
+  minHeight: '100vh',
+  background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)',
+  padding: '100px 20px 60px',
+};
+const panel = {
+  maxWidth: 1100,
+  margin: '0 auto',
+  background: '#fff',
+  borderRadius: 16,
+  padding: 24,
+  boxShadow: '0 18px 40px -24px rgba(0,0,0,0.35)',
+  border: '1px solid #e5e7eb',
+};
+const h1Style = { margin: 0, color: '#003366', fontWeight: 800, fontSize: 28, textAlign: 'center' };
+const sectionTitle = { color: '#003366', fontWeight: 700, fontSize: 18, marginTop: 8 };
+const yellow = '#d4af37';
 
 const SESSION_TYPES = [
   { label: 'Yoga', value: 'yoga' },
@@ -27,6 +45,7 @@ function GymSessionsManager({ editOnly = false }) {
     instructor: '',
     capacity: '',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
@@ -140,11 +159,19 @@ function GymSessionsManager({ editOnly = false }) {
         instructor: form.instructor,
       };
       const createdSession = await createGymSession(payload);
-      showToast.success('Gym session created successfully');
+      setSuccess('Gym session created');
+      
+      // Save user restrictions if any
+      const sessionEvent = createdSession?.event || createdSession;
+      const eventId = sessionEvent?._id || sessionEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        setRestrictedUsers(eventId, restrictedUserIds);
+      }
+      
       setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const sessionEvent = createdSession?.event || createdSession;
       if (sessionEvent && (sessionEvent.status === 'published' || payload.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(sessionEvent);
@@ -322,26 +349,12 @@ function GymSessionsManager({ editOnly = false }) {
               <span>Instructor</span>
             </label>
           </div>
-          <button 
-            className="submit" 
-            type="submit" 
-            disabled={loading} 
-            style={{ 
-              ...buttonStyles.primary,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accentHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accent;
-              }
-            }}
-          >
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
+          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Session'}
           </button>
         </form>

@@ -60,14 +60,14 @@ useEffect(() => {
         if (Array.isArray(x)) return x;
         if (Array.isArray(x.data)) return x.data;
 
-      // NEW: handle common named arrays
+        // NEW: handle common named arrays
         const d = x.data ?? x;
-        const keys = ['bazaars', 'booths', 'items', 'organizations', 'orgs', 'results'];
+        const keys = ['events', 'bazaars', 'booths', 'items', 'organizations', 'orgs', 'results'];
         for (const k of keys) {
           if (Array.isArray(d?.[k])) return d[k];
         }
-      return [];
-    };
+        return [];
+      };
 
 
       const rawBazaars = toArray(bzRes);
@@ -93,7 +93,19 @@ useEffect(() => {
         setFormData(prev => ({ ...prev, eventId: merged[0].idStr }));
       }
 
-      setOrganizations(orgsRaw);
+      // Add default organizations if list is empty, or add GUC to the list
+      const defaultOrgs = [{ _id: 'default-guc', name: 'GUC' }];
+      if (orgsRaw.length === 0) {
+        setOrganizations(defaultOrgs);
+      } else {
+        // Check if GUC already exists, if not add it
+        const hasGUC = orgsRaw.some(o => (o.name || '').toLowerCase() === 'guc');
+        if (!hasGUC) {
+          setOrganizations([...defaultOrgs, ...orgsRaw]);
+        } else {
+          setOrganizations(orgsRaw);
+        }
+      }
 
       // Auto-fill organization from vendor info if not already set
       const currentVendorInfo = getVendorInfo();
@@ -172,8 +184,8 @@ useEffect(() => {
       const payload = {
         organization: formData.organization,
         boothSize: formData.boothSize,
-        attendees: validAttendees,
-        ...(isBooth && formData.setupDurationWeeks ? {
+        attendees: (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email && a.idNumber),
+        ...(isBooth ? {
           setupDurationWeeks: Number(formData.setupDurationWeeks),
         } : {}),
         ...(isBooth && formData.setupLocation ? {
@@ -258,23 +270,10 @@ useEffect(() => {
             value={formData.eventId}
             onChange={(e) => setField('eventId', e.target.value)}
             required
-            style={{ 
-              ...inputStyles.base,
-              width: '100%',
-              padding: '14px 18px',
-              border: `2px solid ${colors.gray200}`,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = colors.accent;
-              e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = colors.gray200;
-              e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-            }}
+            style={{ width: '100%', padding: 10 }}
+            disabled={events.length === 0}
           >
-            <option value="">Select an event</option>
+            <option value="">{events.length > 0 ? 'Select an event' : 'No upcoming booths or bazaars available'}</option>
             {events.map(ev => (
               <option key={ev.idStr} value={ev.idStr}>
                 {ev.title} — {ev.type} — {ev.startDate ? new Date(ev.startDate).toLocaleDateString() : ''}
@@ -282,75 +281,34 @@ useEffect(() => {
               </option>
             ))}
           </select>
-          <div style={{ fontSize: typography.fontSize.xs, color: colors.gray500, marginTop: spacing.xs }}>
-            Select a Bazaar or Booth event created by Event Office
-          </div>
+          {events.length === 0 && (
+            <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
+              Event Office needs to publish upcoming booth/bazaar events before vendors can apply.
+            </div>
+          )}
         </div>
 
-        <div style={{ marginBottom: spacing.lg }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm,
-            color: colors.primary,
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>Organization *</label>
-          {organizations.length > 0 ? (
-            <>
-              <select
-                name="organization"
-                value={formData.organization}
-                onChange={(e) => setField('organization', e.target.value)}
-                required
-                style={{ 
-                  ...inputStyles.base,
-                  width: '100%',
-                  padding: '14px 18px',
-                  border: `2px solid ${colors.gray200}`,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = colors.accent;
-                  e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = colors.gray200;
-                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                <option value="">Select organization</option>
-                {organizations.map(o => (
-                  <option key={o._id || o.name} value={o.name}>{o.name}</option>
-                ))}
-              </select>
-              <div style={{ marginTop: spacing.sm, fontSize: typography.fontSize.sm, color: colors.gray500 }}>
-                Or enter manually:
-              </div>
-            </>
-          ) : null}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 8 }}>Organization</label>
           <input
             type="text"
-            placeholder="Enter organization name"
+            name="organization"
             value={formData.organization}
             onChange={(e) => setField('organization', e.target.value)}
+            list="organizations-list"
+            placeholder="Type or select organization (e.g., GUC)"
             required
-            style={{ 
-              ...inputStyles.base,
-              width: '100%',
-              padding: '14px 18px',
-              border: `2px solid ${colors.gray200}`,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-              marginTop: organizations.length > 0 ? spacing.xs : 0,
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = colors.accent;
-              e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = colors.gray200;
-              e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-            }}
+            style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '1rem' }}
           />
+          <datalist id="organizations-list">
+            {organizations.map(o => (
+              <option key={o._id || o.name} value={o.name} />
+            ))}
+            {organizations.length === 0 && <option value="GUC" />}
+          </datalist>
+          <div style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
+            💡 Type your organization name (e.g., "GUC") or select from dropdown suggestions
+          </div>
         </div>
 
         <div style={{ marginBottom: spacing.lg }}>
@@ -387,123 +345,18 @@ useEffect(() => {
           </select>
         </div>
 
-        <div style={{ marginBottom: spacing.lg }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm,
-            color: colors.primary,
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>Attendees (up to 5) - All fields required</label>
-          {vendorInfo && formData.attendees?.[0]?.name && (
-            <div style={{ 
-              padding: `${spacing.md} ${spacing.lg}`, 
-              background: 'linear-gradient(135deg, rgba(184, 148, 31, 0.12) 0%, rgba(184, 148, 31, 0.08) 100%)', 
-              borderRadius: borderRadius.lg, 
-              marginBottom: spacing.sm, 
-              fontSize: typography.fontSize.sm, 
-              color: colors.primary,
-              border: '2px solid rgba(184, 148, 31, 0.3)',
-              boxShadow: '0 2px 8px rgba(184, 148, 31, 0.15)',
-            }}>
-              <strong style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>✓</span>
-                First attendee auto-filled with your account info
-              </strong>
-            </div>
-          )}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 8 }}>Attendees (up to 5) - Name, Email, and ID Number required</label>
           {(formData.attendees || []).map((a, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.sm }}>
-              <input 
-                placeholder="Name *" 
-                value={a.name} 
-                onChange={e => updateAttendee(idx, 'name', e.target.value)} 
-                required
-                style={{ 
-                  ...inputStyles.base,
-                  flex: 1,
-                  padding: '14px 18px',
-                  border: `2px solid ${colors.gray200}`,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = colors.accent;
-                  e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = colors.gray200;
-                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                }}
-              />
-              <input 
-                type="email"
-                placeholder="Email *" 
-                value={a.email} 
-                onChange={e => updateAttendee(idx, 'email', e.target.value)} 
-                required
-                style={{ 
-                  ...inputStyles.base,
-                  flex: 1,
-                  padding: '14px 18px',
-                  border: `2px solid ${colors.gray200}`,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = colors.accent;
-                  e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = colors.gray200;
-                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                }}
-              />
-              <input 
-                placeholder="ID Number *" 
-                value={a.idNumber || ''} 
-                onChange={e => updateAttendee(idx, 'idNumber', e.target.value)} 
-                required
-                style={{ 
-                  ...inputStyles.base,
-                  flex: 1,
-                  minWidth: '120px',
-                  padding: '14px 18px',
-                  border: `2px solid ${colors.gray200}`,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = colors.accent;
-                  e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = colors.gray200;
-                  e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-                }}
-              />
-              <button 
-                type="button" 
-                onClick={() => removeAttendee(idx)}
-                style={{
-                  ...buttonStyles.outline,
-                  padding: `${spacing.sm} ${spacing.md}`,
-                  fontSize: typography.fontSize.sm,
-                }}
-              >
-                Remove
-              </button>
+            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <input placeholder="Name *" value={a.name || ''} onChange={e => updateAttendee(idx, 'name', e.target.value)} required style={{ flex: 1, minWidth: '150px', padding: 8 }} />
+              <input type="email" placeholder="Email *" value={a.email || ''} onChange={e => updateAttendee(idx, 'email', e.target.value)} required style={{ flex: 1, minWidth: '150px', padding: 8 }} />
+              <input placeholder="ID Number *" value={a.idNumber || ''} onChange={e => updateAttendee(idx, 'idNumber', e.target.value)} required style={{ flex: 1, minWidth: '120px', padding: 8 }} />
+              <button type="button" onClick={() => removeAttendee(idx)} style={{ padding: '8px 12px' }}>Remove</button>
             </div>
           ))}
           {(formData.attendees || []).length < 5 &&
-            <button 
-              type="button" 
-              onClick={addAttendee}
-              style={{
-                ...buttonStyles.secondary,
-                padding: `${spacing.sm} ${spacing.md}`,
-                fontSize: typography.fontSize.sm,
-              }}
-            >
-              Add attendee
-            </button>
+            <button type="button" onClick={addAttendee} style={{ padding: '8px 16px', marginTop: 8 }}>Add attendee</button>
           }
         </div>
 

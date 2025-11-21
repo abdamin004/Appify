@@ -93,6 +93,19 @@ router.get(
   adminController.downloadVendorDocument
 );
 
+// Loyalty applications management
+router.get(
+  '/loyalty-applications',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.listLoyaltyApplications
+);
+
+router.patch(
+  '/loyalty-applications/:id/status',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.reviewLoyaltyApplication
 // Export event registrations to Excel
 router.get(
   '/events/:eventId/export-registrations',

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import { API_BASE } from "../../services/eventService";
+import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import Navbar from "../Navbar";
 import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
@@ -19,6 +21,8 @@ import {
   markReminderSent,
   createReminderNotification
 } from "../../services/notificationService";
+import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
+import StudentPollVoting from "../Polls/StudentPollVoting";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 
@@ -177,8 +181,14 @@ function StaffDashboard() {
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
       
+      // Filter out restricted events that user can't access
+      const accessibleEvents = publishedEvents.filter(e => {
+        const eventId = e._id || e.id;
+        return canUserAccessEvent(eventId);
+      });
+      
       const seenIds = getSeenEventIds();
-      const newEvents = publishedEvents.filter(e => {
+      const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
         return !seenIds.has(eventId);
       });
@@ -377,7 +387,14 @@ function StaffDashboard() {
         setRegisteredEvents([]);
       } else {
         const data = await res.json();
-        setRegisteredEvents(Array.isArray(data) ? data : []);
+        const events = Array.isArray(data) ? data : [];
+        // Filter out restricted events that user can't access
+        const filteredEvents = events.filter(event => {
+          const eventId = event._id || event.id;
+          if (!eventId) return true; // Include events without ID
+          return canUserAccessEvent(eventId);
+        });
+        setRegisteredEvents(filteredEvents);
       }
     } catch (err) {
       console.error('Error loading registered events:', err);
@@ -392,7 +409,11 @@ function StaffDashboard() {
       const res = await fetch(`${API_BASE}/events`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      const filtered = list.filter(ev => ids.includes(String(ev._id || ev.id)));
+      const filtered = list.filter(ev => {
+        const eventId = ev._id || ev.id;
+        // Check if event is in favorites AND user has access
+        return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
+      });
       setFavouriteEvents(filtered);
     } catch (_) {
       setFavouriteEvents([]);
@@ -741,6 +762,47 @@ function StaffDashboard() {
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "loyalty"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ⭐ Loyalty Partners
+            </button>
+            <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                padding: "15px 30px",
+                background:
+                  activeTab === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Vote for Vendors
+            </button>
           </div>
 
           {/* Content */}
@@ -766,7 +828,14 @@ function StaffDashboard() {
                 </div>
               </div>
             ) : (
-              <MyEventsList events={registeredEvents} showRefundButton />
+              <MyEventsList 
+                events={registeredEvents.filter(event => {
+                  const eventId = event._id || event.id;
+                  if (!eventId) return true;
+                  return canUserAccessEvent(eventId);
+                })} 
+                showRefundButton 
+              />
             )
           )}
           
@@ -933,6 +1002,13 @@ function StaffDashboard() {
             </div>
           )}
           
+          {activeTab === "loyalty" && (
+            <LoyaltyPartnersList />
+          )}
+          {activeTab === "polls" && (
+            <StudentPollVoting />
+          )}
+
           {activeTab === "notifications" && (
             <div
               style={{

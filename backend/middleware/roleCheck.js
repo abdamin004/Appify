@@ -19,8 +19,38 @@ module.exports = function roleCheck(...allowedRoles) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
+      // Check if user is a Vendor - multiple detection methods
       const modelName = req.user.constructor && req.user.constructor.modelName;
-      const effectiveRoleRaw = modelName === 'Vendor' ? 'Vendor' : (req.user.role || 'user');
+      
+      // Method 1: Check modelName
+      // Method 2: Check if it has companyName (vendors always have this, users don't)
+      // Method 3: Check collection name
+      // Method 4: Check role field (vendors have role='Vendor' by default)
+      const hasCompanyName = req.user.companyName !== undefined && req.user.companyName !== null;
+      const hasFirstName = req.user.firstName !== undefined && req.user.firstName !== null;
+      const collectionName = req.user.collection && req.user.collection.name;
+      
+      const isVendorModel = modelName === 'Vendor' || 
+                           collectionName === 'vendors' ||
+                           (hasCompanyName && !hasFirstName) || // Vendors have companyName but no firstName
+                           (hasCompanyName && req.user.role === 'Vendor') || // Vendor with role field
+                           (req.user.role && req.user.role.toLowerCase() === 'vendor'); // Case-insensitive role check
+      
+      const effectiveRoleRaw = isVendorModel ? 'Vendor' : (req.user.role || 'user');
+      
+      // Debug logging (remove in production)
+      if (process.env.NODE_ENV !== 'production' && allowedRoles.includes('Vendor')) {
+        console.log('[RoleCheck] Vendor detection:', {
+          modelName,
+          collectionName,
+          hasCompanyName,
+          hasFirstName,
+          userRole: req.user.role,
+          isVendorModel,
+          effectiveRoleRaw,
+          allowedRoles
+        });
+      }
 
       // Canonicalize roles: lowercase and strip non-alphanumerics (spaces, dashes, etc.)
       const toKey = (v) => (v || '')
@@ -39,7 +69,25 @@ module.exports = function roleCheck(...allowedRoles) {
       }
 
       if (!allowedKeys.includes(effKey)) {
-        return res.status(403).json({ message: 'Forbidden' });
+        // Enhanced error message for debugging
+        console.error('Role check failed:', {
+          effectiveRole: effKey,
+          allowedRoles: allowedKeys,
+          modelName,
+          hasCompanyName,
+          hasFirstName,
+          userRole: req.user.role,
+          collectionName
+        });
+        return res.status(403).json({ 
+          message: 'Forbidden',
+          debug: process.env.NODE_ENV !== 'production' ? {
+            effectiveRole: effKey,
+            allowedRoles: allowedKeys,
+            userModel: modelName,
+            userRole: req.user.role
+          } : undefined
+        });
       }
 
       req.userRole = effKey; // handy if controllers want it

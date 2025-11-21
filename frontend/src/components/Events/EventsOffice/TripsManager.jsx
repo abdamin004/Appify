@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createTrip, listTrips, updateEvent, getEventById } from '../../../services/eventService';
-import { showToast } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
+import { createTrip, listTrips, updateEvent } from '../../../services/eventService';
+import UserSelector from '../UserSelector';
+import { setRestrictedUsers, getRestrictedUsers } from '../../../services/eventRestrictionService';
 
 function TripsManager({ editOnly = false }) {
   const navigate = useNavigate();
@@ -23,6 +23,7 @@ function TripsManager({ editOnly = false }) {
     registrationDeadline: '',
     status: 'published',
   });
+  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [trips, setTrips] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -137,11 +138,23 @@ function TripsManager({ editOnly = false }) {
       } catch (e) {}
       
       const createdTrip = await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
-      showToast.success('Trip created successfully');
+      setSuccess('Trip created');
+      
+      // Save user restrictions if any
+      const tripEvent = createdTrip?.event || createdTrip;
+      const eventId = tripEvent?._id || tripEvent?.id;
+      if (eventId && restrictedUserIds.length > 0) {
+        console.log('Saving restrictions for event:', eventId, 'Users:', restrictedUserIds);
+        setRestrictedUsers(eventId, restrictedUserIds);
+        // Verify it was saved
+        const saved = getRestrictedUsers(eventId);
+        console.log('Verified saved restrictions:', saved);
+      }
+      
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
+      setRestrictedUserIds([]);
       
       // Create notifications for all users if event is published
-      const tripEvent = createdTrip?.event || createdTrip;
       if (tripEvent && (tripEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(tripEvent);
@@ -283,26 +296,12 @@ function TripsManager({ editOnly = false }) {
             <input className="input" type="number" required value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
             <span>Capacity</span>
           </label>
-          <button 
-            className="submit" 
-            type="submit" 
-            disabled={loading} 
-            style={{ 
-              ...buttonStyles.primary,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accentHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accent;
-              }
-            }}
-          >
+          <UserSelector 
+            selectedUserIds={restrictedUserIds}
+            onChange={setRestrictedUserIds}
+            label="Restrict Event to Specific Users"
+          />
+          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Trip'}
           </button>
         </form>

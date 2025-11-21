@@ -2,9 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import QRCodeGenerator from "../QRCode/QRCodeGenerator";
+import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
@@ -12,11 +15,17 @@ function EventOfficeDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
   const [vendorRequests, setVendorRequests] = useState([]);
+  const [vendorRequestsLoading, setVendorRequestsLoading] = useState(false);
+  const [vendorRequestsError, setVendorRequestsError] = useState("");
+  const [approvedVendorRequests, setApprovedVendorRequests] = useState([]);
+  const [approvedVendorsLoading, setApprovedVendorsLoading] = useState(false);
+  const [approvedVendorsError, setApprovedVendorsError] = useState("");
   const [gymSessions, setGymSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
+  const [qrCodeEvent, setQrCodeEvent] = useState(null);
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
     // Load approved workshops from localStorage
     try {
@@ -71,6 +80,9 @@ function EventOfficeDashboard() {
       fetchNotifications();
     } else if (activeTab === 'reminders') {
       fetchReminders();
+    } else if (activeTab === 'vendor-requests') {
+      // Refresh vendor requests immediately when tab opens
+      fetchVendorRequests();
     }
   }, [activeTab]);
 
@@ -97,9 +109,7 @@ function EventOfficeDashboard() {
   };
 
   useEffect(() => {
-    if (activeTab === "vendor-requests") {
-      fetchVendorRequests();
-    } else if (activeTab === "gym-sessions") {
+    if (activeTab === "gym-sessions") {
       fetchGymSessions();
     } else if (activeTab === "workshop-approvals") {
       fetchPendingWorkshops();
@@ -107,14 +117,118 @@ function EventOfficeDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  useEffect(() => {
+    fetchVendorRequests();
+    const refresh = setInterval(fetchVendorRequests, 60000);
+    return () => clearInterval(refresh);
+  }, []);
+
+  const normalizePendingApplication = (app = {}) => {
+    const eventData = app.event || {};
+    const organizationName =
+      (app.organization && (app.organization.name || app.organization.companyName)) ||
+      app.organizationName ||
+      (typeof app.organization === "string" ? app.organization : "") ||
+      app.vendorUser?.companyName ||
+      "Vendor";
+
+    return {
+      ...app,
+      organizationName,
+      vendorEmail: app.vendorUser?.email || app.vendorUser?.username || "",
+      eventTitle: eventData.title || app.eventTitle || "Untitled Event",
+      eventType: eventData.type || app.eventType || "Event",
+      eventStart: eventData.startDate,
+      eventLocation: eventData.location,
+      status: app.status || "pending",
+      boothSize: app.boothSize,
+    };
+  };
+
+  const normalizeApprovedApplication = (doc = {}) => {
+    const eventData = doc.event || {};
+    const vendorData = doc.vendor || {};
+
+    return {
+      _id: doc.applicationId || doc._id,
+      status: "approved",
+      organizationName: doc.organization || vendorData.companyName || "Vendor",
+      vendorEmail: vendorData.email || "",
+      boothSize: doc.boothSize,
+      attendees: doc.attendees || [],
+      eventTitle: eventData.title || "Untitled Event",
+      eventType: eventData.type || "Event",
+      eventStart: eventData.startDate,
+      eventLocation: eventData.location,
+      event: {
+        _id: eventData.id || eventData._id,
+        title: eventData.title,
+        type: eventData.type,
+      },
+      vendorUser: {
+        _id: vendorData.id || vendorData._id,
+        email: vendorData.email,
+        companyName: vendorData.companyName,
+      },
+    };
+  };
+
   const fetchVendorRequests = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      const authMessage = "Please log in with an Event Office or Admin account to review vendor requests.";
+      setVendorRequests([]);
+      setVendorRequestsError(authMessage);
+      setApprovedVendorRequests([]);
+      setApprovedVendorsError(authMessage);
+      setVendorRequestsLoading(false);
+      setApprovedVendorsLoading(false);
+      return;
+    }
+
+    setVendorRequestsLoading(true);
+    setVendorRequestsError("");
+    setApprovedVendorsLoading(true);
+    setApprovedVendorsError("");
+
     try {
-      const res = await adminService.listPendingVendorApplications();
-      setVendorRequests(res.applications || []);
+      const [pendingRes, approvedRes] = await Promise.all([
+        adminService.listPendingVendorApplications(),
+        adminService.listApprovedVendorApplications(),
+      ]);
+
+      const pendingList = Array.isArray(pendingRes?.applications)
+        ? pendingRes.applications
+        : Array.isArray(pendingRes)
+          ? pendingRes
+          : [];
+
+      const approvedList = Array.isArray(approvedRes?.vendorDocuments)
+        ? approvedRes.vendorDocuments
+        : Array.isArray(approvedRes)
+          ? approvedRes
+          : [];
+
+      setVendorRequests(pendingList.map(normalizePendingApplication));
+      setApprovedVendorRequests(approvedList.map(normalizeApprovedApplication));
     } catch (err) {
       console.error("Error fetching vendor requests:", err);
       setVendorRequests([]);
+      setApprovedVendorRequests([]);
+      const errMsg = err?.message || err?.error || err?.response?.data?.message;
+      setVendorRequestsError(
+        typeof errMsg === "string" && errMsg.trim().length > 0
+          ? errMsg
+          : "Failed to load vendor requests. Please check your connection or backend status."
+      );
+      setApprovedVendorsError(
+        typeof errMsg === "string" && errMsg.trim().length > 0
+          ? errMsg
+          : "Failed to load approved vendor requests. Please check your connection or backend status."
+      );
     }
+    setVendorRequestsLoading(false);
+    setApprovedVendorsLoading(false);
   };
 
   const fetchGymSessions = async () => {
@@ -678,6 +792,21 @@ function EventOfficeDashboard() {
                     🎤 Create Conference
                   </button>
                   <button
+                    onClick={() => handleCreateEvent("booth")}
+                    style={{
+                      width: "100%",
+                      padding: "12px 20px",
+                      background: "transparent",
+                      border: "none",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      color: "#003366",
+                    }}
+                  >
+                    🏬 Create/edit Booth
+                  </button>
+                  <button
                     onClick={() => handleCreateEvent("gym")}
                     style={{
                       width: "100%",
@@ -1040,6 +1169,47 @@ function EventOfficeDashboard() {
               )}
             </button>
             <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: "15px 30px",
+                background:
+                  activeTab === "polls"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              📊 Booth Polls
+            </button>
+
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: "15px 30px",
+                background:
+                  activeTab === "loyalty"
+                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    : "transparent",
+                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                border: "none",
+                borderRadius: "15px",
+                fontSize: "1rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              ⭐ Loyalty Partners
               onClick={() => setActiveTab("archived")}
               style={{
                 flex: 1,
@@ -1062,6 +1232,11 @@ function EventOfficeDashboard() {
           </div>
 
           {/* Content */}
+          {activeTab === "browse" && (
+            <EventsList 
+              onGenerateQR={(event) => setQrCodeEvent(event)} 
+            />
+          )}
           {activeTab === "browse" && <EventList enableFavorites={false} hideArchived={true} />}
           {activeTab === "archived" && <EventList enableFavorites={false} showArchivedOnly={true} />}
 
@@ -1083,6 +1258,202 @@ function EventOfficeDashboard() {
               }}>
                 Pending Vendor Requests
               </h2>
+              <div style={{ marginBottom: "30px" }}>
+                <h3 style={{ color: "#003366", marginBottom: "10px" }}>Pending Vendor Requests</h3>
+                {vendorRequestsError && (
+                  <div
+                    style={{
+                      background: "#fee2e2",
+                      color: "#991b1b",
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      border: "1px solid #fecaca",
+                      marginBottom: "16px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {vendorRequestsError}
+                  </div>
+                )}
+                {vendorRequestsLoading ? (
+                  <p style={{ color: "#6b7280" }}>Loading vendor requests…</p>
+                ) : vendorRequests.length === 0 ? (
+                  <p style={{ color: "#6b7280" }}>No pending vendor requests</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                    {vendorRequests.map((request) => (
+                      <div
+                        key={request._id}
+                        style={{
+                          padding: "20px",
+                          background: "rgba(212, 175, 55, 0.1)",
+                          borderRadius: "12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div>
+                          <h3 style={{ color: "#003366", marginBottom: "8px" }}>
+                            {request.organizationName || "Vendor"}
+                          </h3>
+                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                            Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
+                          </p>
+                          {request.eventStart && (
+                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                              Date: {new Date(request.eventStart).toLocaleString()}
+                            </p>
+                          )}
+                          {request.eventLocation && (
+                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                              Location: {request.eventLocation}
+                            </p>
+                          )}
+                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                            Booth Size: {request.boothSize || "—"}
+                          </p>
+                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                            Status: {request.status}
+                          </p>
+                          {request.vendorEmail && (
+                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
+                              Vendor Email: {request.vendorEmail}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button
+                            onClick={() => handleVendorRequestAction(request._id, "approve")}
+                            style={{
+                              padding: "10px 20px",
+                              background: "#10b981",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleVendorRequestAction(request._id, "reject")}
+                            style={{
+                              padding: "10px 20px",
+                              background: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 style={{ color: "#003366", marginBottom: "10px" }}>
+                  Approved Vendors (Ready for Polls)
+                </h3>
+                {approvedVendorsError && (
+                  <div
+                    style={{
+                      background: "#fef9c3",
+                      color: "#854d0e",
+                      padding: "12px 16px",
+                      borderRadius: "12px",
+                      border: "1px solid #fde68a",
+                      marginBottom: "16px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {approvedVendorsError}
+                  </div>
+                )}
+                {approvedVendorsLoading ? (
+                  <p style={{ color: "#6b7280" }}>Loading approved vendors…</p>
+                ) : approvedVendorRequests.length === 0 ? (
+                  <p style={{ color: "#6b7280" }}>
+                    No approved vendors yet. Approve requests to enable poll creation.
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                    {approvedVendorRequests.map((request) => (
+                      <div
+                        key={request._id}
+                        style={{
+                          padding: "20px",
+                          background: "rgba(16, 185, 129, 0.1)",
+                          borderRadius: "12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          border: "1px solid rgba(16, 185, 129, 0.3)",
+                        }}
+                      >
+                        <div>
+                          <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
+                            {request.organizationName || "Vendor"}
+                          </h3>
+                          <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
+                            ✅ Approved & ready for polls
+                          </p>
+                          <p style={{ color: "#065f46", margin: "4px 0" }}>
+                            Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
+                          </p>
+                          {request.eventStart && (
+                            <p style={{ color: "#065f46", margin: "4px 0" }}>
+                              Date: {new Date(request.eventStart).toLocaleString()}
+                            </p>
+                          )}
+                          {request.eventLocation && (
+                            <p style={{ color: "#065f46", margin: "4px 0" }}>
+                              Location: {request.eventLocation}
+                            </p>
+                          )}
+                          <p style={{ color: "#065f46", margin: "4px 0" }}>
+                            Booth Size: {request.boothSize || "—"}
+                          </p>
+                          {request.vendorEmail && (
+                            <p style={{ color: "#065f46", margin: "4px 0" }}>
+                              Vendor Email: {request.vendorEmail}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
+                            Use in Booth Polls tab ➜
+                          </p>
+                          <button
+                            onClick={() => {
+                              setActiveTab("polls");
+                              setTimeout(() => {
+                                const el = document.getElementById("booth-polls-section");
+                                if (el) {
+                                  el.scrollIntoView({ behavior: "smooth" });
+                                }
+                              }, 200);
+                            }}
+                            style={{
+                              padding: "10px 20px",
+                              background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Go to Polls
+                          </button>
+                        </div>
               {vendorRequests.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No pending vendor requests</p>
               ) : (
@@ -1157,10 +1528,10 @@ function EventOfficeDashboard() {
                           Reject
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1513,6 +1884,14 @@ function EventOfficeDashboard() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "polls" && (
+            <BoothPollManager />
+          )}
+
+          {activeTab === "loyalty" && (
+            <LoyaltyPartnersList />
           )}
 
           {activeTab === "notifications" && (
@@ -1963,6 +2342,14 @@ function EventOfficeDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code Generator Modal */}
+      {qrCodeEvent && (
+        <QRCodeGenerator 
+          event={qrCodeEvent} 
+          onClose={() => setQrCodeEvent(null)} 
+        />
       )}
     </div>
   );

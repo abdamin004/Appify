@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 import { listEventsByType, publicRegisterForEvent, registerForEvent } from "../services/eventService";
+import { canUserAccessEvent } from "../services/eventRestrictionService";
 import { showToast } from "../utils/toast";
 
 export default function RegisterEvents() {
@@ -79,15 +80,33 @@ export default function RegisterEvents() {
       // support API returning either an array or an object like { events: [] }
       const raw = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const now = new Date();
+      
+      // Check if there's an eventId in URL params (from QR code)
+      const urlParams = new URLSearchParams(window.location.search);
+      const eventIdFromUrl = urlParams.get('eventId');
+      const typeFromUrl = urlParams.get('type');
+      
       const filtered = raw.filter((ev) => {
-        const upcoming = ev.startDate ? new Date(ev.startDate) > now : true;;
+        // First check if user has access to this event
+        const eventId = ev._id || ev.id;
+        if (eventId && !canUserAccessEvent(eventId)) {
+          console.log('Filtering out restricted event from registration form:', eventId, ev.title);
+          return false;
+        }
+        // Then check if event is upcoming
+        const upcoming = ev.startDate ? new Date(ev.startDate) > now : true;
         return upcoming;
       });
+      
       if (form.type === 'Workshop' && filtered.length === 0) {
         console.debug('loadEvents: No workshops returned from API', { raw, data });
       }
+      
       setEvents(filtered);
-      if (filtered.length && !selectedEventId) {
+      
+      // Don't auto-select here - let the useEffect handle it after events are loaded
+      // This ensures the type is set correctly first
+      if (!eventIdFromUrl && filtered.length && !selectedEventId) {
         setSelectedEventId(filtered[0]._id);
       } else if (!filtered.length) {
         setSelectedEventId("");
@@ -101,9 +120,47 @@ export default function RegisterEvents() {
   }
 
   useEffect(() => {
+    // Check URL params on mount to set type if coming from QR code
+    const urlParams = new URLSearchParams(window.location.search);
+    const typeFromUrl = urlParams.get('type');
+    const eventIdFromUrl = urlParams.get('eventId');
+    
+    // Set type from URL if provided (Bazaar, Workshop, Trip, Conference, Booth)
+    if (typeFromUrl && (typeFromUrl === 'Bazaar' || typeFromUrl === 'Workshop' || typeFromUrl === 'Trip' || typeFromUrl === 'Conference' || typeFromUrl === 'Booth')) {
+      setForm(prev => ({ ...prev, type: typeFromUrl }));
+    }
+    
+    // If eventId is in URL, we'll select it after events load
+    if (eventIdFromUrl) {
+      console.log('QR Code detected - Event ID:', eventIdFromUrl, 'Type:', typeFromUrl);
+    }
+  }, []);
+
+  useEffect(() => {
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.type]);
+
+  // Separate effect to handle event selection after events are loaded
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventIdFromUrl = urlParams.get('eventId');
+    const typeFromUrl = urlParams.get('type');
+    
+    if (eventIdFromUrl && events.length > 0 && typeFromUrl === form.type) {
+      const matchingEvent = events.find(ev => {
+        const evId = String(ev._id || ev.id);
+        return evId === String(eventIdFromUrl);
+      });
+      
+      if (matchingEvent) {
+        console.log('Selecting event from QR code:', matchingEvent.title);
+        setSelectedEventId(eventIdFromUrl);
+      } else {
+        console.warn('Event from QR code not found in events list:', eventIdFromUrl);
+      }
+    }
+  }, [events, form.type]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -161,19 +218,9 @@ export default function RegisterEvents() {
               border: "1px solid rgba(0,51,102,0.1)",
             }}
           >
-            <h1 style={{ 
-              color: "#003366", 
-              margin: 0,
-              fontSize: "2rem",
-              fontWeight: 700,
-              letterSpacing: "-0.5px",
-            }}>Register for Workshop/Trip</h1>
-            <p style={{ 
-              color: "#6b7280", 
-              marginTop: "12px",
-              fontSize: "1.05rem",
-            }}>
-              Submit your interest for upcoming Workshops or Trips.
+            <h1 style={{ color: "#003366", margin: 0 }}>Register for Event</h1>
+            <p style={{ color: "#6b7280", marginTop: "8px" }}>
+              Submit your interest for upcoming events. Scan a QR code or select an event below.
             </p>
           </div>
 
@@ -211,8 +258,11 @@ export default function RegisterEvents() {
                   e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
                 }}
               >
-                <option value="Trip">Trip</option>
-                <option value="Workshop">Workshop</option>
+                <option value="Trip">🚌 Trip</option>
+                <option value="Workshop">🛠️ Workshop</option>
+                <option value="Bazaar">🏪 Bazaar</option>
+                <option value="Conference">🎤 Conference</option>
+                <option value="Booth">🎪 Booth</option>
               </select>
             </div>
 

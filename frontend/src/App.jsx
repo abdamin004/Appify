@@ -27,6 +27,7 @@ import AdminDashboard from "./components/Admin/AdminDashboard";
 import UserManagement from "./components/Admin/UserManagement";
 import CreateAdmin from "./components/Admin/CreateAdmin";
 import VendorApplications from "./components/Admin/VendorApplications";
+import LoyaltyApplications from "./components/Admin/LoyaltyApplications";
 import AdminNotifications from "./components/Admin/AdminNotifications";
 import CommentModeration from "./components/Admin/CommentModeration";
 import ViewEvents from "./components/Admin/ViewEvents";
@@ -113,6 +114,7 @@ function App() {
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/create" element={<CreateAdmin />} />
           <Route path="/admin/vendor-applications" element={<VendorApplications />} />
+          <Route path="/admin/loyalty-applications" element={<LoyaltyApplications />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/comments" element={<CommentModeration />} />
           <Route path="/admin/view-events" element={<ViewEvents />} />
