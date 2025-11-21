@@ -855,7 +855,31 @@ function EventOfficeDashboard() {
 >
   📊 Attendees Report
 </button>
-  
+  <button
+  onClick={() => {
+    setActiveTab("sales-report");
+    navigate("/admin/sales-report");
+  }}
+  style={{
+    flex: 1,
+    minWidth: "150px",
+    padding: "15px 30px",
+    background:
+      activeTab === "sales-report"
+        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+        : "transparent",
+    color: activeTab === "sales-report" ? "#003366" : "#6b7280",
+    border: "none",
+    borderRadius: "15px",
+    fontSize: "1rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "all 0.3s",
+  }}
+>
+  💰 Sales Report
+</button>
+
 
 
             <button

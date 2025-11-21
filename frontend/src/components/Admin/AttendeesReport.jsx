@@ -86,10 +86,6 @@ export default function AttendeesReport() {
       }}
     >
       <div style={{ maxWidth: 1000, margin: "auto" }}>
-        <Link to="/admin" style={{ color: "white", textDecoration: "underline" }}>
-          ⬅ Back to Dashboard
-        </Link>
-
         <h1 style={{ color: "#fff", marginBottom: 20 }}>Attendees Report</h1>
 
         {/* Filters */}

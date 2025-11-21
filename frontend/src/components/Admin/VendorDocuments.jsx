@@ -69,9 +69,6 @@ export default function VendorDocumentsPage() {
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)", padding: "40px" }}>
       <div style={{ maxWidth: 1000, margin: "auto" }}>
-        <Link to="/admin" style={{ color: "white", textDecoration: "underline" }}>
-          ⬅ Back to Dashboard
-        </Link>
 
         <h1 style={{ color: "#fff", marginBottom: 20 }}>Vendor Documents</h1>
 
@@ -79,9 +76,7 @@ export default function VendorDocumentsPage() {
         <div style={cardStyle}>
           <h3 style={{ marginTop: 0 }}>Filters</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-            <input type="text" placeholder="Event ID" value={eventId} onChange={(e) => setEventId(e.target.value)} />
             <input type="text" placeholder="Organization name" value={organization} onChange={(e) => setOrganization(e.target.value)} />
-            <input type="text" placeholder="Vendor ID" value={vendorId} onChange={(e) => setVendorId(e.target.value)} />
           </div>
 
           <button
