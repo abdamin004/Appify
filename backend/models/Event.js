@@ -19,10 +19,15 @@ const eventSchema = new Schema({
   registeredUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   registrationDeadline: { type: Date },
 
+  allowedRoles: [{
+    type: String,
+    enum: ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'EventOffice']
+  }],
+
   // Status & Type
   status: { 
     type: String, 
-    enum: ['draft', 'published', 'cancelled', 'completed'], 
+    enum: ['draft', 'published', 'cancelled', 'completed', 'archived'], 
     default: 'published', 
     index: true 
   },

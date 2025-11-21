@@ -33,6 +33,13 @@ router.patch(
   adminController.reviewVendorApplication
 );
 
+router.patch(
+  '/loyalty-applications/:id/status',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.reviewLoyaltyApplication
+);
+
 router.get(
   '/notifications/unread-count',
   auth,
@@ -99,6 +106,12 @@ router.patch(
   auth,
   roleCheck('Admin', 'EventOffice'),
   adminController.reviewLoyaltyApplication
+// Export event registrations to Excel
+router.get(
+  '/events/:eventId/export-registrations',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.exportEventRegistrations
 );
 
 module.exports = router;

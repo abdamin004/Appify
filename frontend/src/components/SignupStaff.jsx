@@ -196,14 +196,28 @@ function SignupStaff() {
           color: '#6b7280'
         }}>
           Already have an account?{" "}
-          <a onClick={() => navigate('/login')} style={{
-            color: '#d4af37',
-            fontWeight: '600',
-            textDecoration: 'none',
-            cursor: 'pointer'
-          }}>
+          <button 
+            onClick={() => navigate('/login')} 
+            style={{
+              color: '#d4af37',
+              fontWeight: '600',
+              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s',
+              padding: 0
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.textDecoration = 'none';
+            }}
+          >
             Login
-          </a>
+          </button>
         </p>
       </div>
     </div>

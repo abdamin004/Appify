@@ -38,6 +38,9 @@ function currentUserId() {
 export function createBazaar(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Bazaar', createdBy: currentUserId() });
 }
+export function createBooth(payload) {
+  return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Booth', createdBy: currentUserId() });
+}
 export function createTrip(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Trip', createdBy: currentUserId() });
 }
@@ -60,6 +63,10 @@ export function updateEvent(id, payload) {
 // Lists (by type)
 export async function listBazaars() {
   const res = await fetch(`${API_BASE}/events/filter?type=Bazaar`);
+  return res.json();
+}
+export async function listBooths() {
+  const res = await fetch(`${API_BASE}/events/filter?type=Booth`);
   return res.json();
 }
 export async function listTrips() {
@@ -132,7 +139,11 @@ export function deleteEvent(id) {
 
 // Event details + comments/ratings
 export async function getEventById(id) {
-  const res = await fetch(`${API_BASE}/events/${id}`);
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  const res = await fetch(`${API_BASE}/events/${id}`, { headers });
   if (!res.ok) {
     const text = await res.text();
     let errorMsg = `Failed to load event (${res.status})`;

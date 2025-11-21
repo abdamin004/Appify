@@ -1,6 +1,8 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { useState } from "react";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import ChooseRole from "./components/ChooseRole"; // make sure path is correct
 import Login from "./components/Auth/Login";
 import VerifyEmail from "./components/Auth/VerifyEmail";
@@ -32,6 +34,9 @@ import ViewEvents from "./components/Admin/ViewEvents";
 import RegisterEvents from "./components/RegisterEvents";
 import GymSessions from "./components/GymSessions";
 import EventDetails from "./components/EventDetails";
+import VendorDocuments from "./components/Admin/VendorDocuments";
+import AttendeesReport from "./components/Admin/AttendeesReport";
+import SalesReport from "./components/Admin/SalesReport";
 
 
 function App() {
@@ -47,7 +52,21 @@ function App() {
   return (
 
     <>
-  
+      <ToastContainer
+        position="top-center"
+        autoClose={2500}
+        hideProgressBar={true}
+        newestOnTop={true}
+        closeOnClick={true}
+        rtl={false}
+        pauseOnFocusLoss={false}
+        draggable={false}
+        pauseOnHover={true}
+        theme="light"
+        limit={3}
+        toastClassName="custom-toast"
+        bodyClassName="custom-toast-body"
+      />
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
       
       
@@ -70,13 +89,18 @@ function App() {
           <Route path="/StaffDashboard" element={<StaffDashboard />} />
           {/* Events Office */}
           <Route path="/events-office/bazaars" element={<BazaarsManager />} />
+          <Route path="/events-office/bazaars/edit/:id" element={<BazaarsManager editOnly={true} />} />
           <Route path="/events-office/booths" element={<BoothsManager />} />
           <Route path="/events-office/trips" element={<TripsManager />} />
+          <Route path="/events-office/trips/edit/:id" element={<TripsManager editOnly={true} />} />
           <Route path="/events-office/conferences" element={<ConferencesManager />} />
+          <Route path="/events-office/conferences/edit/:id" element={<ConferencesManager editOnly={true} />} />
           <Route path="/events-office/gym-sessions" element={<GymSessionsManager />} />
+          <Route path="/events-office/gym-sessions/edit/:id" element={<GymSessionsManager editOnly={true} />} />
           {/* Student */}
           {/* Professor */}
           <Route path="/professor/workshops" element={<WorkshopsManager />} />
+          <Route path="/professor/workshops/edit/:id" element={<WorkshopsManager editOnly={true} />} />
           {/* Public events listing */}
           <Route path="/events" element={<EventList />} />
           <Route path="/events/:id" element={<EventDetails />} />
@@ -94,6 +118,9 @@ function App() {
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/comments" element={<CommentModeration />} />
           <Route path="/admin/view-events" element={<ViewEvents />} />
+          <Route path="/admin/vendor-documents" element={<VendorDocuments />} />
+          <Route path="/admin/attendees-report" element={<AttendeesReport />} />
+          <Route path="/admin/sales-report" element={<SalesReport />} />
         </Routes>
       </div>
     </>

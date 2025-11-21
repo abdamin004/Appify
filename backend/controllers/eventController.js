@@ -12,7 +12,13 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
-const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
+const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail, sendVendorVisitorPassesEmail } = require('../utils/sendEmail');
+const Notification = require('../models/Notification');
+const VisitorPass = require('../models/VisitorPass');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
+
+const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'EventOffice'];
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -49,6 +55,63 @@ async function attachApprovedParticipants(events) {
     // In case of error, return original events
     return events;
   }
+}
+
+function qualifiesForExternalVisitors(event) {
+  if (!event) return { allowed: false };
+  if (event.type === 'Bazaar') {
+    return { allowed: true, category: 'Bazaar' };
+  }
+  const haystack = [
+    event.category || '',
+    event.title || '',
+    Array.isArray(event.tags) ? event.tags.join(' ') : ''
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes('career') && haystack.includes('fair')) {
+    return { allowed: true, category: 'CareerFair' };
+  }
+
+  return { allowed: false };
+}
+
+function parseAllowedRoles(input) {
+  if (input === undefined) return null;
+  if (input === null) return [];
+
+  let list;
+  if (Array.isArray(input)) {
+    list = input;
+  } else if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return [];
+    list = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+  } else {
+    return null;
+  }
+
+  if (list.length === 0) return [];
+
+  const normalized = [];
+  list.forEach((role) => {
+    if (!role) return;
+    const match = USER_ROLE_OPTIONS.find(
+      (opt) => opt.toLowerCase() === role.toString().toLowerCase()
+    );
+    if (match && !normalized.includes(match)) {
+      normalized.push(match);
+    }
+  });
+
+  if (normalized.length === 0) {
+    throw new Error(
+      `allowedRoles contains invalid values. Valid options: ${USER_ROLE_OPTIONS.join(', ')}`
+    );
+  }
+
+  return normalized;
 }
 
 module.exports = {
@@ -113,11 +176,25 @@ module.exports = {
                 createdBy: req.user._id
             };
 
+            const allowedRoles = parseAllowedRoles(req.body.allowedRoles);
+            if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+                eventData.allowedRoles = allowedRoles;
+            }
+
             let event;
 
             switch (type) {
                 case 'Workshop':
                     event = await Workshop.create({...eventData, professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses});
+                    const eventOffice = await User.find({ role: 'EventOffice' });
+                    eventOffice.forEach(office => {
+                        office.notifications.push({
+                            message: `New workshop titled "${event.title}" has been submitted for approval.`,
+                            date: new Date(),
+                            read: false,
+                        });
+                        office.save();
+                    });
                     break;
                 case 'Trip':
                     event = await Trip.create({...eventData, price});
@@ -136,6 +213,20 @@ module.exports = {
                     break;
                 default:
                     event = await Event.create(eventData);
+            }
+            //  NEW EVENT NOTIFICATION � ONLY if published
+            if (event.status === 'published') {
+                try {
+                    await Notification.create({
+                        type: 'NewEventPublished',
+                        message: `A new ${event.type || 'event'} has been added: ${event.title}`,
+                        event: event._id,
+                        recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+                    });
+                } catch (notifyErr) {
+                    console.error('Failed to create new event notification:', notifyErr);
+                    // do NOT fail the request
+                }
             }
 
             res.status(201).json({
@@ -256,7 +347,7 @@ module.exports = {
 
     async getMyWorkshops(req, res) {
         try {
-            const professorId = req.query.professorId || '670abc12345...';
+            const professorId = req.user._id;
             const workshops = await Workshop.find({ createdBy: professorId });
             res.status(200).json(workshops);
         } catch (err) {
@@ -264,166 +355,233 @@ module.exports = {
         }
     },// Add this to your eventController.js
 
-async registerForEvent(req, res) {
-    try {
-        const eventId = req.params.eventId;
-        const userId = req.user._id;
+    // GET /events/workshops/registrations - Get registered users & remaining spots for my workshops
+    async getWorkshopRegistrations(req, res) {
+        try {
+            const professorId = req.user._id;
 
-        // Find the event
-        const event = await Event.findById(eventId);
-        console.log('Registering user', userId, 'for event', eventId);
-        if (!event) {
-            return res.status(404).json({ 
+            // Find workshops created by this professor
+            const workshops = await Workshop.find({ createdBy: professorId })
+                .populate('registeredUsers', 'firstName lastName email') // populate user details
+                .exec();
+
+            // Map each workshop to include registered users and remaining spots
+            const workshopsInfo = workshops.map(ws => {
+                const registeredUsers = ws.registeredUsers || [];
+                const capacity = ws.capacity || 0;
+                const remainingSpots = capacity - registeredUsers.length;
+
+                return {
+                    id: ws._id,
+                    title: ws.title,
+                    startDate: ws.startDate,
+                    endDate: ws.endDate,
+                    location: ws.location,
+                    capacity,
+                    remainingSpots,
+                    registeredUsers
+                };
+            });
+
+            res.status(200).json({
+                success: true,
+                workshops: workshopsInfo
+            });
+        } catch (err) {
+            console.error('Error fetching workshop registrations:', err);
+            res.status(500).json({
                 success: false,
-                message: 'Event not found' 
+                message: err.message
             });
         }
+    },
 
-        // Check if event has already started
-        if (new Date(event.startDate) <= new Date()) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Cannot register for an event that has already started' 
-            });
-        }
-
-        // Check if registration deadline has passed
-        if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Registration deadline has passed' 
-            });
-        }
-
-      
-
-        // Check if event is at capacity
-        if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Event is at full capacity' 
-            });
-        }
-
-        // Check if user is already registered
-        if (event.registeredUsers && event.registeredUsers.includes(userId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are already registered for this event' 
-            });
-        }
-
-        // Find the user
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ 
-                success: false,
-                message: 'User not found' 
-            });
-        }
-
-        // Check if user already registered
-        if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are already registered for this event' 
-            });
-        }
-
-        // Add user to event's registeredUsers array
-        event.registeredUsers = event.registeredUsers || [];
-        event.registeredUsers.push(userId);
-        await event.save();
-
-        // Add event to user's registeredEvents array
-        user.registeredEvents = user.registeredEvents || [];
-        user.registeredEvents.push(eventId);
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Successfully registered for the event',
-            event: {
-                id: event._id,
-                title: event.title,
-                startDate: event.startDate,
-                location: event.location
+    async viewWorkshopStatusAndEditRequests(req, res) {
+        try {
+            const workshopId = req.params.id;
+            const workshop = await Workshop.findById(workshopId);
+            if (!workshop) {
+                return res.status(404).json({ error: 'Workshop not found' });
             }
-        });
+            res.status(200).json({
+                success: true,
+                status: workshop.status,
+                editRequests: workshop.editRequests
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    },
 
-    } catch (err) {
-        console.error('Registration error:', err);
-        res.status(500).json({ 
-            success: false,
-            message: err.message 
-        });
-    }
-},
+    async registerForEvent(req, res) {
+        try {
+            const eventId = req.params.eventId;
+            const userId = req.user._id;
 
-async unregisterFromEvent(req, res) {
-    try {
-        const { eventId } = req.params;
-        const userId = req.user._id;
+            // Find the event
+            const event = await Event.findById(eventId);
+            console.log('Registering user', userId, 'for event', eventId);
+            if (!event) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Event not found' 
+                });
+            }
 
-        // Find the event
-        const event = await Event.findById(eventId);
-        if (!event) {
-            return res.status(404).json({ 
+            // Check if event has already started
+            if (new Date(event.startDate) <= new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Cannot register for an event that has already started' 
+                });
+            }
+
+            // Check if registration deadline has passed
+            if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Registration deadline has passed' 
+                });
+            }
+
+        
+
+            // Check if event is at capacity
+            if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Event is at full capacity' 
+                });
+            }
+
+            // Check if user is already registered
+            if (event.registeredUsers && event.registeredUsers.includes(userId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are already registered for this event' 
+                });
+            }
+
+            // Find the user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'User not found' 
+                });
+            }
+
+            if (Array.isArray(event.allowedRoles) && event.allowedRoles.length > 0) {
+                if (!event.allowedRoles.includes(user.role)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: `This event is restricted to: ${event.allowedRoles.join(', ')}`
+                    });
+                }
+            }
+
+            // Check if user already registered
+            if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are already registered for this event' 
+                });
+            }
+
+            // Add user to event's registeredUsers array
+            event.registeredUsers = event.registeredUsers || [];
+            event.registeredUsers.push(userId);
+            await event.save();
+
+            // Add event to user's registeredEvents array
+            user.registeredEvents = user.registeredEvents || [];
+            user.registeredEvents.push(eventId);
+            await user.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Successfully registered for the event',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    startDate: event.startDate,
+                    location: event.location
+                }
+            });
+
+        } catch (err) {
+            console.error('Registration error:', err);
+            res.status(500).json({ 
                 success: false,
-                message: 'Event not found' 
+                message: err.message 
             });
         }
+    },
 
-        // Check if event has already started
-        if (new Date(event.startDate) <= new Date()) {
-            return res.status(400).json({ 
+    async unregisterFromEvent(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // Find the event
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Event not found' 
+                });
+            }
+
+            // Check if event has already started
+            if (new Date(event.startDate) <= new Date()) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Cannot unregister from an event that has already started' 
+                });
+            }
+
+            // Check if user is registered
+            if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'You are not registered for this event' 
+                });
+            }
+
+            // Find the user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'User not found' 
+                });
+            }
+
+            // Remove user from event's registeredUsers array
+            event.registeredUsers = event.registeredUsers.filter(
+                id => id.toString() !== userId.toString()
+            );
+            await event.save();
+
+            // Remove event from user's registeredEvents array
+            user.registeredEvents = user.registeredEvents.filter(
+                id => id.toString() !== eventId.toString()
+            );
+            await user.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Successfully unregistered from the event'
+            });
+
+        } catch (err) {
+            console.error('Unregistration error:', err);
+            res.status(500).json({ 
                 success: false,
-                message: 'Cannot unregister from an event that has already started' 
+                message: err.message 
             });
         }
-
-        // Check if user is registered
-        if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'You are not registered for this event' 
-            });
-        }
-
-        // Find the user
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ 
-                success: false,
-                message: 'User not found' 
-            });
-        }
-
-        // Remove user from event's registeredUsers array
-        event.registeredUsers = event.registeredUsers.filter(
-            id => id.toString() !== userId.toString()
-        );
-        await event.save();
-
-        // Remove event from user's registeredEvents array
-        user.registeredEvents = user.registeredEvents.filter(
-            id => id.toString() !== eventId.toString()
-        );
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Successfully unregistered from the event'
-        });
-
-    } catch (err) {
-        console.error('Unregistration error:', err);
-        res.status(500).json({ 
-            success: false,
-            message: err.message 
-        });
-    }
-},
+    },
 
     async updateEvent(req, res) {
         try {
@@ -468,6 +626,15 @@ async unregisterFromEvent(req, res) {
                 ...(status && { status }),
                 ...(registrationDeadline && { registrationDeadline })
             };
+
+            if (Object.prototype.hasOwnProperty.call(req.body, 'allowedRoles')) {
+                const parsedRoles = parseAllowedRoles(req.body.allowedRoles);
+                if (parsedRoles === null || parsedRoles.length === 0) {
+                    updatedData.allowedRoles = [];
+                } else {
+                    updatedData.allowedRoles = parsedRoles;
+                }
+            }
 
             switch (event.type) {
                 case 'Workshop':
@@ -583,6 +750,168 @@ async unregisterFromEvent(req, res) {
         }
     },
 
+    async archiveEvent(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: 'Invalid event id' });
+            }
+
+            const event = await Event.findById(id);
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
+
+            const now = new Date();
+            const end = event.endDate ? new Date(event.endDate) : null;
+            const start = event.startDate ? new Date(event.startDate) : null;
+            const hasPassed = (end && end <= now) || (!end && start && start <= now);
+
+            if (!hasPassed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Only past events can be archived'
+                });
+            }
+
+            if (event.status === 'archived') {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Event already archived',
+                    event
+                });
+            }
+
+            event.status = 'archived';
+            await event.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Event archived successfully',
+                event
+            });
+        } catch (err) {
+            console.error('archiveEvent error:', err);
+            res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async acceptOrRejectWorkshopRequests(req, res) {
+        try {
+            const { workshopId } = req.params;
+            const { action } = req.body; // "accept" or "reject"
+
+            // Only Admin or EventOffice can do this
+            if (!['Admin', 'EventOffice'].includes(req.user.role)) {
+                return res.status(403).json({ error: "Not authorized" });
+            }
+
+            const workshop = await Workshop.findById(workshopId).populate("createdBy");
+            if (!workshop) {
+                return res.status(404).json({ error: "Workshop not found" });
+            }
+
+            const professor = workshop.createdBy;
+            if (!professor) {
+                return res.status(404).json({ error: "Workshop creator not found" });
+            }
+
+            if (action === "accept") {
+                workshop.status = "published";
+                await workshop.save();
+
+                // Send notification to professor
+                professor.notifications.push({
+                    message: `Your workshop "${workshop.title}" has been accepted and published.`,
+                    date: new Date(),
+                    read: false
+                });
+                await professor.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Workshop approved and published",
+                    workshop
+                });
+
+            } else if (action === "reject") {
+                workshop.status = "rejected";
+                await workshop.save();
+
+                professor.notifications.push({
+                    message: `Your workshop "${workshop.title}" has been rejected.`,
+                    date: new Date(),
+                    read: false
+                });
+                await professor.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Workshop rejected.",
+                    workshop
+                });
+            }
+
+            return res.status(400).json({ error: 'Invalid action. Use "accept" or "reject".' });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+
+    async requestWorkshopEdit(req, res) {
+        try {
+            const { workshopId } = req.params;
+            const { field, requestedValue } = req.body;
+
+            // Only EventOffice can request edits
+            if (req.user.role !== "EventOffice") {
+                return res.status(403).json({ error: "Only Event Office can request workshop edits" });
+            }
+
+            const workshop = await Workshop.findById(workshopId).populate("createdBy");
+            if (!workshop) {
+                return res.status(404).json({ error: "Workshop not found" });
+            }
+
+            const professor = workshop.createdBy;
+
+            workshop.editRequests.push({
+                field,
+                requestedValue,
+                requestedBy: req.user._id,
+                date: new Date(),
+                resolved: false
+            });
+
+            await workshop.save();
+
+            // Notify professor
+            professor.notifications.push({
+                message: `The Event Office requested changes to your workshop "${workshop.title}" (Field: ${field}).`,
+                date: new Date(),
+                read: false
+            });
+            await professor.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "Edit request submitted successfully.",
+                workshop
+            });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+
     async deleteEvent(req, res) {
         try {
             const {id} = req.params;
@@ -629,6 +958,18 @@ async unregisterFromEvent(req, res) {
         event.status = 'published';
         await event.save();
 
+        //  New Event Published notification
+        try {
+            await Notification.create({
+                type: 'NewEventPublished',
+                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                event: event._id,
+                recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+            });
+        } catch (notifyErr) {
+            console.error('Failed to create publish event notification:', notifyErr);
+            // don't fail the request because of a notification error
+        }
         res.status(200).json({
             success: true,
             message: 'Event published successfully',
@@ -805,6 +1146,247 @@ async unregisterFromEvent(req, res) {
                 message: err.message
             });
         }
+    },
+
+    async addEventToFavorites(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // 1) Ensure event exists and is published (optional but makes sense)
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // 2) Load user
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            user.favoriteEvents = user.favoriteEvents || [];
+
+            // 3) Prevent duplicates
+            const alreadyFav = user.favoriteEvents.some(
+                (id) => id.toString() === eventId.toString()
+            );
+            if (alreadyFav) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
+            }
+
+            // 4) Add to favorites and save
+            user.favoriteEvents.push(eventId);
+            await user.save();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event added to favorites successfully',
+                event: {
+                    id: event._id,
+                    title: event.title,
+                    type: event.type,
+                    startDate: event.startDate,
+                    location: event.location
+                }
+            });
+        } catch (err) {
+            console.error('addEventToFavorites error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getMyFavoriteEvents(req, res) {
+        try {
+            const userId = req.user._id;
+
+            const user = await User.findById(userId).populate({
+                path: 'favoriteEvents',
+                populate: { path: 'vendors', options: { strictPopulate: false } }
+            });
+
+            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+
+            if (events.length === 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'No favorite events yet',
+                    events: []
+                });
+            }
+
+            const enriched = await attachApprovedParticipants(events);
+
+            return res.status(200).json({
+                success: true,
+                count: enriched.length,
+                events: enriched
+            });
+        } catch (err) {
+            console.error('getMyFavoriteEvents error:', err);
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async generateVendorAttendeePasses(req, res) {
+        try {
+            const { applicationId } = req.params;
+
+            if (!applicationId || !ObjectId.isValid(applicationId)) {
+                return res.status(400).json({ success: false, message: 'Invalid vendor application id' });
+            }
+
+            const application = await VendorApplication.findById(applicationId)
+                .populate('event', 'title type category tags status location startDate')
+                .populate('vendorUser', 'email companyName');
+
+            if (!application) {
+                return res.status(404).json({ success: false, message: 'Vendor application not found' });
+            }
+
+            const event = application.event;
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event linked to application not found' });
+            }
+
+            const eligibility = qualifiesForExternalVisitors(event);
+            if (!eligibility.allowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Only Bazaar or Career Fair events support attendee QR generation'
+                });
+            }
+
+            if (!Array.isArray(application.attendees) || application.attendees.length === 0) {
+                return res.status(400).json({ success: false, message: 'No attendees found on this vendor application' });
+            }
+
+            const created = [];
+            const skipped = [];
+
+            for (const attendee of application.attendees) {
+                if (!attendee || !attendee.name) continue;
+
+                const existing = await VisitorPass.findOne({
+                    $or: [
+                        {
+                            vendorApplication: application._id,
+                            visitorEmail: attendee.email || undefined,
+                            visitorName: attendee.name
+                        },
+                        {
+                            vendorApplication: { $exists: false },
+                            event: event._id,
+                            visitorEmail: attendee.email || undefined,
+                            visitorName: attendee.name
+                        }
+                    ]
+                });
+
+                if (existing) {
+                    skipped.push({ visitorName: attendee.name, reason: 'Already generated' });
+                    continue;
+                }
+
+                const passCode = crypto.randomBytes(8).toString('hex').toUpperCase();
+                const payload = {
+                    eventId: event._id.toString(),
+                    eventTitle: event.title,
+                    eventType: event.type,
+                    vendorApplicationId: application._id.toString(),
+                    organization: application.organization,
+                    visitorName: attendee.name,
+                    visitorEmail: attendee.email,
+                    visitorIdNumber: attendee.idNumber,
+                    passCode,
+                    issuedAt: new Date().toISOString()
+                };
+
+                const qrData = JSON.stringify(payload);
+                const qrImageDataUrl = await QRCode.toDataURL(qrData, {
+                    width: 320,
+                    margin: 1,
+                    errorCorrectionLevel: 'H'
+                });
+
+                const pass = await VisitorPass.create({
+                    event: event._id,
+                    vendorApplication: application._id,
+                    eventTitle: event.title,
+                    eventType: event.type,
+                    visitorName: attendee.name,
+                    visitorEmail: attendee.email,
+                    visitorOrganization: application.organization,
+                    visitorIdNumber: attendee.idNumber,
+                    purpose: `Vendor attendee for ${event.title}`,
+                    passCode,
+                    qrData,
+                    qrImageDataUrl,
+                    createdBy: req.user._id
+                });
+
+                created.push(pass);
+            }
+
+            let emailError = null;
+            try {
+                const passesForEmail = await VisitorPass.find({
+                    $or: [
+                        { vendorApplication: application._id },
+                        {
+                            vendorApplication: { $exists: false },
+                            event: event._id,
+                            visitorOrganization: application.organization
+                        }
+                    ]
+                })
+                    .select('visitorName visitorEmail visitorIdNumber passCode qrImageDataUrl')
+                    .sort({ createdAt: 1 })
+                    .lean();
+
+                if (passesForEmail.length && application.vendorUser?.email) {
+                    await sendVendorVisitorPassesEmail(
+                        application.vendorUser,
+                        event,
+                        application.organization,
+                        passesForEmail
+                    );
+                } else if (!application.vendorUser?.email) {
+                    console.warn('Vendor email not found for application:', applicationId);
+                }
+            } catch (err) {
+                emailError = err;
+                console.error('Failed to email vendor visitor passes:', err);
+            }
+
+            res.status(201).json({
+                success: true,
+                message: `Generated ${created.length} attendee QR codes`,
+                createdCount: created.length,
+                skipped,
+                passes: created,
+                emailDelivered: !emailError
+            });
+        } catch (error) {
+            console.error('generateVendorAttendeePasses error:', error);
+            res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
+        }
     }
+
 
 };

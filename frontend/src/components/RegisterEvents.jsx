@@ -2,37 +2,71 @@ import React, { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 import { listEventsByType, publicRegisterForEvent, registerForEvent } from "../services/eventService";
 import { canUserAccessEvent } from "../services/eventRestrictionService";
+import { showToast } from "../utils/toast";
 
 export default function RegisterEvents() {
-  const [form, setForm] = useState({ type: "Trip", name: "", email: "", id: "" });
+  // Check if user is logged in and get user info
+  const isLoggedIn = (() => {
+    try {
+      return !!(typeof localStorage !== 'undefined' && localStorage.getItem('token'));
+    } catch {
+      return false;
+    }
+  })();
+
+  const getUserInfo = () => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+      if (!raw) return null;
+      const user = JSON.parse(raw);
+      return {
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email?.split('@')[0] || '',
+        email: user.email || '',
+        id: user.gucId || user.studentId || user.staffId || ''
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const userInfo = getUserInfo();
+  
+  const [form, setForm] = useState({ 
+    type: "Trip", 
+    name: userInfo?.name || "", 
+    email: userInfo?.email || "", 
+    id: userInfo?.id || "" 
+  });
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
 
   const inputStyle = {
-    padding: "12px 16px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    background: "#fff",
+    padding: "14px 18px",
+    borderRadius: "12px",
+    border: "2px solid #e5e7eb",
+    background: "#ffffff",
     outline: "none",
     color: "#003366",
     fontSize: "1rem",
     flex: 1,
     minWidth: "220px",
+    transition: "all 0.2s ease",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
   };
 
   function validate() {
-    if (!form.name.trim() || !form.email.trim() || !form.id.trim()) {
-      setError("Please fill in name, email, and student/staff ID.");
+    if (!isLoggedIn && (!form.name.trim() || !form.email.trim() || !form.id.trim())) {
+      showToast.error("Please fill in name, email, and student/staff ID.");
       return false;
     }
-    const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-    if (!emailRe.test(form.email)) {
-      setError("Please enter a valid email address.");
-      return false;
+    if (!isLoggedIn) {
+      const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+      if (!emailRe.test(form.email)) {
+        showToast.error("Please enter a valid email address.");
+        return false;
+      }
     }
     return true;
   }
@@ -130,11 +164,9 @@ export default function RegisterEvents() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    setError("");
-    setSuccess("");
 
     if (!selectedEventId) {
-      setError(`Please select an existing ${form.type} to register for.`);
+      showToast.error(`Please select an existing ${form.type} to register for.`);
       return;
     }
 
@@ -150,12 +182,14 @@ export default function RegisterEvents() {
             email: form.email,
             studentStaffId: form.id,
           });
-      setSuccess(data.message || "Registration submitted successfully.");
+      showToast.success(data.message || "Registration submitted successfully!");
       // Refresh events to reflect capacity/registration changes
       loadEvents();
-      setForm((prev) => ({ ...prev, name: "", email: "", id: "" }));
+      if (!isLoggedIn) {
+        setForm((prev) => ({ ...prev, name: "", email: "", id: "" }));
+      }
     } catch (err) {
-      setError(err.message || "Submission failed");
+      showToast.error(err.message || "Registration failed");
     } finally {
       setSubmitting(false);
     }
@@ -176,11 +210,12 @@ export default function RegisterEvents() {
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <div
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "35px 40px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              marginBottom: "30px",
+              background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)",
+              padding: "40px 45px",
+              borderRadius: "24px",
+              boxShadow: "0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)",
+              marginBottom: "32px",
+              border: "1px solid rgba(0,51,102,0.1)",
             }}
           >
             <h1 style={{ color: "#003366", margin: 0 }}>Register for Event</h1>
@@ -192,21 +227,36 @@ export default function RegisterEvents() {
           <form
             onSubmit={onSubmit}
             style={{
-              background: "rgba(255,255,255,0.95)",
-              padding: "30px",
-              borderRadius: "20px",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+              background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)",
+              padding: "40px",
+              borderRadius: "24px",
+              boxShadow: "0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)",
               display: "flex",
               flexDirection: "column",
-              gap: "16px",
+              gap: "24px",
+              border: "1px solid rgba(0,51,102,0.1)",
             }}
           >
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ color: "#003366", fontWeight: 600, alignSelf: "center" }}>Type</label>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+              <label style={{ 
+                color: "#003366", 
+                fontWeight: 600, 
+                alignSelf: "center",
+                minWidth: "100px",
+                fontSize: "0.95rem",
+              }}>Type</label>
               <select
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 style={inputStyle}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#b8941f";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(184, 148, 31, 0.1)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#e5e7eb";
+                  e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                }}
               >
                 <option value="Trip">🚌 Trip</option>
                 <option value="Workshop">🛠️ Workshop</option>
@@ -216,13 +266,33 @@ export default function RegisterEvents() {
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ color: "#003366", fontWeight: 600, alignSelf: "center", minWidth: 100 }}>Event</label>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+              <label style={{ 
+                color: "#003366", 
+                fontWeight: 600, 
+                alignSelf: "center", 
+                minWidth: 100,
+                fontSize: "0.95rem",
+              }}>Event</label>
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  opacity: loadingEvents || events.length === 0 ? 0.6 : 1,
+                  cursor: loadingEvents || events.length === 0 ? "not-allowed" : "pointer",
+                }}
                 disabled={loadingEvents || events.length === 0}
+                onFocus={(e) => {
+                  if (!e.target.disabled) {
+                    e.target.style.borderColor = "#b8941f";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(184, 148, 31, 0.1)";
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#e5e7eb";
+                  e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                }}
               >
                 <option value="">
                   {loadingEvents ? "Loading events..." : `Select an existing ${form.type}`}
@@ -242,63 +312,135 @@ export default function RegisterEvents() {
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ color: "#003366", fontWeight: 600, alignSelf: "center", minWidth: 100 }}>Full Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Your full name"
-                style={inputStyle}
-              />
-            </div>
+            {/* Only show form fields if user is not logged in */}
+            {!isLoggedIn && (
+              <>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <label style={{ 
+                    color: "#003366", 
+                    fontWeight: 600, 
+                    alignSelf: "center", 
+                    minWidth: 100,
+                    fontSize: "0.95rem",
+                  }}>Full Name</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Your full name"
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#b8941f";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(184, 148, 31, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb";
+                      e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                    }}
+                  />
+                </div>
 
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ color: "#003366", fontWeight: 600, alignSelf: "center", minWidth: 100 }}>Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="name@example.com"
-                style={inputStyle}
-              />
-            </div>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <label style={{ 
+                    color: "#003366", 
+                    fontWeight: 600, 
+                    alignSelf: "center", 
+                    minWidth: 100,
+                    fontSize: "0.95rem",
+                  }}>Email</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="name@example.com"
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#b8941f";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(184, 148, 31, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb";
+                      e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                    }}
+                  />
+                </div>
 
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ color: "#003366", fontWeight: 600, alignSelf: "center", minWidth: 140 }}>Student/Staff ID</label>
-              <input
-                type="text"
-                value={form.id}
-                onChange={(e) => setForm({ ...form, id: e.target.value })}
-                placeholder="e.g., 202000123 or ST12345"
-                style={inputStyle}
-              />
-            </div>
-
-
-            {error && (
-              <div style={{ color: "#b91c1c", fontWeight: 600 }}>{error}</div>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <label style={{ 
+                    color: "#003366", 
+                    fontWeight: 600, 
+                    alignSelf: "center", 
+                    minWidth: 140,
+                    fontSize: "0.95rem",
+                  }}>Student/Staff ID</label>
+                  <input
+                    type="text"
+                    value={form.id}
+                    onChange={(e) => setForm({ ...form, id: e.target.value })}
+                    placeholder="e.g., 202000123 or ST12345"
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#b8941f";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(184, 148, 31, 0.1)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#e5e7eb";
+                      e.target.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+                    }}
+                  />
+                </div>
+              </>
             )}
-            {success && (
-              <div style={{ color: "#065f46", fontWeight: 600 }}>{success}</div>
+
+            {isLoggedIn && (
+              <div style={{ 
+                padding: "18px 20px", 
+                background: "linear-gradient(135deg, rgba(184, 148, 31, 0.12) 0%, rgba(184, 148, 31, 0.08) 100%)", 
+                borderRadius: "14px", 
+                border: "2px solid rgba(184, 148, 31, 0.3)",
+                color: "#003366",
+                fontSize: "0.95rem",
+                boxShadow: "0 2px 8px rgba(184, 148, 31, 0.15)",
+              }}>
+                <strong style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "1.2rem" }}>✓</span>
+                  Logged in as: {userInfo?.name || userInfo?.email || 'User'}
+                </strong>
+                <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "6px" }}>
+                  Your account information will be used for registration.
+                </div>
+              </div>
             )}
 
-            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: "8px" }}>
               <button
                 type="submit"
                 disabled={submitting}
                 style={{
-                  padding: "14px 24px",
-                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
+                  padding: "16px 32px",
+                  background: "linear-gradient(135deg, #b8941f 0%, #9a7a1a 100%)",
                   color: "#003366",
                   border: "none",
-                  borderRadius: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 6px 20px rgba(212, 175, 55, 0.4)",
+                  borderRadius: "14px",
+                  fontWeight: 700,
+                  fontSize: "1.05rem",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  boxShadow: "0 6px 20px rgba(184, 148, 31, 0.4)",
+                  transition: "all 0.2s ease",
+                  opacity: submitting ? 0.7 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!submitting) {
+                    e.target.style.transform = "translateY(-2px)";
+                    e.target.style.boxShadow = "0 8px 25px rgba(184, 148, 31, 0.5)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = "translateY(0)";
+                  e.target.style.boxShadow = "0 6px 20px rgba(184, 148, 31, 0.4)";
                 }}
               >
-                {submitting ? "Submitting..." : "Submit"}
+                {submitting ? "Submitting..." : "Submit Registration"}
               </button>
             </div>
           </form>

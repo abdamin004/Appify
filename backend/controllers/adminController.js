@@ -2,10 +2,12 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const XLSX = require('xlsx');
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Trip = require('../models/Trip');
 const Vendor = require('../models/Vendor');
+const LoyaltyApplication = require('../models/LoyaltyApplication');
 const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEmail, sendVendorApplicationRejectionEmail } = require('../utils/sendEmail');
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
@@ -380,6 +382,66 @@ exports.reviewVendorApplication = async (req, res) => {
   } catch (error) {
     console.error('Error reviewing application:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+exports.reviewLoyaltyApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body || {};
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, message: "Invalid action. Use 'approve' or 'reject'." });
+    }
+
+    const application = await LoyaltyApplication.findById(id)
+      .populate('vendorUser', 'companyName email');
+
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Loyalty application not found.' });
+    }
+
+    if (application.status === 'approved' && action === 'approve') {
+      return res.status(200).json({ success: true, message: 'Application already approved.', application });
+    }
+    if (application.status === 'rejected' && action === 'reject') {
+      return res.status(200).json({ success: true, message: 'Application already rejected.', application });
+    }
+    if (application.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot review a cancelled loyalty application.' });
+    }
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    application.status = newStatus;
+    await application.save();
+
+    if (newStatus === 'approved') {
+      const orgName = application.organization || application.vendorUser?.companyName || 'A vendor';
+      const discountInfo = typeof application.discountRate === 'number'
+        ? `${application.discountRate}%`
+        : 'a special';
+      const promoInfo = application.promoCode ? ` Use code ${application.promoCode}.` : '';
+
+      try {
+        await Notification.create({
+          type: 'LoyaltyPartnerAdded',
+          message: `${orgName} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
+          recipientsRoles: ['Student', 'Staff', 'TA', 'Professor', 'Vendor'],
+          organization: application.organization || undefined
+        });
+      } catch (notifyErr) {
+        console.error('Failed to create loyalty partner notification:', notifyErr?.message || notifyErr);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Loyalty application ${newStatus}.`,
+      application
+    });
+  } catch (error) {
+    console.error('Error reviewing loyalty application:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
   }
 };
 

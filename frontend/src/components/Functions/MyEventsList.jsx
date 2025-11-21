@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getEventComments, addEventComment, rateEvent } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
 import { FaStar } from "react-icons/fa";
 import PayDialog from "../Payments/PayDialog";
 import { refundAndCancel } from "../../services/paymentService";
+import { showToast, confirmDialog } from "../../utils/toast";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
 // Per-user ratings storage key (frontend-only persistence)
 const ratingsStorageKeyForUser = () => {
@@ -80,6 +83,7 @@ function RatingStars({ value = 0, onChange, disabled = false }) {
 }
 
 function MyEventsList({ events, showRefundButton = false }) {
+  const navigate = useNavigate();
   const [ratings, setRatings] = useState({});
   const [attendedSet, setAttendedSet] = useState(new Set(getAttendedIds().map(String)));
   const [openComments, setOpenComments] = useState({}); // { [eventId]: true }
@@ -90,6 +94,24 @@ function MyEventsList({ events, showRefundButton = false }) {
   const [payEvent, setPayEvent] = useState(null); // payment modal state
   const [paidLocal, setPaidLocal] = useState(new Set());
   const [refundedSet, setRefundedSet] = useState(new Set());
+
+  // Check if current user is a professor and can edit this workshop
+  const canEditWorkshop = (evt) => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+      if (!raw) return false;
+      const u = JSON.parse(raw);
+      const role = (u.role || '').toLowerCase();
+      if (role !== 'professor') return false;
+      const userId = String(u._id || u.id || '');
+      const eventType = getType(evt);
+      if (eventType !== 'Workshop') return false;
+      const eventCreatorId = String(evt?.createdBy || evt?.createdByUser || evt?.professor || '');
+      return eventCreatorId && userId && eventCreatorId === userId;
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     setRatings(loadRatings());
@@ -114,22 +136,22 @@ function MyEventsList({ events, showRefundButton = false }) {
 
   async function handleRefundAndCancel(eventId) {
     try {
-      const ok = window.confirm('Cancel your registration and refund to wallet?');
-      if (!ok) return;
+      const confirmed = await confirmDialog('Cancel your registration and refund to wallet?', 'Confirm Cancellation');
+      if (!confirmed) return;
       const res = await refundAndCancel(eventId);
       const msg = (res && (res.message || (`Refunded ${res.refunded ?? ''} to wallet. New balance: ${res.balance ?? ''}`))) || 'Registration cancelled and refunded to wallet.';
       try {
         const detail = { reason: 'refund', eventId, balance: res?.balance, amount: res?.refunded };
         window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
       } catch (_) {}
-      alert(msg);
+      showToast.success(msg);
       // Locally mark refunded so Pay Now appears again immediately
       try {
         setRefundedSet(prev => new Set(prev).add(String(eventId)));
         setPaidLocal(prev => { const next = new Set(prev); next.delete(String(eventId)); return next; });
       } catch (_) {}
     } catch (e) {
-      alert(e?.message || 'Refund failed');
+      showToast.error(e?.message || 'Refund failed');
     }
   }
 
@@ -153,7 +175,7 @@ function MyEventsList({ events, showRefundButton = false }) {
         saveRatings(next);
         return next;
       });
-      alert(err?.message || 'Failed to save rating. Please try again.');
+      showToast.error(err?.message || 'Failed to save rating. Please try again.');
     }
   };
 
@@ -285,7 +307,7 @@ function MyEventsList({ events, showRefundButton = false }) {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-        gap: "30px",
+        gap: spacing['2xl'],
       }}
     >
       {events.map((evt) => {
@@ -502,6 +524,36 @@ function MyEventsList({ events, showRefundButton = false }) {
                     }}
                   >
                     Cancel & Refund
+                  </button>
+                )}
+                {canEditWorkshop(evt) && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/professor/workshops?edit=${id}`)}
+                    style={{
+                      padding: '8px 12px',
+                      background: colors.warning,
+                      color: colors.white,
+                      border: 'none',
+                      borderRadius: borderRadius.lg,
+                      fontWeight: typography.fontWeight.bold,
+                      fontSize: typography.fontSize.sm,
+                      cursor: 'pointer',
+                      transition: transitions.normal,
+                      boxShadow: shadows.sm,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = shadows.md;
+                      e.target.style.opacity = 0.9;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = shadows.sm;
+                      e.target.style.opacity = 1;
+                    }}
+                  >
+                    ✏️ Edit Workshop
                   </button>
                 )}
               </div>

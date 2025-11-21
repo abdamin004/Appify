@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { colors, spacing, borderRadius, shadows, typography, transitions } from "../utils/designSystem";
 
 function Navbar({ onLogout }) {
   const navigate = useNavigate();
@@ -76,101 +77,121 @@ function Navbar({ onLogout }) {
         top: 0,
         left: 0,
         right: 0,
-        background: "rgba(0, 51, 102, 0.95)",
-        backdropFilter: "blur(10px)",
-        boxShadow: "0 2px 20px rgba(212, 175, 55, 0.3)",
+        background: colors.bgOverlay,
+        backdropFilter: "blur(12px)",
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         zIndex: 1000,
-        padding: "20px 0",
+        padding: `${spacing.lg} 0`,
+        borderBottom: `1px solid rgba(212, 175, 55, 0.2)`,
       }}
     >
       <div
         style={{
           maxWidth: "1400px",
           margin: "0 auto",
-          padding: "0 40px",
+          padding: `0 ${spacing['4xl']}`,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+        <div 
+          style={{ display: "flex", alignItems: "center", gap: spacing.lg, cursor: "pointer" }}
+          onClick={() => handleNavigation("/")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = "0.8";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = "1";
+          }}
+        >
           <div
             style={{
-              width: "45px",
-              height: "45px",
-              background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-              borderRadius: "12px",
+              width: "48px",
+              height: "48px",
+              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+              borderRadius: borderRadius.xl,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "1.5rem",
+              fontSize: typography.fontSize['2xl'],
+              boxShadow: shadows.accent,
             }}
           >
             🎓
           </div>
           <h1
             style={{
-              fontSize: "1.5rem",
-              fontWeight: "bold",
-              color: "white",
+              fontSize: typography.fontSize['2xl'],
+              fontWeight: typography.fontWeight.bold,
+              color: colors.white,
               margin: 0,
+              letterSpacing: "-0.5px",
             }}
           >
             GUC Events
           </h1>
         </div>
-        <div style={{ display: "flex", gap: "15px" }}>
+        <div style={{ display: "flex", gap: spacing.lg, alignItems: "center" }}>
           {isLoggedIn ? (
             // Logged in: Show Dashboard and Logout buttons
             <>
               <button
                 onClick={() => handleNavigation(getDashboardPath())}
                 style={{
-                  padding: "12px 28px",
+                  padding: `${spacing.sm} ${spacing.xl}`,
                   background: "transparent",
-                  color: "#d4af37",
-                  border: "2px solid #d4af37",
-                  borderRadius: "10px",
-                  fontSize: "1rem",
-                  fontWeight: "600",
+                  color: colors.accent,
+                  border: `1.5px solid ${colors.accent}`,
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
+                  transition: transitions.fast,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = "#d4af37";
-                  e.target.style.color = "#003366";
+                  e.target.style.background = colors.accent;
+                  e.target.style.color = colors.primary;
+                  e.target.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.background = "transparent";
-                  e.target.style.color = "#d4af37";
+                  e.target.style.color = colors.accent;
+                  e.target.style.transform = 'translateY(0)';
                 }}
               >
-                Dashboard
+                <span>📊</span> Dashboard
               </button>
               <button
                 onClick={handleLogout}
                 style={{
-                  padding: "12px 28px",
-                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                  color: "#003366",
+                  padding: `${spacing.sm} ${spacing.xl}`,
+                  background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+                  color: colors.primary,
                   border: "none",
-                  borderRadius: "10px",
-                  fontSize: "1rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  boxShadow: "0 4px 15px rgba(212, 175, 55, 0.4)",
+                  transition: transitions.fast,
+                  boxShadow: '0 2px 6px rgba(212, 175, 55, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-2px)";
-                  e.target.style.boxShadow = "0 6px 20px rgba(212, 175, 55, 0.6)";
+                  e.target.style.transform = "translateY(-1px)";
+                  e.target.style.boxShadow = '0 4px 10px rgba(212, 175, 55, 0.4)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.transform = "translateY(0)";
-                  e.target.style.boxShadow = "0 4px 15px rgba(212, 175, 55, 0.4)";
+                  e.target.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.3)';
                 }}
               >
-                Logout
+                <span>↪️</span> Logout
               </button>
             </>
           ) : (
@@ -179,51 +200,59 @@ function Navbar({ onLogout }) {
               <button
                 onClick={() => handleNavigation("/login")}
                 style={{
-                  padding: "12px 28px",
+                  padding: `${spacing.sm} ${spacing.xl}`,
                   background: "transparent",
-                  color: "#d4af37",
-                  border: "2px solid #d4af37",
-                  borderRadius: "10px",
-                  fontSize: "1rem",
-                  fontWeight: "600",
+                  color: colors.accent,
+                  border: `1.5px solid ${colors.accent}`,
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
+                  transition: transitions.fast,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = "#d4af37";
-                  e.target.style.color = "#003366";
+                  e.target.style.background = colors.accent;
+                  e.target.style.color = colors.primary;
+                  e.target.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.background = "transparent";
-                  e.target.style.color = "#d4af37";
+                  e.target.style.color = colors.accent;
+                  e.target.style.transform = 'translateY(0)';
                 }}
               >
-                Login
+                <span>🔑</span> Login
               </button>
               <button
                 onClick={() => handleNavigation("/ChooseRole")}
                 style={{
-                  padding: "12px 28px",
-                  background: "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)",
-                  color: "#003366",
+                  padding: `${spacing.sm} ${spacing.xl}`,
+                  background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+                  color: colors.primary,
                   border: "none",
-                  borderRadius: "10px",
-                  fontSize: "1rem",
-                  fontWeight: "600",
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.bold,
                   cursor: "pointer",
-                  transition: "all 0.3s",
-                  boxShadow: "0 4px 15px rgba(212, 175, 55, 0.4)",
+                  transition: transitions.fast,
+                  boxShadow: '0 2px 6px rgba(212, 175, 55, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-2px)";
-                  e.target.style.boxShadow = "0 6px 20px rgba(212, 175, 55, 0.6)";
+                  e.target.style.transform = "translateY(-1px)";
+                  e.target.style.boxShadow = '0 4px 10px rgba(212, 175, 55, 0.4)';
                 }}
                 onMouseLeave={(e) => {
                   e.target.style.transform = "translateY(0)";
-                  e.target.style.boxShadow = "0 4px 15px rgba(212, 175, 55, 0.4)";
+                  e.target.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.3)';
                 }}
               >
-                Sign Up
+                <span>➕</span> Sign Up
               </button>
             </>
           )}

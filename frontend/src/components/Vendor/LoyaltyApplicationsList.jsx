@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
+import { showToast, confirmDialog } from '../../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
 
 const LoyaltyApplicationsList = () => {
   const [applications, setApplications] = useState([]);
@@ -25,30 +27,32 @@ const LoyaltyApplicationsList = () => {
   };
 
   const handleCancel = async (applicationId) => {
-    if (!window.confirm('Are you sure you want to cancel this loyalty application? This action cannot be undone.')) {
+    const confirmed = await confirmDialog('Are you sure you want to cancel this loyalty application? This action cannot be undone.', 'Cancel Application');
+    if (!confirmed) {
       return;
     }
 
     try {
       await vendorService.cancelLoyaltyApplication(applicationId);
-      alert('Loyalty application cancelled successfully');
+      showToast.success('Loyalty application cancelled successfully');
       fetchApplications();
     } catch (err) {
-      alert(err.message || 'Failed to cancel application');
+      showToast.error(err.message || 'Failed to cancel application');
     }
   };
 
   const handleDelete = async (applicationId) => {
-    if (!window.confirm('Are you sure you want to permanently delete this cancelled loyalty application? This action cannot be undone.')) {
+    const confirmed = await confirmDialog('Are you sure you want to permanently delete this cancelled loyalty application? This action cannot be undone.', 'Delete Application');
+    if (!confirmed) {
       return;
     }
 
     try {
       await vendorService.deleteLoyaltyApplication(applicationId);
-      alert('Loyalty application deleted successfully');
+      showToast.success('Loyalty application deleted successfully');
       fetchApplications();
     } catch (err) {
-      alert(err.message || 'Failed to delete application. Only cancelled applications can be deleted.');
+      showToast.error(err.message || 'Failed to delete application. Only cancelled applications can be deleted.');
     }
   };
 

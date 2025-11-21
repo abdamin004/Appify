@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import vendorService from '../../services/vendorService';
+import { showToast } from '../../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../utils/designSystem';
 
 export default function RequestBooth() {
   const navigate = useNavigate();
@@ -9,17 +11,35 @@ export default function RequestBooth() {
   const [organizations, setOrganizations] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  // Get logged-in vendor info
+  const getVendorInfo = () => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+      if (!raw) return null;
+      const vendor = JSON.parse(raw);
+      return {
+        name: `${vendor.firstName || ''} ${vendor.lastName || ''}`.trim() || vendor.email?.split('@')[0] || '',
+        email: vendor.email || '',
+        companyName: vendor.companyName || vendor.companyname || vendor.company || ''
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const vendorInfo = getVendorInfo();
+  const initialAttendee = vendorInfo ? { name: vendorInfo.name, email: vendorInfo.email, idNumber: '' } : { name: '', email: '', idNumber: '' };
+
   const [formData, setFormData] = useState({
     eventId: '',
-    organization: '',
+    organization: vendorInfo?.companyName || '',
     boothSize: '2x2',
-    attendees: [{ name: '', email: '' }],
+    attendees: [initialAttendee],
     setupDurationWeeks: '',
     setupLocation: '',
     notes: ''
   });
 
-  const [message, setMessage] = useState('');
 
   const setField = (field, value) =>
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -68,7 +88,7 @@ useEffect(() => {
       const merged = [...bazaars, ...booths];
       setEvents(merged);
 
-      // (Optional) autoselect first event so the form is immediately usable
+      // Autoselect first event if available
       if (!formData.eventId && merged.length) {
         setFormData(prev => ({ ...prev, eventId: merged[0].idStr }));
       }
@@ -87,22 +107,19 @@ useEffect(() => {
         }
       }
 
-      // Optional: preselect org from localStorage vendor profile
-      try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser && orgsRaw.length) {
-          const parsed = JSON.parse(storedUser);
-          const companyName = parsed?.companyName || parsed?.companyname || parsed?.company;
-          if (companyName) {
-            const found = orgsRaw.find(o => (o?.name || '').toLowerCase() === companyName.toLowerCase());
-            if (found?.name) {
-              setFormData(prev => ({ ...prev, organization: found.name }));
-            } else {
-              setFormData(prev => ({ ...prev, organization: companyName }));
-            }
-          }
-        }
-      } catch {}
+      // Auto-fill organization from vendor info if not already set
+      const currentVendorInfo = getVendorInfo();
+      if (currentVendorInfo?.companyName) {
+        setFormData(prev => {
+          // Only update if organization is empty
+          if (prev.organization) return prev;
+          const found = orgsRaw.find(o => (o?.name || '').toLowerCase() === currentVendorInfo.companyName.toLowerCase());
+          return {
+            ...prev,
+            organization: found?.name || currentVendorInfo.companyName
+          };
+        });
+      }
 
       // DEBUG: see what we actually got
       console.log('bazaars:', bazaars);
@@ -120,11 +137,6 @@ useEffect(() => {
   useEffect(() => {
     const ev = events.find(e => e.idStr === String(formData.eventId));
     setSelectedEvent(ev || null);
-
-    // DEBUG: remove once it works
-    console.log('eventId:', formData.eventId);
-    console.log('events sample:', events.slice(0, 3).map(x => ({ idStr: x.idStr, type: x.type, title: x.title })));
-    console.log('selectedEvent:', ev);
   }, [formData.eventId, events]);
 
   const updateAttendee = (idx, key, value) => {
@@ -145,17 +157,26 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
 
     const isBooth = selectedEvent?.type === 'Booth';
 
     if (!formData.eventId || !formData.organization || !formData.boothSize) {
-      return setMessage('Please select event, organization, and booth size');
+      showToast.error('Please select event, organization, and booth size');
+      return;
     }
+    
+    // Validate attendees have all required fields (name, email, and ID number)
+    const validAttendees = (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email && a.idNumber);
+    if (formData.attendees.length > 0 && validAttendees.length !== formData.attendees.filter(a => a.name || a.email || a.idNumber).length) {
+      showToast.error('All attendees must have name, email, and ID number');
+      return;
+    }
+    
     if (isBooth) {
       const w = Number(formData.setupDurationWeeks);
       if (!w || w < 1 || w > 4 || !formData.setupLocation) {
-        return setMessage('Booth requires setup duration (1–4 weeks) and setup location');
+        showToast.error('Booth requires setup duration (1–4 weeks) and setup location');
+        return;
       }
     }
 
@@ -166,6 +187,8 @@ useEffect(() => {
         attendees: (formData.attendees || []).slice(0, 5).filter(a => a.name && a.email && a.idNumber),
         ...(isBooth ? {
           setupDurationWeeks: Number(formData.setupDurationWeeks),
+        } : {}),
+        ...(isBooth && formData.setupLocation ? {
           setupLocation: formData.setupLocation,
         } : {}),
         notes: formData.notes,
@@ -173,11 +196,10 @@ useEffect(() => {
 
       console.log('POST payload:', payload, 'eventId:', formData.eventId);
       
-      // eventId must be the URL param, not in body
       await vendorService.applyToEvent(formData.eventId, payload);
 
-      setMessage('Application submitted successfully.');
-      setTimeout(() => navigate('/VendorDashboard'), 1000);
+      showToast.success('Application submitted successfully!');
+      setTimeout(() => navigate('/VendorDashboard'), 1500);
       
       } catch (err) {
         console.error('applyToEvent error:', err);
@@ -186,7 +208,7 @@ useEffect(() => {
           (err && err.error) ||
           (err && err.response && err.response.data && err.response.data.message) ||
           (typeof err === 'string' ? err : JSON.stringify(err));
-        setMessage(msg);
+        showToast.error(msg || 'Failed to submit application');
       }
 
   };
@@ -194,12 +216,55 @@ useEffect(() => {
   const isBooth = selectedEvent?.type === 'Booth';
 
   return (
-    <div style={{ maxWidth: '800px', margin: '24px auto', padding: '24px' }}>
-      <h2 style={{ fontSize: '1.6rem', color: '#003366' }}>Apply to Event (Bazaar / Booth)</h2>
+    <div style={{ 
+      minHeight: '100vh',
+      background: colors.bgPrimary,
+      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
+    }}>
+      <div style={{ 
+        maxWidth: '800px', 
+        margin: '0 auto', 
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
+        borderRadius: borderRadius['2xl'],
+        padding: spacing['3xl'],
+        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
+        border: `1px solid rgba(0,51,102,0.1)`,
+        position: 'relative',
+      }}>
+        <button
+          onClick={() => navigate('/VendorDashboard')}
+          style={{
+            ...buttonStyles.back,
+            marginBottom: spacing.lg,
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = colors.accent;
+            e.target.style.color = colors.primary;
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = 'transparent';
+            e.target.style.color = colors.primary;
+          }}
+        >
+          ← Back
+        </button>
+        
+        <h2 style={{ 
+          fontSize: typography.fontSize['2xl'], 
+          color: colors.primary,
+          fontWeight: typography.fontWeight.bold,
+          marginBottom: spacing.xl,
+        }}>Apply to Event (Bazaar / Booth)</h2>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 8 }}>Event</label>
+        <div style={{ marginBottom: spacing.lg }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: spacing.sm,
+            color: colors.primary,
+            fontWeight: typography.fontWeight.semibold,
+            fontSize: typography.fontSize.base,
+          }}>Event *</label>
           <select
             name="eventId"
             value={formData.eventId}
@@ -212,6 +277,7 @@ useEffect(() => {
             {events.map(ev => (
               <option key={ev.idStr} value={ev.idStr}>
                 {ev.title} — {ev.type} — {ev.startDate ? new Date(ev.startDate).toLocaleDateString() : ''}
+                {ev.location ? ` — ${ev.location}` : ''}
               </option>
             ))}
           </select>
@@ -245,14 +311,34 @@ useEffect(() => {
           </div>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 8 }}>Booth Size</label>
+        <div style={{ marginBottom: spacing.lg }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: spacing.sm,
+            color: colors.primary,
+            fontWeight: typography.fontWeight.semibold,
+            fontSize: typography.fontSize.base,
+          }}>Booth Size</label>
           <select
             name="boothSize"
             value={formData.boothSize}
             onChange={(e) => setField('boothSize', e.target.value)}
             required
-            style={{ width: '100%', padding: 10 }}
+            style={{ 
+              ...inputStyles.base,
+              width: '100%',
+              padding: '14px 18px',
+              border: `2px solid ${colors.gray200}`,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = colors.accent;
+              e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = colors.gray200;
+              e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+            }}
           >
             <option value="2x2">2x2</option>
             <option value="4x4">4x4</option>
@@ -275,8 +361,14 @@ useEffect(() => {
         </div>
 
         {/* Booth-only fields */}
-        <div style={{ marginBottom: 12, opacity: isBooth ? 1 : 0.6 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>Setup duration (weeks)</label>
+        <div style={{ marginBottom: spacing.lg, opacity: isBooth ? 1 : 0.6 }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: spacing.xs,
+            color: colors.primary,
+            fontWeight: typography.fontWeight.semibold,
+            fontSize: typography.fontSize.base,
+          }}>Setup duration (weeks)</label>
           <input
             type="number" min={1} max={4}
             value={formData.setupDurationWeeks}
@@ -284,43 +376,99 @@ useEffect(() => {
             required={!!isBooth}
             disabled={!isBooth}
             placeholder="1-4"
-            style={{ width: '100%', padding: 8 }}
+            style={{ 
+              ...inputStyles.base,
+              width: '100%',
+              opacity: !isBooth ? 0.6 : 1,
+            }}
           />
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+          <div style={{ 
+            fontSize: typography.fontSize.xs, 
+            color: colors.gray500, 
+            marginTop: spacing.xs 
+          }}>
             {isBooth ? 'Required for Booth events.' : 'Required only for Booth events.'}
           </div>
         </div>
 
-        <div style={{ marginBottom: 12, opacity: isBooth ? 1 : 0.6 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>Setup location (map slot id)</label>
+        <div style={{ marginBottom: spacing.lg, opacity: isBooth ? 1 : 0.6 }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: spacing.xs,
+            color: colors.primary,
+            fontWeight: typography.fontWeight.semibold,
+            fontSize: typography.fontSize.base,
+          }}>Setup location (map slot id)</label>
           <input
             value={formData.setupLocation}
             onChange={e => setField('setupLocation', e.target.value)}
             required={!!isBooth}
             disabled={!isBooth}
             placeholder="e.g., ZB-04"
-            style={{ width: '100%', padding: 8 }}
+            style={{ 
+              ...inputStyles.base,
+              width: '100%',
+              opacity: !isBooth ? 0.6 : 1,
+            }}
           />
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+          <div style={{ 
+            fontSize: typography.fontSize.xs, 
+            color: colors.gray500, 
+            marginTop: spacing.xs 
+          }}>
             {isBooth ? 'Required for Booth events.' : 'Required only for Booth events.'}
           </div>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 8 }}>Notes</label>
-          <textarea value={formData.notes} onChange={e => setField('notes', e.target.value)} rows={4} style={{ width: '100%', padding: 8 }} />
+        <div style={{ marginBottom: spacing.lg }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: spacing.sm,
+            color: colors.primary,
+            fontWeight: typography.fontWeight.semibold,
+            fontSize: typography.fontSize.base,
+          }}>Notes</label>
+          <textarea 
+            value={formData.notes} 
+            onChange={e => setField('notes', e.target.value)} 
+            rows={4} 
+            style={{ 
+              ...inputStyles.base,
+              width: '100%',
+              resize: 'vertical',
+              fontFamily: typography.fontFamily,
+              padding: '14px 18px',
+              border: `2px solid ${colors.gray200}`,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = colors.accent;
+              e.target.style.boxShadow = `0 0 0 3px rgba(184, 148, 31, 0.1)`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = colors.gray200;
+              e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+            }} 
+          />
         </div>
 
-        <button type="submit" style={{ padding: '12px 16px', background: '#d4af37', border: 'none', borderRadius: 8 }}>
+        <button 
+          type="submit" 
+          style={{ 
+            ...buttonStyles.primary,
+            width: '100%',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.boxShadow = shadows.accentHover;
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.boxShadow = shadows.accent;
+          }}
+        >
           Submit Application
         </button>
       </form>
-
-      {message && (
-        <div style={{ marginTop: 12, color: message.includes('failed') || message.includes('already') ? '#dc2626' : '#065f46' }}>
-          {message}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

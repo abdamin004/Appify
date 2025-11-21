@@ -14,6 +14,20 @@ const workshopSchema = new mongoose.Schema({
   required: true
     },
     extraRequiredResourses: { type: Boolean, default: false },
+    editRequests: [
+        {
+            field: { type: String, required: true },
+            requestedValue: { type: mongoose.Schema.Types.Mixed, required: true },
+            requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            date: { type: Date, default: Date.now },
+            resolved: { type: Boolean, default: false }
+        }
+    ],
+    status: {
+        type: String,
+        enum: ['pending', 'published', 'rejected', 'archived'],
+        default: 'pending'
+    },
 });
 
 const Workshop = Event.discriminator('Workshop', workshopSchema);// indicates its a subclass of Event

@@ -34,6 +34,8 @@ app.use('/api/courts', require('./routes/court'));
 app.use('/api/auth', require('./routes/Auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/vendor', require('./routes/vendors'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/polls', require('./routes/polls'));
 app.use('/api/payments', require('./routes/payments'));
 
 // Root route
@@ -47,6 +49,7 @@ app.use((err, req, res, next) => {
   res.status(500).send('Something broke!');
 });
 
+require('./cron/eventReminderCron')(); // Start the event reminder cron job
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

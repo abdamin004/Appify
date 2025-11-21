@@ -1,35 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createTrip, listTrips, updateEvent } from '../../../services/eventService';
 import UserSelector from '../UserSelector';
 import { setRestrictedUsers, getRestrictedUsers } from '../../../services/eventRestrictionService';
 
-const pageWrap = {
-  minHeight: '100vh',
-  background: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)',
-  padding: '100px 20px 60px',
-};
-const panel = {
-  maxWidth: 1100,
-  margin: '0 auto',
-  background: '#fff',
-  borderRadius: 16,
-  padding: 24,
-  boxShadow: '0 18px 40px -24px rgba(0,0,0,0.35)',
-  border: '1px solid #e5e7eb',
-};
-const h1Style = {
-  margin: 0,
-  color: '#003366',
-  fontWeight: 800,
-  fontSize: 28,
-  textAlign: 'center',
-};
-const sectionTitle = { color: '#003366', fontWeight: 700, fontSize: 18, marginTop: 8 };
-const yellow = '#d4af37';
-
-function TripsManager() {
+function TripsManager({ editOnly = false }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  const autoEditApplied = useRef(false);
+  const editId = editOnly ? params.id : null;
   const [form, setForm] = useState({
     title: '',
     shortDescription: '',
@@ -43,13 +25,24 @@ function TripsManager() {
   });
   const [restrictedUserIds, setRestrictedUserIds] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [trips, setTrips] = useState([]);
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({});
 
-  async function refresh() { const rows = await listTrips(); setTrips(rows); }
+  const clearEditParam = () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('edit');
+      window.history.replaceState({}, '', url.toString());
+    } catch (_) {}
+  };
+
+  async function refresh() { 
+    if (!editOnly) {
+      const rows = await listTrips(); 
+      setTrips(rows); 
+    }
+  }
   useEffect(() => { 
     refresh(); 
     // Debug: Check authentication status
@@ -65,18 +58,75 @@ function TripsManager() {
     } else {
       console.warn('⚠️ No authentication token or user data found');
     }
-  }, []);
+  }, [editOnly]);
+
+  // Load event for editing when in edit-only mode
+  useEffect(() => {
+    if (editOnly && editId && !editing) {
+      loadTripForEdit(editId);
+    }
+  }, [editOnly, editId]);
+
+  const loadTripForEdit = async (id) => {
+    setLoading(true);
+    try {
+      const trip = await getEventById(id);
+      if (trip) {
+        setEditData({
+          title: trip.title || '',
+          shortDescription: trip.shortDescription || '',
+          location: trip.location || '',
+          price: trip.price || 0,
+          capacity: trip.capacity || 0,
+          startDate: trip.startDate ? trip.startDate.slice(0,16) : '',
+          endDate: trip.endDate ? trip.endDate.slice(0,16) : '',
+          registrationDeadline: trip.registrationDeadline ? trip.registrationDeadline.slice(0,16) : '',
+          status: trip.status || 'published'
+        });
+        setEditing(id);
+      } else {
+        showToast.error('Trip not found');
+        navigate('/EventOfficeDashboard');
+      }
+    } catch (err) {
+      showToast.error(err.message || 'Failed to load trip');
+      navigate('/EventOfficeDashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Legacy support: If opened with ?edit=<id>, auto-start editing that trip once
+  useEffect(() => {
+    if (editOnly) return; // Skip if in edit-only mode
+    try {
+      if (autoEditApplied.current) return;
+      const urlParams = new URLSearchParams(window.location.search || "");
+      const targetFromQuery = urlParams.get('edit');
+      const targetFromState = (location && location.state && location.state.edit) || null;
+      const targetId = targetFromState || targetFromQuery;
+      if (targetId && !editing && Array.isArray(trips) && trips.length) {
+        const row = trips.find(t => String(t._id) === String(targetId));
+        if (row) {
+          startEdit(row);
+          autoEditApplied.current = true;
+        }
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, [trips, editing, editOnly]);
 
   const onCreate = async (e) => {
     e.preventDefault();
-    setLoading(true); setError(''); setSuccess('');
+    setLoading(true);
     try {
       // Check if user is logged in
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
       
       if (!token || !user) {
-        setError('You must be logged in to create a trip. Please log in and try again.');
+        showToast.error('You must be logged in to create a trip. Please log in and try again.');
         setLoading(false);
         return;
       }
@@ -111,15 +161,17 @@ function TripsManager() {
       }
       
       await refresh();
+      // Redirect to Event Office dashboard
+      navigate('/EventOfficeDashboard');
     } catch (err) { 
       console.error('Error creating trip:', err);
       const errorMsg = err.message || 'Failed to create trip';
       if (errorMsg.includes('Forbidden') || errorMsg.includes('403')) {
-        setError('Access denied. Please ensure you are logged in as an Event Office, Admin, or Professor account.');
+        showToast.error('Access denied. Please ensure you are logged in as an Event Office, Admin, or Professor account.');
       } else if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
-        setError('Session expired. Please log in again.');
+        showToast.error('Session expired. Please log in again.');
       } else {
-        setError(errorMsg);
+        showToast.error(errorMsg);
       }
     }
     finally { setLoading(false); }
@@ -131,24 +183,81 @@ function TripsManager() {
     registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', status: row.status || 'published'
   }); };
   const onSave = async (id) => {
-    setLoading(true); setError(''); setSuccess('');
+    setLoading(true);
     try {
       const payload = { ...editData, price: Number(editData.price || 0), capacity: Number(editData.capacity || 0) };
       await updateEvent(id, payload);
-      setSuccess('Trip updated');
-      setEditing(null); setEditData({});
-      await refresh();
-    } catch (err) { setError(err.message || 'Failed to update'); }
-    finally { setLoading(false); }
+      showToast.success('Trip updated successfully');
+      setEditing(null); 
+      setEditData({});
+      clearEditParam();
+      // Redirect to EventOfficeDashboard after saving
+      navigate('/EventOfficeDashboard');
+    } catch (err) { 
+      showToast.error(err.message || 'Failed to update trip');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={pageWrap}>
-      <div style={panel}>
-        <h1 style={h1Style}>Events Office — Trips</h1>
+    <div style={{
+      minHeight: '100vh',
+      background: colors.bgPrimary,
+      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
+    }}>
+      <div style={{
+        maxWidth: 1100,
+        margin: '0 auto',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
+        borderRadius: borderRadius['2xl'],
+        padding: spacing['3xl'],
+        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
+        border: `1px solid rgba(0,51,102,0.1)`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: spacing.md }}>
+          <button
+            onClick={() => navigate('/EventOfficeDashboard')}
+            style={{
+              ...buttonStyles.back,
+              background: colors.bgCard,
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = colors.accent;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = colors.bgCard;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.primary;
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+        <h1 style={{
+          margin: 0,
+          color: colors.primary,
+          fontWeight: typography.fontWeight.extrabold,
+          fontSize: typography.fontSize['2xl'],
+          textAlign: 'center',
+          marginBottom: spacing['2xl']
+        }}>{editOnly ? 'Edit Trip' : 'Events Office — Trips'}</h1>
 
-        <h2 style={sectionTitle}>Create Trip</h2>
-        <form className="form managerForm" onSubmit={onCreate}>
+        {!editOnly && (
+          <>
+            <h2 style={{ 
+              color: colors.primary, 
+              fontWeight: typography.fontWeight.bold, 
+              fontSize: typography.fontSize.lg, 
+              marginTop: spacing.xl,
+              marginBottom: spacing.lg,
+            }}>Create Trip</h2>
+            {!editing && (
+          <form className="form managerForm" onSubmit={onCreate}>
           <label>
             <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
             <span>Title</span>
@@ -195,40 +304,312 @@ function TripsManager() {
           <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
             {loading ? 'Creating...' : 'Create Trip'}
           </button>
-          {error && <p className="message" style={{ color: 'red' }}>{error}</p>}
-          {success && <p className="message" style={{ color: 'green' }}>{success}</p>}
         </form>
+            )}
+          </>
+        )}
 
-        <h2 style={sectionTitle}>Existing Trips</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          {trips.map((t) => (
-            <div key={t._id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fff' }}>
-              {editing === t._id ? (
+        {editing && (() => {
+          const trip = trips.find(t => t._id === editing);
+          if (!trip) return null;
+          return (
+            <div style={{
+              background: colors.white,
+              borderRadius: borderRadius.xl,
+              padding: spacing['2xl'],
+              marginTop: spacing.xl,
+              marginBottom: spacing['2xl'],
+              boxShadow: shadows.lg,
+              border: `1px solid ${colors.gray200}`,
+            }}>
+              <div style={{
+                marginBottom: spacing.xl,
+                paddingBottom: spacing.lg,
+                borderBottom: `2px solid ${colors.gray200}`,
+              }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  fontWeight: typography.fontWeight.bold, 
+                  fontSize: typography.fontSize.xl,
+                  margin: 0,
+                }}>✏️ Edit Trip</h2>
+              </div>
+              <div style={{ display: 'grid', gap: spacing.lg }}>
                 <div>
-                  <input className="input" style={{ marginBottom: 8 }} value={editData.title} onChange={e=>setEditData({ ...editData, title: e.target.value })} placeholder="Title" />
-                  <input className="input" style={{ marginBottom: 8 }} value={editData.shortDescription} onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} placeholder="Short description" />
-                  <input className="input" style={{ marginBottom: 8 }} value={editData.location} onChange={e=>setEditData({ ...editData, location: e.target.value })} placeholder="Location" />
-                  <input className="input" style={{ marginBottom: 8 }} type="number" value={editData.price} onChange={e=>setEditData({ ...editData, price: e.target.value })} placeholder="Price" />
-                  <input className="input" style={{ marginBottom: 8 }} type="number" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} placeholder="Capacity" />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" placeholder=" " value={editData.startDate} onChange={e=>setEditData({ ...editData, startDate: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" value={editData.endDate} onChange={e=>setEditData({ ...editData, endDate: e.target.value })} />
-                  <input className="input" style={{ marginBottom: 8 }} type="datetime-local" placeholder=" " value={editData.registrationDeadline} onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} />
-                  <button className="submit" onClick={() => onSave(t._id)} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700, marginRight: 8 }}>Save</button>
-                  <button className="submit" onClick={() => setEditing(null)} style={{ backgroundColor: '#e5e7eb', color: '#111827' }}>Cancel</button>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Title *</span>
+                    <input 
+                      className="input" 
+                      required 
+                      value={editData.title} 
+                      onChange={e=>setEditData({ ...editData, title: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
                 </div>
-              ) : (
                 <div>
-                  <div style={{ fontWeight: 800, color: '#003366' }}>{t.title}</div>
-                  <div style={{ color: '#374151', fontSize: 14 }}>{t.shortDescription || '—'}</div>
-                  <div style={{ color: '#6b7280', fontSize: 12, marginTop: 6 }}>{t.location} • ${t.price}</div>
-                  <div style={{ color: '#6b7280', fontSize: 12 }}>Capacity: {t.capacity ?? '-'}</div>
-                  <div style={{ color: '#6b7280', fontSize: 12 }}>From {new Date(t.startDate).toLocaleString()} to {t.endDate ? new Date(t.endDate).toLocaleString() : '—'}</div>
-                  <button className="submit" onClick={() => startEdit(t)} style={{ marginTop: 8, backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>Edit</button>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Short Description</span>
+                    <input 
+                      className="input" 
+                      value={editData.shortDescription} 
+                      onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Start Date/Time *</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      required 
+                      value={editData.startDate} 
+                      onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>End Date/Time *</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      required 
+                      value={editData.endDate} 
+                      onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Location *</span>
+                    <input 
+                      className="input" 
+                      required 
+                      value={editData.location} 
+                      onChange={e=>setEditData({ ...editData, location: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Registration Deadline</span>
+                    <input 
+                      className="input" 
+                      type="datetime-local" 
+                      value={editData.registrationDeadline} 
+                      onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Price *</span>
+                    <input 
+                      className="input" 
+                      type="number" 
+                      required 
+                      value={editData.price} 
+                      onChange={e=>setEditData({ ...editData, price: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
+                    <span style={{ 
+                      display: 'block', 
+                      color: colors.primary, 
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.xs,
+                      fontSize: typography.fontSize.sm,
+                    }}>Capacity *</span>
+                    <input 
+                      className="input" 
+                      type="number" 
+                      required 
+                      value={editData.capacity} 
+                      onChange={e=>setEditData({ ...editData, capacity: e.target.value })} 
+                      style={{ ...inputStyles.base, width: '100%' }}
+                    />
+                  </label>
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: spacing.md, 
+                  marginTop: spacing.lg,
+                  paddingTop: spacing.lg,
+                  borderTop: `1px solid ${colors.gray200}`,
+                }}>
+                  <button 
+                    type="button" 
+                    onClick={() => onSave(editing)} 
+                    disabled={loading}
+                    style={{ 
+                      ...buttonStyles.primary,
+                      flex: 1,
+                      padding: `${spacing.md} ${spacing.xl}`,
+                      fontSize: typography.fontSize.base,
+                      opacity: loading ? 0.7 : 1,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.target.style.boxShadow = shadows.accentHover;
+                        e.target.style.transform = 'translateY(-2px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.target.style.boxShadow = shadows.accent;
+                        e.target.style.transform = 'translateY(0)';
+                      }
+                    }}
+                  >
+                    {loading ? '💾 Saving...' : '💾 Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {!editOnly && (
+          <>
+            <h2 style={{ 
+              color: colors.primary, 
+              fontWeight: typography.fontWeight.bold, 
+              fontSize: typography.fontSize.lg, 
+              marginTop: spacing['3xl'],
+              marginBottom: spacing.lg,
+            }}>Existing Trips</h2>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+              gap: spacing.lg 
+            }}>
+              {trips.map((t) => (
+            <div key={t._id} style={{ 
+              border: `1px solid ${colors.gray200}`, 
+              borderRadius: borderRadius.xl, 
+              padding: spacing.lg, 
+              background: colors.white,
+              boxShadow: shadows.md,
+              transition: transitions.normal,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = shadows.lg;
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = shadows.md;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            >
+              {editing !== t._id && (
+                <div>
+                  <div style={{ 
+                    fontWeight: typography.fontWeight.extrabold, 
+                    color: colors.primary,
+                    fontSize: typography.fontSize.lg,
+                    marginBottom: spacing.sm,
+                  }}>
+                    {t.title}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray700, 
+                    fontSize: typography.fontSize.sm,
+                    marginBottom: spacing.xs,
+                  }}>
+                    {t.shortDescription || '—'}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray500, 
+                    fontSize: typography.fontSize.xs, 
+                    marginTop: spacing.sm,
+                    marginBottom: spacing.xs,
+                  }}>
+                    📍 {t.location} • ${t.price}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray500, 
+                    fontSize: typography.fontSize.xs,
+                    marginBottom: spacing.xs,
+                  }}>
+                    👥 Capacity: {t.capacity ?? '-'}
+                  </div>
+                  <div style={{ 
+                    color: colors.gray500, 
+                    fontSize: typography.fontSize.xs,
+                    marginBottom: spacing.md,
+                  }}>
+                    From {new Date(t.startDate).toLocaleString()} to {t.endDate ? new Date(t.endDate).toLocaleString() : '—'}
+                  </div>
+                  <button 
+                    className="submit" 
+                    onClick={() => navigate(`/events-office/trips/edit/${t._id}`)} 
+                    style={{ 
+                      ...buttonStyles.primary,
+                      width: '100%',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.boxShadow = shadows.accentHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.boxShadow = shadows.accent;
+                    }}
+                  >
+                    Edit
+                  </button>
                 </div>
               )}
             </div>
-          ))}
-        </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
