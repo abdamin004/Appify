@@ -352,12 +352,26 @@ exports.applyToLoyaltyProgram = async (req, res, next) => {
             organization,
             discountRate,
             promoCode,
-            termsAndConditions
+            termsAndConditions,
+            status: 'approved'
         });
+
+        try {
+            const discountInfo = typeof discountRate === 'number' ? `${discountRate}%` : 'a special';
+            const promoInfo = promoCode ? ` Use code ${promoCode}.` : '';
+            await Notification.create({
+                type: 'LoyaltyPartnerAdded',
+                message: `${organization} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
+                recipientsRoles: ['Student', 'Staff', 'TA', 'Professor', 'Vendor'],
+                organization
+            });
+        } catch (notifyErr) {
+            console.error('Failed to create instant loyalty notification:', notifyErr?.message || notifyErr);
+        }
 
         return res.status(201).json({
             success: true,
-            message: 'Loyalty program application submitted',
+            message: 'Loyalty program offer is live and visible to all users',
             application: app
         });
     } catch (err) {

@@ -33,6 +33,13 @@ router.patch(
   adminController.reviewVendorApplication
 );
 
+router.patch(
+  '/loyalty-applications/:id/status',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.reviewLoyaltyApplication
+);
+
 router.get(
   '/notifications/unread-count',
   auth,

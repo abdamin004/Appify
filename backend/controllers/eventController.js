@@ -12,8 +12,13 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
-const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail } = require('../utils/sendEmail');
+const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail, sendVendorVisitorPassesEmail } = require('../utils/sendEmail');
 const Notification = require('../models/Notification');
+const VisitorPass = require('../models/VisitorPass');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
+
+const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'EventOffice'];
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -50,6 +55,63 @@ async function attachApprovedParticipants(events) {
     // In case of error, return original events
     return events;
   }
+}
+
+function qualifiesForExternalVisitors(event) {
+  if (!event) return { allowed: false };
+  if (event.type === 'Bazaar') {
+    return { allowed: true, category: 'Bazaar' };
+  }
+  const haystack = [
+    event.category || '',
+    event.title || '',
+    Array.isArray(event.tags) ? event.tags.join(' ') : ''
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes('career') && haystack.includes('fair')) {
+    return { allowed: true, category: 'CareerFair' };
+  }
+
+  return { allowed: false };
+}
+
+function parseAllowedRoles(input) {
+  if (input === undefined) return null;
+  if (input === null) return [];
+
+  let list;
+  if (Array.isArray(input)) {
+    list = input;
+  } else if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return [];
+    list = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+  } else {
+    return null;
+  }
+
+  if (list.length === 0) return [];
+
+  const normalized = [];
+  list.forEach((role) => {
+    if (!role) return;
+    const match = USER_ROLE_OPTIONS.find(
+      (opt) => opt.toLowerCase() === role.toString().toLowerCase()
+    );
+    if (match && !normalized.includes(match)) {
+      normalized.push(match);
+    }
+  });
+
+  if (normalized.length === 0) {
+    throw new Error(
+      `allowedRoles contains invalid values. Valid options: ${USER_ROLE_OPTIONS.join(', ')}`
+    );
+  }
+
+  return normalized;
 }
 
 module.exports = {
@@ -114,6 +176,11 @@ module.exports = {
                 createdBy: req.user._id
             };
 
+            const allowedRoles = parseAllowedRoles(req.body.allowedRoles);
+            if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+                eventData.allowedRoles = allowedRoles;
+            }
+
             let event;
 
             switch (type) {
@@ -147,7 +214,7 @@ module.exports = {
                 default:
                     event = await Event.create(eventData);
             }
-            //  NEW EVENT NOTIFICATION — ONLY if published
+            //  NEW EVENT NOTIFICATION ï¿½ ONLY if published
             if (event.status === 'published') {
                 try {
                     await Notification.create({
@@ -404,6 +471,15 @@ module.exports = {
                 });
             }
 
+            if (Array.isArray(event.allowedRoles) && event.allowedRoles.length > 0) {
+                if (!event.allowedRoles.includes(user.role)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: `This event is restricted to: ${event.allowedRoles.join(', ')}`
+                    });
+                }
+            }
+
             // Check if user already registered
             if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
                 return res.status(400).json({ 
@@ -551,6 +627,15 @@ module.exports = {
                 ...(registrationDeadline && { registrationDeadline })
             };
 
+            if (Object.prototype.hasOwnProperty.call(req.body, 'allowedRoles')) {
+                const parsedRoles = parseAllowedRoles(req.body.allowedRoles);
+                if (parsedRoles === null || parsedRoles.length === 0) {
+                    updatedData.allowedRoles = [];
+                } else {
+                    updatedData.allowedRoles = parsedRoles;
+                }
+            }
+
             switch (event.type) {
                 case 'Workshop':
                     if (professors) updatedData.professors = professors;
@@ -662,6 +747,55 @@ module.exports = {
             });
         } catch (err) {
             res.status(400).json({ error: err.message });
+        }
+    },
+
+    async archiveEvent(req, res) {
+        try {
+            const { id } = req.params;
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: 'Invalid event id' });
+            }
+
+            const event = await Event.findById(id);
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
+
+            const now = new Date();
+            const end = event.endDate ? new Date(event.endDate) : null;
+            const start = event.startDate ? new Date(event.startDate) : null;
+            const hasPassed = (end && end <= now) || (!end && start && start <= now);
+
+            if (!hasPassed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Only past events can be archived'
+                });
+            }
+
+            if (event.status === 'archived') {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Event already archived',
+                    event
+                });
+            }
+
+            event.status = 'archived';
+            await event.save();
+
+            res.status(200).json({
+                success: true,
+                message: 'Event archived successfully',
+                event
+            });
+        } catch (err) {
+            console.error('archiveEvent error:', err);
+            res.status(500).json({
+                success: false,
+                message: err.message
+            });
         }
     },
 
@@ -1106,6 +1240,151 @@ module.exports = {
                 success: false,
                 message: err.message
             });
+        }
+    },
+
+    async generateVendorAttendeePasses(req, res) {
+        try {
+            const { applicationId } = req.params;
+
+            if (!applicationId || !ObjectId.isValid(applicationId)) {
+                return res.status(400).json({ success: false, message: 'Invalid vendor application id' });
+            }
+
+            const application = await VendorApplication.findById(applicationId)
+                .populate('event', 'title type category tags status location startDate')
+                .populate('vendorUser', 'email companyName');
+
+            if (!application) {
+                return res.status(404).json({ success: false, message: 'Vendor application not found' });
+            }
+
+            const event = application.event;
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event linked to application not found' });
+            }
+
+            const eligibility = qualifiesForExternalVisitors(event);
+            if (!eligibility.allowed) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Only Bazaar or Career Fair events support attendee QR generation'
+                });
+            }
+
+            if (!Array.isArray(application.attendees) || application.attendees.length === 0) {
+                return res.status(400).json({ success: false, message: 'No attendees found on this vendor application' });
+            }
+
+            const created = [];
+            const skipped = [];
+
+            for (const attendee of application.attendees) {
+                if (!attendee || !attendee.name) continue;
+
+                const existing = await VisitorPass.findOne({
+                    $or: [
+                        {
+                            vendorApplication: application._id,
+                            visitorEmail: attendee.email || undefined,
+                            visitorName: attendee.name
+                        },
+                        {
+                            vendorApplication: { $exists: false },
+                            event: event._id,
+                            visitorEmail: attendee.email || undefined,
+                            visitorName: attendee.name
+                        }
+                    ]
+                });
+
+                if (existing) {
+                    skipped.push({ visitorName: attendee.name, reason: 'Already generated' });
+                    continue;
+                }
+
+                const passCode = crypto.randomBytes(8).toString('hex').toUpperCase();
+                const payload = {
+                    eventId: event._id.toString(),
+                    eventTitle: event.title,
+                    eventType: event.type,
+                    vendorApplicationId: application._id.toString(),
+                    organization: application.organization,
+                    visitorName: attendee.name,
+                    visitorEmail: attendee.email,
+                    visitorIdNumber: attendee.idNumber,
+                    passCode,
+                    issuedAt: new Date().toISOString()
+                };
+
+                const qrData = JSON.stringify(payload);
+                const qrImageDataUrl = await QRCode.toDataURL(qrData, {
+                    width: 320,
+                    margin: 1,
+                    errorCorrectionLevel: 'H'
+                });
+
+                const pass = await VisitorPass.create({
+                    event: event._id,
+                    vendorApplication: application._id,
+                    eventTitle: event.title,
+                    eventType: event.type,
+                    visitorName: attendee.name,
+                    visitorEmail: attendee.email,
+                    visitorOrganization: application.organization,
+                    visitorIdNumber: attendee.idNumber,
+                    purpose: `Vendor attendee for ${event.title}`,
+                    passCode,
+                    qrData,
+                    qrImageDataUrl,
+                    createdBy: req.user._id
+                });
+
+                created.push(pass);
+            }
+
+            let emailError = null;
+            try {
+                const passesForEmail = await VisitorPass.find({
+                    $or: [
+                        { vendorApplication: application._id },
+                        {
+                            vendorApplication: { $exists: false },
+                            event: event._id,
+                            visitorOrganization: application.organization
+                        }
+                    ]
+                })
+                    .select('visitorName visitorEmail visitorIdNumber passCode qrImageDataUrl')
+                    .sort({ createdAt: 1 })
+                    .lean();
+
+                if (passesForEmail.length && application.vendorUser?.email) {
+                    await sendVendorVisitorPassesEmail(
+                        application.vendorUser,
+                        event,
+                        application.organization,
+                        passesForEmail
+                    );
+                } else if (!application.vendorUser?.email) {
+                    console.warn('Vendor email not found for application:', applicationId);
+                }
+            } catch (err) {
+                emailError = err;
+                console.error('Failed to email vendor visitor passes:', err);
+            }
+
+            res.status(201).json({
+                success: true,
+                message: `Generated ${created.length} attendee QR codes`,
+                createdCount: created.length,
+                skipped,
+                passes: created,
+                emailDelivered: !emailError
+            });
+        } catch (error) {
+            console.error('generateVendorAttendeePasses error:', error);
+            res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
         }
     }
 

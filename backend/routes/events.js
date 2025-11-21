@@ -13,6 +13,13 @@ router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice', 'Professor'), 
 // Delete event
 router.delete('/delete/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.deleteEvent);
 
+router.patch(
+  '/:id/archive',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  eventController.archiveEvent
+);
+
 // Get my workshops
 router.get('/workshops/mine', auth, roleCheck('Professor'), eventController.getMyWorkshops);
 
@@ -55,6 +62,12 @@ router.post('/workshops/:workshopId/request-edit', auth, roleCheck('Admin', 'Eve
 
 // routes/events.js
 router.patch('/publish/:id', auth, roleCheck('Admin', 'EventOffice'), eventController.publishEvent);
+router.post(
+  '/vendor-applications/:applicationId/attendee-passes',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  eventController.generateVendorAttendeePasses
+);
 // Get single event by ID (must be before /:id/comments and /:id/ratings)
 router.get('/:id', eventController.getEventById);
 

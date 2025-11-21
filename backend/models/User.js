@@ -40,7 +40,6 @@ const userSchema = new mongoose.Schema({ // el schema da by7aded structure el do
     }
   }
 ],
-    }],
 
     favoriteEvents: [{
         type: mongoose.Schema.Types.ObjectId,

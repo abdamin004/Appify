@@ -3,7 +3,15 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
-        enum: ['VendorApplicationSubmitted', 'VendorApplicationApproved', 'VendorApplicationRejected', 'NewEventPublished','EventReminder1Day','EventReminder1Hour' ],
+        enum: [
+          'VendorApplicationSubmitted',
+          'VendorApplicationApproved',
+          'VendorApplicationRejected',
+          'NewEventPublished',
+          'EventReminder1Day',
+          'EventReminder1Hour',
+          'LoyaltyPartnerAdded'
+        ],
     required: true
   },
   message: { type: String, required: true },
