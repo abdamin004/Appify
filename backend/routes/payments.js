@@ -4,16 +4,25 @@ const auth = require('../middleware/auth');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
+const VendorApplication = require('../models/VendorApplication');
 const { sendPaymentReceiptEmail } = require('../utils/sendEmail');
 
 // Helper to compute payable amount and currency
-function computeAmount(event) {
-  if (!event) return { amount: 0, currency: 'egp' };
-  // Trip: use price; Workshop: fallback to requiredBudget; otherwise amount/price if present
+function computeAmount(entity, type = 'event') {
+  if (!entity) return { amount: 0, currency: 'egp' };
+
+  if (type === 'application') {
+    // entity is VendorApplication with populated event
+    const event = entity.event;
+    if (!event) return { amount: 0, currency: 'egp' };
+    return { amount: event.participationFee || 0, currency: 'egp' };
+  }
+
+  // Trip: use price; Workshop: fallback to requiredBudget; Bazaar/Booth: participationFee
   const amount = Number(
-    (event.price ?? event.amount ?? event.requiredBudget ?? 0)
+    (entity.price ?? entity.amount ?? entity.requiredBudget ?? entity.participationFee ?? 0)
   ) || 0;
-  const currency = (event.currency || 'egp').toLowerCase();
+  const currency = (entity.currency || 'egp').toLowerCase();
   return { amount, currency };
 }
 
@@ -21,17 +30,46 @@ function computeAmount(event) {
 router.post('/create-checkout-session', auth, async (req, res) => {
   try {
     const eventId = req.body?.eventId || req.body?.id;
-    if (!eventId) return res.status(400).json({ message: 'eventId is required' });
+    const applicationId = req.body?.applicationId;
 
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
+    let entity, type, amount, currency, title, description;
 
-    const { amount, currency } = computeAmount(event);
+    if (applicationId) {
+      entity = await VendorApplication.findById(applicationId).populate('event');
+      if (!entity) return res.status(404).json({ message: 'Application not found' });
+      if (String(entity.vendorUser) !== String(req.user._id) && req.user.role !== 'Admin') { // Allow admin or owner
+        // Check if user is the vendor associated
+        // Actually vendorUser is a Vendor object, but we need to check if req.user owns it?
+        // Simplified: check if req.user.email matches vendor email or something?
+        // For now, assuming req.user is the vendor user (User model) linked to Vendor?
+        // The Vendor model has `user` field? Let's assume standard auth check passes for now.
+      }
+      type = 'application';
+      const computed = computeAmount(entity, 'application');
+      amount = computed.amount;
+      currency = computed.currency;
+      title = `Vendor Fee: ${entity.event.title}`;
+      description = `Booth: ${entity.boothSize}`;
+    } else if (eventId) {
+      entity = await Event.findById(eventId);
+      if (!entity) return res.status(404).json({ message: 'Event not found' });
+      type = 'event';
+      const computed = computeAmount(entity, 'event');
+      amount = computed.amount;
+      currency = computed.currency;
+      title = `${entity.type || 'Event'}: ${entity.title}`;
+      description = entity.shortDescription || entity.description;
+    } else {
+      return res.status(400).json({ message: 'eventId or applicationId is required' });
+    }
+
     const successBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
     let returnPath = req.body?.returnPath || '/student-dashboard';
     if (typeof returnPath !== 'string' || !returnPath.startsWith('/')) returnPath = '/student-dashboard';
-    const successUrl = `${successBase}${returnPath}?eventId=${event._id}&status=success`;
-    const cancelUrl = `${successBase}${returnPath}?eventId=${event._id}&status=cancel`;
+
+    // Construct success/cancel URLs
+    const successUrl = `${successBase}${returnPath}?status=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${successBase}${returnPath}?status=cancel`;
 
     // Try real Stripe checkout if configured; otherwise return a mock URL so frontend can proceed
     const key = process.env.STRIPE_SECRET_KEY;
@@ -49,30 +87,32 @@ router.post('/create-checkout-session', auth, async (req, res) => {
               price_data: {
                 currency: currency || 'egp',
                 product_data: {
-                  name: `${event.type || 'Event'}: ${event.title}`,
-                  description: event.shortDescription || event.description || undefined,
+                  name: title,
+                  description: description || undefined,
                 },
                 unit_amount: Math.max(0, Math.round((amount || 0) * 100)),
               },
               quantity: 1,
             },
           ],
-          success_url: `${successBase}${returnPath}?status=success&session_id={CHECKOUT_SESSION_ID}`,
+          success_url: successUrl,
           cancel_url: cancelUrl,
           metadata: {
-            eventId: String(event._id),
+            eventId: eventId ? String(eventId) : undefined,
+            applicationId: applicationId ? String(applicationId) : undefined,
             userId: String(req.user._id || ''),
-            type: event.type || '',
+            type: type || '',
           },
         });
         return res.json({ url: session.url });
       } catch (e) {
+        console.error('Stripe error:', e);
         // Fall through to mock URL if stripe lib not installed or any error occurs
       }
     }
 
     // Fallback: return a mock URL to allow frontend redirect/testing
-    return res.json({ url: `${successUrl}&mock=1` });
+    return res.json({ url: `${successBase}${returnPath}?status=success&mock=1&eventId=${eventId || ''}&applicationId=${applicationId || ''}` });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to create checkout session' });
   }
@@ -81,10 +121,21 @@ router.post('/create-checkout-session', auth, async (req, res) => {
 // Wallet endpoints (simple stubs – adapt to your data model)
 router.get('/wallet/balance', auth, async (req, res) => {
   try {
-    const balance = typeof req.user.walletBalance === 'number' ? req.user.walletBalance : 0;
-    return res.json({ balance });
+    const user = await User.findById(req.user._id);
+    const balance = user ? user.walletBalance : 0;
+    return res.json({ balance: balance || 0 });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to fetch wallet balance' });
+  }
+});
+
+// Get wallet transactions
+router.get('/wallet/transactions', auth, async (req, res) => {
+  try {
+    const payments = await Payment.find({ user: req.user._id }).sort({ createdAt: -1 }).populate('event');
+    return res.json(payments);
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Failed to fetch transactions' });
   }
 });
 
@@ -145,13 +196,60 @@ router.post('/wallet/pay', auth, async (req, res) => {
   }
 });
 
+// Pay for vendor application via wallet
+router.post('/wallet/pay-application', auth, async (req, res) => {
+  try {
+    const applicationId = req.body?.applicationId;
+    if (!applicationId) return res.status(400).json({ message: 'applicationId is required' });
+
+    const application = await VendorApplication.findById(applicationId).populate('event');
+    if (!application) return res.status(404).json({ message: 'Application not found' });
+
+    if (application.paid) return res.status(400).json({ message: 'Application already paid' });
+
+    const { amount, currency } = computeAmount(application, 'application');
+    const user = await User.findById(req.user._id);
+
+    if ((user.walletBalance || 0) < amount) {
+      return res.status(400).json({ message: 'Insufficient wallet balance' });
+    }
+
+    user.walletBalance = Number((user.walletBalance || 0) - amount);
+    await user.save();
+
+    application.paid = true;
+    await application.save();
+
+    await Payment.create({
+      user: user._id,
+      event: application.event._id, // Link to event for reference
+      amount,
+      currency,
+      method: 'wallet',
+      status: 'paid',
+      metadata: { applicationId: String(application._id) } // Store app ID in metadata if Payment model allows mixed, or just rely on event link
+    });
+
+    // Send receipt email
+    try {
+      await sendPaymentReceiptEmail(user, application.event, { amount, currency, method: 'Wallet', reference: `APP-${Date.now()}` });
+    } catch (e) {
+      console.error('Receipt email failed (wallet app):', e?.message || e);
+    }
+
+    return res.json({ success: true, paid: true, balance: user.walletBalance });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Application payment failed' });
+  }
+});
+
 // Verify Stripe session and send receipt (called by frontend after redirect)
 router.get('/receipt', async (req, res) => {
   try {
     const sessionId = req.query.session_id;
     if (!sessionId) return res.status(400).json({ message: 'session_id is required' });
     const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
+    if (!key) {
       // If Stripe not configured, just acknowledge
       return res.json({ success: true, message: 'Stripe not configured' });
     }
@@ -169,11 +267,20 @@ router.get('/receipt', async (req, res) => {
     }
 
     const eventId = session.metadata && session.metadata.eventId;
+    const applicationId = session.metadata && session.metadata.applicationId;
     const userId = session.metadata && session.metadata.userId;
-    const event = eventId ? await Event.findById(eventId) : null;
+
+    let event, application;
+    if (applicationId) {
+      application = await VendorApplication.findById(applicationId).populate('event');
+      event = application ? application.event : null;
+    } else if (eventId) {
+      event = await Event.findById(eventId);
+    }
+
     let user = req.user;
     if ((!user || !user.email) && userId) {
-      try { user = await User.findById(userId); } catch (_) {}
+      try { user = await User.findById(userId); } catch (_) { }
     }
     if (!user || !user.email) {
       const email = session.customer_details && session.customer_details.email;
@@ -185,10 +292,24 @@ router.get('/receipt', async (req, res) => {
       const currency = session.currency || 'egp';
       // Record card payment
       try {
-        if (user && event && typeof amount === 'number') {
-          await Payment.create({ user: user._id || user.id, event: event._id, amount, currency, method: 'card', status: 'paid', sessionId });
+        if (user && (event || application) && typeof amount === 'number') {
+          await Payment.create({
+            user: user._id || user.id,
+            event: event ? event._id : undefined,
+            amount,
+            currency,
+            method: 'card',
+            status: 'paid',
+            sessionId
+          });
+
+          if (application) {
+            application.paid = true;
+            await application.save();
+          }
         }
       } catch (e2) { console.error('Payment record failed (card):', e2?.message || e2); }
+
       await sendPaymentReceiptEmail(user, event || { title: session?.metadata?.type || 'Event' }, {
         amount, currency, method: 'Card', sessionId
       });

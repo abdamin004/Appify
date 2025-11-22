@@ -48,7 +48,7 @@ const sendVerificationEmail = async (user, token) => {
   });
 };
 
-const sendWarningEmail = async (user,comment) => {
+const sendWarningEmail = async (user, comment) => {
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: user.email,
@@ -65,7 +65,7 @@ const sendWarningEmail = async (user,comment) => {
 const sendGymSessionCancellationEmail = async (user, gymSession) => {
   const sessionDate = gymSession.startDate ? new Date(gymSession.startDate).toLocaleString() : 'TBA';
   const sessionType = gymSession.sessionType || 'Gym Session';
-  
+
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: user.email,
@@ -90,7 +90,7 @@ const sendGymSessionCancellationEmail = async (user, gymSession) => {
 const sendGymSessionUpdateEmail = async (user, gymSession, changes) => {
   const sessionDate = gymSession.startDate ? new Date(gymSession.startDate).toLocaleString() : 'TBA';
   const sessionType = gymSession.sessionType || 'Gym Session';
-  
+
   let changesList = '';
   if (changes.length > 0) {
     changesList = '<ul style="margin: 10px 0; padding-left: 20px;">';
@@ -99,7 +99,7 @@ const sendGymSessionUpdateEmail = async (user, gymSession, changes) => {
     });
     changesList += '</ul>';
   }
-  
+
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: user.email,
@@ -126,7 +126,7 @@ const sendGymSessionUpdateEmail = async (user, gymSession, changes) => {
 const sendVendorApplicationApprovalEmail = async (vendor, application, event) => {
   const eventDate = event.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
   const eventLocation = event.location || 'TBA';
-  
+
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: vendor.email,
@@ -155,7 +155,7 @@ const sendVendorApplicationApprovalEmail = async (vendor, application, event) =>
 
 const sendVendorApplicationRejectionEmail = async (vendor, application, event) => {
   const eventDate = event.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
-  
+
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
     to: vendor.email,
@@ -289,8 +289,44 @@ const sendPaymentReceiptEmail = async (user, event, details) => {
   });
 };
 
-module.exports = { 
-  sendVerificationEmail, 
+const sendCertificateEmail = async (user, workshop) => {
+  const date = workshop.endDate ? new Date(workshop.endDate).toLocaleDateString() : new Date().toLocaleDateString();
+
+  await transporter.sendMail({
+    from: `"Appify Events" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: `Certificate of Attendance - ${workshop.title}`,
+    html: `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-align: center; border: 10px solid #ddd; padding: 40px; max-width: 800px; margin: 0 auto;">
+        <div style="border: 5px solid #10b981; padding: 20px;">
+            <h1 style="font-size: 40px; font-weight: bold; color: #10b981; margin-bottom: 20px;">Certificate of Attendance</h1>
+            <p style="font-size: 20px; color: #555;">This is to certify that</p>
+            <h2 style="font-size: 30px; color: #333; margin: 10px 0; border-bottom: 2px solid #333; display: inline-block; padding-bottom: 5px;">${user.firstName} ${user.lastName}</h2>
+            <p style="font-size: 20px; color: #555; margin-top: 20px;">has successfully attended the workshop</p>
+            <h3 style="font-size: 25px; color: #2563eb; margin: 10px 0;">${workshop.title}</h3>
+            <p style="font-size: 18px; color: #555;">conducted on ${date}</p>
+            
+            <div style="margin-top: 40px; display: flex; justify-content: space-around;">
+                <div style="text-align: center;">
+                    <p style="font-weight: bold; border-top: 1px solid #333; padding-top: 5px; width: 200px; margin: 0 auto;">${workshop.facultyName || 'Appify Events'}</p>
+                    <p style="font-size: 14px; color: #777;">Organizer</p>
+                </div>
+                <div style="text-align: center;">
+                    <img src="https://fakeimg.pl/100x50/?text=Signature&font=lobster" alt="Signature" style="opacity: 0.7;">
+                    <p style="font-weight: bold; border-top: 1px solid #333; padding-top: 5px; width: 200px; margin: 0 auto;">Appify Certification</p>
+                    <p style="font-size: 14px; color: #777;">Authority</p>
+                </div>
+            </div>
+            
+            <p style="font-size: 12px; color: #999; margin-top: 30px;">Certificate ID: ${workshop._id}-${user._id}</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+module.exports = {
+  sendVerificationEmail,
   sendWarningEmail,
   sendGymSessionCancellationEmail,
   sendGymSessionUpdateEmail,
@@ -298,4 +334,5 @@ module.exports = {
   sendVendorApplicationRejectionEmail,
   sendPaymentReceiptEmail,
   sendVendorVisitorPassesEmail,
+  sendCertificateEmail,
 };

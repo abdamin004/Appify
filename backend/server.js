@@ -37,6 +37,7 @@ app.use('/api/vendor', require('./routes/vendors'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/polls', require('./routes/polls'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/certificates', require('./routes/certificates'));
 
 // Root route
 app.get('/', (req, res) => {
@@ -51,7 +52,7 @@ app.use((err, req, res, next) => {
 
 require('./cron/eventReminderCron')(); // Start the event reminder cron job
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(` Server running on port ${PORT}`);
   console.log(` JWT_SECRET is ${process.env.JWT_SECRET ? 'SET' : 'NOT SET'}`);

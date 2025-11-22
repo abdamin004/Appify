@@ -21,7 +21,7 @@ services:
     container_name: university_events_backend
     restart: unless-stopped
     ports:
-      - "5001:5000"
+      - "5001:5001"
     depends_on:
       - mongodb
     volumes:
