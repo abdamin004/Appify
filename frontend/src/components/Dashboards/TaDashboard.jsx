@@ -28,6 +28,7 @@ function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("browse");
+  const [filter, setFilter] = useState("");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -918,15 +919,15 @@ function TADashboard() {
               onClick={() => setFilter("loyalty")}
               style={{
                 flex: 1,
-                padding: "14px 24px",
-                background: filter === "loyalty" ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)" : "transparent",
-                color: filter === "loyalty" ? "#003366" : "#6b7280",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background: filter === "loyalty" ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)` : "transparent",
+                color: filter === "loyalty" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "8px",
-                fontSize: "1rem",
-                fontWeight: "600",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               ⭐ Loyalty Partners
@@ -935,18 +936,18 @@ function TADashboard() {
               onClick={() => setFilter("polls")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   filter === "polls"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
                     : "transparent",
-                color: filter === "polls" ? "#003366" : "#6b7280",
+                color: filter === "polls" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               📊 Vote for Vendors
@@ -955,9 +956,29 @@ function TADashboard() {
 
           {/* Events List */}
           {filter === "loyalty" ? (
-            <LoyaltyPartnersList />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <LoyaltyPartnersList />
+            </div>
           ) : filter === "polls" ? (
-            <StudentPollVoting />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <StudentPollVoting />
+            </div>
           ) : filter === "allevents" ? (
             <EventList enableFavorites={true} />
           ) : filter === 'favourites' ? (
@@ -1089,6 +1110,7 @@ function TADashboard() {
                 padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
@@ -1261,7 +1283,7 @@ function TADashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1495,6 +1517,7 @@ function TADashboard() {
                 padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>

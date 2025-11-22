@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { getEventById } from "../../services/eventService";
 
 function WorkshopParticipantsView({ workshops }) {
+  const navigate = useNavigate();
   const [participantsData, setParticipantsData] = useState({}); // { [workshopId]: { participants: [], loading: boolean, error: string } }
   const [openWorkshopId, setOpenWorkshopId] = useState(null);
 
@@ -184,24 +186,53 @@ function WorkshopParticipantsView({ workshops }) {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => toggleParticipants(workshopId)}
-                  style={{
-                    padding: "12px 24px",
-                    background: isOpen
-                      ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                      : "rgba(212, 175, 55, 0.15)",
-                    color: isOpen ? "#003366" : "#b8941f",
-                    border: isOpen ? "none" : "2px solid rgba(212, 175, 55, 0.3)",
-                    borderRadius: "12px",
-                    fontSize: "0.95rem",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    transition: "all 0.3s",
-                  }}
-                >
-                  {isOpen ? "Hide Participants" : "View Participants"}
-                </button>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => navigate(`/professor/workshops?edit=${workshopId}`)}
+                    style={{
+                      padding: "12px 24px",
+                      background: "#f59e0b",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "12px",
+                      fontSize: "0.95rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.3s",
+                      boxShadow: "0 2px 4px rgba(245, 158, 11, 0.2)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "#d97706";
+                      e.target.style.transform = "translateY(-1px)";
+                      e.target.style.boxShadow = "0 4px 8px rgba(245, 158, 11, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "#f59e0b";
+                      e.target.style.transform = "translateY(0)";
+                      e.target.style.boxShadow = "0 2px 4px rgba(245, 158, 11, 0.2)";
+                    }}
+                  >
+                    ✏️ Edit Workshop
+                  </button>
+                  <button
+                    onClick={() => toggleParticipants(workshopId)}
+                    style={{
+                      padding: "12px 24px",
+                      background: isOpen
+                        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
+                        : "rgba(212, 175, 55, 0.15)",
+                      color: isOpen ? "#003366" : "#b8941f",
+                      border: isOpen ? "none" : "2px solid rgba(212, 175, 55, 0.3)",
+                      borderRadius: "12px",
+                      fontSize: "0.95rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.3s",
+                    }}
+                  >
+                    {isOpen ? "Hide Participants" : "View Participants"}
+                  </button>
+                </div>
               </div>
             </div>
 

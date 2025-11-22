@@ -62,7 +62,7 @@ export default function VendorDocumentsPage({ hideBackButton = false, backPath =
 
   const content = (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'], marginBottom: spacing.xl }}>
+      <div style={{ background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'], marginBottom: spacing.xl, border: `1px solid ${colors.gray200}` }}>
         <div style={{ 
           position: 'relative',
           display: 'flex',

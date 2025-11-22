@@ -722,10 +722,13 @@ function StudentDashboard() {
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
               display: "flex",
+              flexDirection: "column",
               gap: spacing.md,
               border: `1px solid ${colors.gray200}`,
             }}
           >
+            {/* First Row of Tabs */}
+            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("browse")}
               style={{
@@ -833,7 +836,10 @@ function StudentDashboard() {
             >
               🏀 Courts
             </button>
+            </div>
 
+            {/* Second Row of Tabs - Notifications, Reminders, Loyalty, Polls */}
+            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => {
                 setActiveTab("notifications");
@@ -930,18 +936,18 @@ function StudentDashboard() {
               onClick={() => setActiveTab("loyalty")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "loyalty"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               ⭐ Loyalty Partners
@@ -951,23 +957,23 @@ function StudentDashboard() {
               onClick={() => setActiveTab("polls")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "polls"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                color: activeTab === "polls" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               📊 Vote for Vendors
             </button>
-
+            </div>
           </div>
 
           {/* Content */}
@@ -993,7 +999,7 @@ function StudentDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1224,7 +1230,7 @@ function StudentDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1401,17 +1407,37 @@ function StudentDashboard() {
           )}
           
           {activeTab === "loyalty" && (
-            <LoyaltyPartnersList />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <LoyaltyPartnersList />
+            </div>
           )}
           {activeTab === "polls" && (
-            <StudentPollVoting />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <StudentPollVoting />
+            </div>
           )}
           
           {activeTab === "notifications" && (
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,

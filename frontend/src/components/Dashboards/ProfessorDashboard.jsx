@@ -672,17 +672,18 @@ function ProfessorDashboard() {
               padding: spacing.md,
               borderRadius: borderRadius['2xl'],
               boxShadow: shadows.lg,
-              marginBottom: spacing['3xl'],
+              marginBottom: spacing['2xl'],
               display: "flex",
               flexWrap: "wrap",
               gap: spacing.md,
+              border: `1px solid ${colors.gray200}`,
             }}
           >
             <button
               onClick={() => setActiveTab("browse")}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "browse"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -707,7 +708,7 @@ function ProfessorDashboard() {
               }}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "gym-sessions"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -727,7 +728,7 @@ function ProfessorDashboard() {
               onClick={() => setActiveTab("registered")}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "registered"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -747,7 +748,7 @@ function ProfessorDashboard() {
               onClick={() => setActiveTab("favourites")}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "favourites"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -767,7 +768,7 @@ function ProfessorDashboard() {
               onClick={() => setActiveTab("my-workshops")}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "my-workshops"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -788,7 +789,7 @@ function ProfessorDashboard() {
               onClick={() => setActiveTab("edit-requests")}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "edit-requests"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -833,7 +834,7 @@ function ProfessorDashboard() {
               }}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "notifications"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -879,7 +880,7 @@ function ProfessorDashboard() {
               }}
               style={{
                 flex: 1,
-                padding: `${spacing.lg} ${spacing['3xl']}`,
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "reminders"
                     ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
@@ -923,18 +924,18 @@ function ProfessorDashboard() {
               style={{
                 flex: 1,
                 minWidth: "180px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "loyalty"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               ⭐ Loyalty Partners
@@ -944,18 +945,18 @@ function ProfessorDashboard() {
               style={{
                 flex: 1,
                 minWidth: "180px",
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "polls"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                color: activeTab === "polls" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               📊 Vote for Vendors
@@ -981,7 +982,7 @@ function ProfessorDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1215,6 +1216,7 @@ function ProfessorDashboard() {
                 padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
@@ -1398,10 +1400,30 @@ function ProfessorDashboard() {
           )}
 
           {activeTab === "loyalty" && (
-            <LoyaltyPartnersList />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <LoyaltyPartnersList />
+            </div>
           )}
           {activeTab === "polls" && (
-            <StudentPollVoting />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <StudentPollVoting />
+            </div>
           )}
 
           {activeTab === "notifications" && (
@@ -1411,6 +1433,7 @@ function ProfessorDashboard() {
                 padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>

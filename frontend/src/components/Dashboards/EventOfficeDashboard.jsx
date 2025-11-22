@@ -1235,7 +1235,7 @@ function EventOfficeDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1457,7 +1457,7 @@ function EventOfficeDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
@@ -1829,7 +1829,17 @@ function EventOfficeDashboard() {
           )}
 
           {activeTab === "loyalty" && (
-            <LoyaltyPartnersList />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <LoyaltyPartnersList />
+            </div>
           )}
 
           {activeTab === "vendor-documents" && (
@@ -2040,7 +2050,7 @@ function EventOfficeDashboard() {
             <div
               style={{
                 background: colors.bgCard,
-                padding: `${spacing['2xl']} ${spacing['2xl']}`,
+                padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,

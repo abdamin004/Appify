@@ -766,18 +766,18 @@ function StaffDashboard() {
               onClick={() => setActiveTab("loyalty")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "loyalty"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
+                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               ⭐ Loyalty Partners
@@ -786,18 +786,18 @@ function StaffDashboard() {
               onClick={() => setActiveTab("polls")}
               style={{
                 flex: 1,
-                padding: "15px 30px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "polls"
                     ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
                     : "transparent",
-                color: activeTab === "polls" ? "#003366" : "#6b7280",
+                color: activeTab === "polls" ? colors.primary : colors.gray500,
                 border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
                 cursor: "pointer",
-                transition: "all 0.3s",
+                transition: transitions.normal,
               }}
             >
               📊 Vote for Vendors
@@ -1002,7 +1002,17 @@ function StaffDashboard() {
           )}
           
           {activeTab === "loyalty" && (
-            <LoyaltyPartnersList />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <LoyaltyPartnersList />
+            </div>
           )}
           {activeTab === "polls" && (
             <StudentPollVoting />
