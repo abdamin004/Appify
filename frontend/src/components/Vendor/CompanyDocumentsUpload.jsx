@@ -142,7 +142,7 @@ function CompanyDocumentsUpload() {
   const baseUrl = API_BASE.replace('/api', ''); // Remove /api to get base URL for static files
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div>
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Company Documents</h2>
         <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>

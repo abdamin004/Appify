@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from "../../utils/designSystem";
 
-export default function AttendeesReport() {
+export default function AttendeesReport({ hideBackButton = false, backPath = '/Admin' }) {
+  const navigate = useNavigate();
   const [allEvents, setAllEvents] = useState([]);
   const [summary, setSummary] = useState(null);
   const [breakdownByType, setBreakdownByType] = useState([]);
@@ -32,6 +34,7 @@ export default function AttendeesReport() {
       setLoading(true);
       setError(null);
 
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       const query = new URLSearchParams();
       if (status) query.append("status", status);
       if (type) query.append("type", type);
@@ -40,7 +43,7 @@ export default function AttendeesReport() {
       if (endDate) query.append("endDate", endDate);
 
       const res = await fetch(
-        `http://localhost:5001/api/admin/reports/attendees?${query.toString()}`,
+        `${API_BASE}/admin/reports/attendees?${query.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -68,138 +71,216 @@ export default function AttendeesReport() {
     }
   };
 
-  const cardStyle = {
-    background: "rgba(255,255,255,0.95)",
-    borderRadius: 20,
-    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-    border: "1px solid #e5e7eb",
-    padding: "28px 24px",
-    marginBottom: 20,
-  };
+  const content = (
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'], marginBottom: spacing.xl }}>
+        <div style={{ 
+          position: 'relative',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: spacing.xl
+        }}>
+          {!hideBackButton && (
+            <button
+              onClick={() => navigate(backPath)}
+              style={{
+                ...buttonStyles.back,
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: colors.bgCard,
+                color: colors.primary,
+                borderColor: colors.primary
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = colors.accent;
+                e.target.style.color = colors.primary;
+                e.target.style.borderColor = colors.accent;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = colors.bgCard;
+                e.target.style.color = colors.primary;
+                e.target.style.borderColor = colors.primary;
+              }}
+            >
+              ← Back
+            </button>
+          )}
+          <h2 style={{ 
+                color: colors.primary, 
+                margin: 0,
+                fontSize: typography.fontSize['2xl'],
+                fontWeight: typography.fontWeight.bold,
+                textAlign: 'center',
+                textDecoration: 'underline',
+                textDecorationColor: colors.primary,
+                textUnderlineOffset: '4px'
+              }}>Attendees Report</h2>
+            </div>
+
+            {/* Filters */}
+            <div style={{ marginBottom: spacing.xl }}>
+              <h3 style={{ 
+                color: colors.primary, 
+                marginTop: 0, 
+                marginBottom: spacing.lg,
+                fontSize: typography.fontSize.xl,
+                fontWeight: typography.fontWeight.bold
+              }}>Filters</h3>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: spacing.lg,
+                marginBottom: spacing.lg
+              }}>
+                <input
+                  type="text"
+                  placeholder="Event Status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{ ...inputStyles.base }}
+                />
+                <input
+                  type="text"
+                  placeholder="Event Type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  style={{ ...inputStyles.base }}
+                />
+                <input
+                  type="text"
+                  placeholder="Event Name"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  style={{ ...inputStyles.base }}
+                />
+                <input
+                  type="date"
+                  placeholder="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{ ...inputStyles.base }}
+                />
+                <input
+                  type="date"
+                  placeholder="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{ ...inputStyles.base }}
+                />
+              </div>
+              <button
+                onClick={fetchReports}
+                style={{
+                  ...buttonStyles.primary,
+                  padding: `${spacing.md} ${spacing.xl}`
+                }}
+              >
+                Apply Filters
+              </button>
+            </div>
+
+            {/* Loading/Error */}
+            {loading ? (
+              <div style={{ 
+                color: colors.gray500, 
+                fontSize: typography.fontSize.base,
+                textAlign: 'center',
+                padding: spacing['3xl']
+              }}>Loading...</div>
+            ) : error ? (
+              <div style={{ 
+                color: colors.error, 
+                background: colors.errorLight,
+                padding: spacing.md,
+                borderRadius: borderRadius.md,
+                marginBottom: spacing.lg,
+                fontSize: typography.fontSize.sm
+              }}>{error}</div>
+            ) : (
+            <>
+              {/* Summary */}
+              {summary && (
+                <div style={{ 
+                  background: colors.white, 
+                  borderRadius: borderRadius.xl, 
+                  boxShadow: shadows.md, 
+                  border: `1px solid ${colors.gray200}`, 
+                  padding: spacing['2xl'], 
+                  marginBottom: spacing.xl 
+                }}>
+                  <h2 style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>Summary</h2>
+                  <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}><b>Total Events:</b> {summary.totalEvents}</p>
+                  <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}><b>Total Attendees:</b> {summary.totalAttendees}</p>
+                  <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}><b>Average Attendees per Event:</b> {summary.averageAttendeesPerEvent}</p>
+                </div>
+              )}
+
+              {/* Breakdown by Type */}
+              {breakdownByType.length > 0 && breakdownByType.map((typeGroup, i) => (
+                <div key={i} style={{ 
+                  background: colors.white, 
+                  borderRadius: borderRadius.xl, 
+                  boxShadow: shadows.md, 
+                  border: `1px solid ${colors.gray200}`, 
+                  padding: spacing['2xl'], 
+                  marginBottom: spacing.xl 
+                }}>
+                  <h2 style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>{typeGroup.type}</h2>
+                  <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}><b>Total Events:</b> {typeGroup.totalEvents}</p>
+                  <p style={{ color: colors.gray700, marginBottom: spacing.lg, fontSize: typography.fontSize.base }}><b>Total Attendees:</b> {typeGroup.totalAttendees}</p>
+
+                  {typeGroup.events.map((event, j) => (
+                    <div key={j} style={{ marginTop: spacing.lg, padding: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Title:</b> {event.title}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Status:</b> {event.status}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Attendees:</b> {event.attendeeCount}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Capacity:</b> {event.capacity}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Utilization Rate:</b> {event.utilizationRate}</p>
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {/* All Events */}
+              {allEvents.length > 0 && (
+                <div style={{ 
+                  background: colors.white, 
+                  borderRadius: borderRadius.xl, 
+                  boxShadow: shadows.md, 
+                  border: `1px solid ${colors.gray200}`, 
+                  padding: spacing['2xl'], 
+                  marginBottom: spacing.xl 
+                }}>
+                  <h2 style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>All Events</h2>
+                  {allEvents.map((event, i) => (
+                    <div key={i} style={{ marginTop: spacing.lg, padding: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Title:</b> {event.title}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Type:</b> {event.type}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Status:</b> {event.status}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Attendees:</b> {event.attendeeCount}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Capacity:</b> {event.capacity}</p>
+                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}><b>Utilization Rate:</b> {event.utilizationRate}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+  );
+
+  if (hideBackButton) {
+    return content;
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
-        padding: "40px",
-      }}
-    >
-      <div style={{ maxWidth: 1000, margin: "auto" }}>
-        <h1 style={{ color: "#fff", marginBottom: 20 }}>Attendees Report</h1>
-
-        {/* Filters */}
-        <div style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>Filters</h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 16,
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Event Status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Event Type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Event Name"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <input
-              type="date"
-              placeholder="Start Date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-            <input
-              type="date"
-              placeholder="End Date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-
-          <button
-            onClick={fetchReports}
-            style={{
-              marginTop: 20,
-              padding: "10px 20px",
-              background: "#d4af37",
-              border: "none",
-              borderRadius: 8,
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Apply Filters
-          </button>
-        </div>
-
-        {/* Loading/Error */}
-        {loading ? (
-          <p style={{ color: "white" }}>Loading...</p>
-        ) : error ? (
-          <p style={{ color: "red" }}>{error}</p>
-        ) : (
-          <>
-            {/* Summary */}
-            {summary && (
-              <div style={cardStyle}>
-                <h2 style={{ margin: 0, color: "#003366" }}>Summary</h2>
-                <p><b>Total Events:</b> {summary.totalEvents}</p>
-                <p><b>Total Attendees:</b> {summary.totalAttendees}</p>
-                <p><b>Average Attendees per Event:</b> {summary.averageAttendeesPerEvent}</p>
-              </div>
-            )}
-
-            {/* Breakdown by Type */}
-            {breakdownByType.length > 0 && breakdownByType.map((typeGroup, i) => (
-              <div key={i} style={cardStyle}>
-                <h2 style={{ margin: 0, color: "#003366" }}>{typeGroup.type}</h2>
-                <p><b>Total Events:</b> {typeGroup.totalEvents}</p>
-                <p><b>Total Attendees:</b> {typeGroup.totalAttendees}</p>
-
-                {typeGroup.events.map((event, j) => (
-                  <div key={j} style={{ marginTop: 10, padding: 10, borderTop: "1px solid #ccc" }}>
-                    <p><b>Title:</b> {event.title}</p>
-                    <p><b>Status:</b> {event.status}</p>
-                    <p><b>Attendees:</b> {event.attendeeCount}</p>
-                    <p><b>Capacity:</b> {event.capacity}</p>
-                    <p><b>Utilization Rate:</b> {event.utilizationRate}</p>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* All Events */}
-            {allEvents.length > 0 && (
-              <div style={cardStyle}>
-                <h2 style={{ margin: 0, color: "#003366" }}>All Events</h2>
-                {allEvents.map((event, i) => (
-                  <div key={i} style={{ marginTop: 10, padding: 10, borderTop: "1px solid #ccc" }}>
-                    <p><b>Title:</b> {event.title}</p>
-                    <p><b>Type:</b> {event.type}</p>
-                    <p><b>Status:</b> {event.status}</p>
-                    <p><b>Attendees:</b> {event.attendeeCount}</p>
-                    <p><b>Capacity:</b> {event.capacity}</p>
-                    <p><b>Utilization Rate:</b> {event.utilizationRate}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
+        {content}
       </div>
     </div>
   );

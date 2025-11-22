@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
-import { API_BASE } from "../../services/eventService";
 import Navbar from "../Navbar";
 import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
@@ -964,34 +963,126 @@ function TADashboard() {
           ) : filter === 'favourites' ? (
             <MyEventsList events={favouriteEvents} />
           ) : filter === 'reminders' ? (
-          {/* Content */}
-          {activeTab === "browse" && <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />}
-          {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
-          {activeTab === "registered" && (
-            loading ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                  background: colors.bgCard,
-                  borderRadius: borderRadius.xl,
-                  boxShadow: shadows.md,
-                }}
-              >
-                <div style={{ 
-                  fontSize: typography.fontSize.lg, 
-                  color: colors.gray500, 
-                  fontWeight: typography.fontWeight.medium 
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <h2 style={{ 
+                  color: colors.primary, 
+                  margin: 0,
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold
                 }}>
-                  Loading your registered events...
-                </div>
+                  Event Reminders
+                </h2>
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markStudentNotificationRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    style={{
+                      ...buttonStyles.primary,
+                      padding: `${spacing.md} ${spacing.lg}`,
+                      fontSize: typography.fontSize.sm
+                    }}
+                  >
+                    Mark All as Read
+                  </button>
+                )}
               </div>
-            ) : (
-              <MyEventsList events={registeredEvents} showRefundButton />
-            )
-          )}
-          
-          {activeTab === "reminders" && (
+              {reminders.length === 0 ? (
+                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders yet</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.md }}>
+                  {reminders.map((reminder) => (
+                    <div
+                      key={reminder.id}
+                      style={{
+                        padding: spacing.lg,
+                        background: reminder.isRead ? colors.gray50 : colors.white,
+                        borderRadius: borderRadius.lg,
+                        border: `1px solid ${colors.gray200}`,
+                        opacity: reminder.isRead ? 0.7 : 1,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ 
+                            color: colors.primary, 
+                            fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.semibold,
+                            margin: 0,
+                            marginBottom: spacing.xs,
+                            fontSize: typography.fontSize.base
+                          }}>
+                            {reminder.message}
+                          </p>
+                          {reminder.eventTitle && (
+                            <p style={{ color: colors.gray500, margin: 0, fontSize: typography.fontSize.sm }}>
+                              Event: {reminder.eventTitle}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", gap: spacing.sm }}>
+                          {!reminder.isRead && (
+                            <button
+                              onClick={() => {
+                                markStudentNotificationRead(reminder.id);
+                                fetchReminders();
+                              }}
+                              style={{
+                                ...buttonStyles.secondary,
+                                padding: `${spacing.xs} ${spacing.sm}`,
+                                fontSize: typography.fontSize.xs
+                              }}
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Content */}
+              {activeTab === "browse" && <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />}
+              {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
+              {activeTab === "registered" && (
+                loading ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: `${spacing['6xl']} ${spacing.xl}`,
+                      background: colors.bgCard,
+                      borderRadius: borderRadius.xl,
+                      boxShadow: shadows.md,
+                    }}
+                  >
+                    <div style={{ 
+                      fontSize: typography.fontSize.lg, 
+                      color: colors.gray500, 
+                      fontWeight: typography.fontWeight.medium 
+                    }}>
+                      Loading your registered events...
+                    </div>
+                  </div>
+                ) : (
+                  <MyEventsList events={registeredEvents} showRefundButton />
+                )
+              )}
+              
+              {activeTab === "reminders" && (
             <div
               style={{
                 background: colors.bgCard,
@@ -1562,6 +1653,8 @@ function TADashboard() {
               )}
             </div>
           )}
+          </>
+        )}
         </div>
       </div>
       {topUpOpen && (

@@ -17,53 +17,70 @@ export default function Login({ onLogin }) {
     if (!password) return setError("Please enter your password.");
 
     try {
-      const res = await fetch("http://localhost:5001/api/auth/login", {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
+      if (!res.ok) {
+        // Try to parse error message from response
+        let errorMessage = "Login failed";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseErr) {
+          // If response is not JSON, use status text
+          errorMessage = res.statusText || `Server error (${res.status})`;
+        }
+        setError(errorMessage);
+        return;
+      }
+
       const data = await res.json();
 
-      if (res.ok) {
-        // backend returns either data.user (for User) or data.vendor (for Vendor)
-        const userObj = data.user || data.vendor || null;
-        // Store user data in localStorage
-        if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
-        localStorage.setItem("token", data.token || "");
+      // backend returns either data.user (for User) or data.vendor (for Vendor)
+      const userObj = data.user || data.vendor || null;
+      // Store user data in localStorage
+      if (userObj) localStorage.setItem("user", JSON.stringify(userObj));
+      localStorage.setItem("token", data.token || "");
 
-        // Normalize role casing to simplify routing logic
-        const roleRaw = (userObj && (userObj.role || '')) || '';
-        const role = roleRaw.toLowerCase();
+      // Normalize role casing to simplify routing logic
+      const roleRaw = (userObj && (userObj.role || '')) || '';
+      const role = roleRaw.toLowerCase();
 
-        if (onLogin) onLogin(role);
+      if (onLogin) onLogin(role);
 
-        // Route to role-specific dashboard (use lowercase comparisons)
-        if (role === "vendor") {
-          navigate("/VendorDashboard");
-        } else if (role === "student") {
-          navigate("/student-dashboard");
-        } else if (role === "ta") {
-          navigate("/TaDashboard");
-        } else if (role === "professor") {
-          navigate("/ProfessorDashboard");
-        } else if (role === "eventoffice") {
-          navigate("/EventOfficeDashboard");
-        } else if (role === "staff") {
-          navigate("/StaffDashboard");
-        }else if (role === "admin") {
-          navigate("/Admin");
-        } 
-        else {
-          // fallback
-          navigate('/');
-        }
+      // Route to role-specific dashboard (use lowercase comparisons)
+      if (role === "vendor") {
+        navigate("/VendorDashboard");
+      } else if (role === "student") {
+        navigate("/student-dashboard");
+      } else if (role === "ta") {
+        navigate("/TaDashboard");
+      } else if (role === "professor") {
+        navigate("/ProfessorDashboard");
+      } else if (role === "eventoffice") {
+        navigate("/EventOfficeDashboard");
+      } else if (role === "staff") {
+        navigate("/StaffDashboard");
+      } else if (role === "admin") {
+        navigate("/Admin");
       } else {
-        setError(data.message || "Login failed");
+        // fallback
+        navigate('/');
       }
     } catch (err) {
-      console.error("Error:", err);
-      setError("Please try again later.");
+      console.error("Login error:", err);
+      // Provide more specific error messages
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.name === 'TypeError') {
+        setError("Cannot connect to server. The backend may not be running. Please check if the backend server is started.");
+      } else if (err.message?.includes('JSON')) {
+        setError("Invalid response from server. Please try again.");
+      } else {
+        setError(err.message || "An unexpected error occurred. Please try again later.");
+      }
     }
   };
 

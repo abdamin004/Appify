@@ -113,7 +113,7 @@ router.delete(
 router.get(
   '/loyalty/partners',
   auth,
-  roleCheck('Student', 'Staff', 'EventsOffice', 'TA', 'Professor', 'Admin'),
+  roleCheck('Student', 'Staff', 'EventOffice', 'TA', 'Professor', 'Admin'),
   vendorCtrl.listLoyaltyPartners
 );
 

@@ -2,9 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createGymSession, listGymSessions, updateGymSession, cancelGymSession } from '../../../services/eventService';
+import { createGymSession, listGymSessions, updateGymSession, cancelGymSession, getEventById } from '../../../services/eventService';
 import UserSelector from '../UserSelector';
 import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import { showToast, confirmDialog } from '../../../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -354,7 +356,26 @@ function GymSessionsManager({ editOnly = false }) {
             onChange={setRestrictedUserIds}
             label="Restrict Event to Specific Users"
           />
-          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+          <button 
+            className="submit" 
+            type="submit" 
+            disabled={loading} 
+            style={{ 
+              ...buttonStyles.primary,
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accentHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accent;
+              }
+            }}
+          >
             {loading ? 'Creating...' : 'Create Session'}
           </button>
         </form>

@@ -860,13 +860,43 @@ function VendorDashboard() {
             </div>
           )}
           {activeTab === "visitor-qrcodes" && (
-            <VisitorQRCodeManager />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <VisitorQRCodeManager />
+            </div>
           )}
           {activeTab === "company-documents" && (
-            <CompanyDocumentsUpload />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <CompanyDocumentsUpload />
+            </div>
           )}
           {activeTab === "attendee-ids" && (
-            <AttendeeIDUpload />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <AttendeeIDUpload />
+            </div>
           )}
         </div>
       </div>

@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
-import { createBooth, listBooths, updateEvent } from '../../../services/eventService';
+import { createBooth, listBooths, updateEvent, getEventById } from '../../../services/eventService';
 import UserSelector from '../UserSelector';
 import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import { showToast } from '../../../utils/toast';
+import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
 const pageWrap = {
   minHeight: '100vh',
@@ -58,7 +61,7 @@ function BoothsManager() {
     setLoading(true); setError(''); setSuccess('');
     try {
       const createdBooth = await createBooth(form);
-      setSuccess('Booth created');
+      showToast.success('Booth created successfully');
       
       // Save user restrictions if any
       const boothEvent = createdBooth?.event || createdBooth;
@@ -78,7 +81,9 @@ function BoothsManager() {
       
       await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to create booth');
+      const errorMsg = err.message || 'Failed to create booth';
+      setError(errorMsg);
+      showToast.error(errorMsg);
     } finally { setLoading(false); }
   };
 
@@ -88,24 +93,87 @@ function BoothsManager() {
     setLoading(true); setError(''); setSuccess('');
     try {
       await updateEvent(editing, editData);
-      setSuccess('Booth updated');
+      showToast.success('Booth updated successfully');
       setEditing(null);
       setEditData({});
       await refresh();
     } catch (err) {
-      setError(err.message || 'Failed to update booth');
+      const errorMsg = err.message || 'Failed to update booth';
+      setError(errorMsg);
+      showToast.error(errorMsg);
     } finally { setLoading(false); }
   };
 
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  
   return (
-    <div style={pageWrap}>
+    <div style={{
+      minHeight: '100vh',
+      background: colors.bgPrimary,
+      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
+    }}>
       <div style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 260, height: 260, background: 'rgba(212,175,55,0.12)', borderRadius: '50%', filter: 'blur(60px)' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: -40, 
+          right: -40, 
+          width: 260, 
+          height: 260, 
+          background: 'rgba(212,175,55,0.12)', 
+          borderRadius: '50%', 
+          filter: 'blur(60px)' 
+        }} />
       </div>
-      <div style={panel}>
-        <h1 style={h1Style}>Events Office — Booths</h1>
+      <div style={{
+        maxWidth: 1100,
+        margin: '0 auto',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
+        borderRadius: borderRadius['2xl'],
+        padding: spacing['3xl'],
+        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
+        border: `1px solid rgba(0,51,102,0.1)`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: spacing.md }}>
+          <button
+            onClick={() => navigate('/EventOfficeDashboard')}
+            style={{
+              ...buttonStyles.back,
+              background: colors.bgCard,
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = colors.accent;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = colors.bgCard;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.primary;
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+        <h1 style={{
+          margin: 0,
+          color: colors.primary,
+          fontWeight: typography.fontWeight.extrabold,
+          fontSize: typography.fontSize['2xl'],
+          textAlign: 'center',
+          marginBottom: spacing['2xl']
+        }}>Events Office — Booths</h1>
 
-        <h2 style={sectionTitle}>Create Booth</h2>
+        <h2 style={{ 
+          color: colors.primary, 
+          fontWeight: typography.fontWeight.bold, 
+          fontSize: typography.fontSize.lg, 
+          marginTop: spacing.xl,
+          marginBottom: spacing.lg,
+        }}>Create Booth</h2>
         <form className="form managerForm" onSubmit={onCreate}>
           <label>
             <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
@@ -142,18 +210,47 @@ function BoothsManager() {
             onChange={setRestrictedUserIds}
             label="Restrict Event to Specific Users"
           />
-          <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+          <button 
+            className="submit" 
+            type="submit" 
+            disabled={loading} 
+            style={{ 
+              ...buttonStyles.primary,
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accentHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = shadows.accent;
+              }
+            }}
+          >
             {loading ? 'Creating...' : 'Create Booth'}
           </button>
         </form>
 
-        {error && <div style={{ color: '#dc2626', marginTop: 12 }}>{error}</div>}
-        {success && <div style={{ color: '#059669', marginTop: 12 }}>{success}</div>}
 
-        <h2 style={{ ...sectionTitle, marginTop: 40 }}>Existing Booths</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h2 style={{ 
+          color: colors.primary, 
+          fontWeight: typography.fontWeight.bold, 
+          fontSize: typography.fontSize.lg, 
+          marginTop: spacing['2xl'],
+          marginBottom: spacing.lg,
+        }}>Existing Booths</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
           {booths.map(b => (
-            <div key={b._id || b.id} style={{ padding: 16, background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+            <div key={b._id || b.id} style={{ 
+              padding: spacing.xl, 
+              background: colors.white, 
+              borderRadius: borderRadius.xl, 
+              border: `1px solid ${colors.gray200}`,
+              boxShadow: shadows.md,
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div>
                   <h3 style={{ margin: 0, color: '#003366' }}>{b.title}</h3>
@@ -169,7 +266,11 @@ function BoothsManager() {
                     setEditing(b._id || b.id);
                     setEditData({ title: b.title, shortDescription: b.shortDescription, location: b.location, startDate: b.startDate ? new Date(b.startDate).toISOString().slice(0, 16) : '', endDate: b.endDate ? new Date(b.endDate).toISOString().slice(0, 16) : '', registrationDeadline: b.registrationDeadline ? new Date(b.registrationDeadline).toISOString().slice(0, 16) : '', status: b.status || 'published' });
                   }}
-                  style={{ padding: '6px 12px', background: yellow, color: '#003366', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                  style={{ 
+                    ...buttonStyles.primary,
+                    padding: `${spacing.xs} ${spacing.md}`,
+                    fontSize: typography.fontSize.sm,
+                  }}
                 >
                   Edit
                 </button>
@@ -211,10 +312,36 @@ function BoothsManager() {
                 </label>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="submit" type="submit" disabled={loading} style={{ backgroundColor: yellow, color: '#003366', fontWeight: 700 }}>
+                <button 
+                  className="submit" 
+                  type="submit" 
+                  disabled={loading} 
+                  style={{ 
+                    ...buttonStyles.primary,
+                    opacity: loading ? 0.7 : 1,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.boxShadow = shadows.accentHover;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!loading) {
+                      e.target.style.boxShadow = shadows.accent;
+                    }
+                  }}
+                >
                   {loading ? 'Updating...' : 'Update'}
                 </button>
-                <button type="button" onClick={() => { setEditing(null); setEditData({}); }} style={{ padding: '10px 20px', background: '#e5e7eb', color: '#003366', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                <button 
+                  type="button" 
+                  onClick={() => { setEditing(null); setEditData({}); }} 
+                  style={{ 
+                    ...buttonStyles.secondary,
+                    padding: `${spacing.sm} ${spacing.md}`,
+                  }}
+                >
                   Cancel
                 </button>
               </div>

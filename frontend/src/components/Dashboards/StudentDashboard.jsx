@@ -3,7 +3,7 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
-import { API_BASE } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
 import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
@@ -11,7 +11,6 @@ import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
-import { listGymSessions, registerForEvent } from "../../services/eventService";
 import { 
   getStudentNotifications, 
   createStudentNotification, 

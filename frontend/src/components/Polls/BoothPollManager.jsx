@@ -175,7 +175,7 @@ function BoothPollManager() {
     .map(([eventId, data]) => ({ eventId, ...data }));
 
   return (
-    <div id="booth-polls-section" style={{ padding: '20px' }}>
+    <div id="booth-polls-section">
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 

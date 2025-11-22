@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../Navbar";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import QRCodeGenerator from "../QRCode/QRCodeGenerator";
@@ -8,6 +9,9 @@ import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
+import AttendeesReport from "../Admin/AttendeesReport";
+import SalesReport from "../Admin/SalesReport";
+import VendorDocumentsPage from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
@@ -355,34 +359,29 @@ function EventOfficeDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      // Fetch backend notifications
+      // Fetch backend notifications for Event Office
       let backendNotifications = [];
       try {
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5001/api/notifications", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          backendNotifications = Array.isArray(data) ? data : [];
-        } else if (res.status === 404) {
-          // Backend route not implemented yet - gracefully handle
-          backendNotifications = [];
-        } else {
-          // Other error - try to parse JSON, but handle HTML responses
-          try {
+        if (token) {
+          // Try the user notifications endpoint first (Event Office is a user role)
+          const res = await fetch(`${API_BASE}/users/me/notifications`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) {
             const data = await res.json();
-            backendNotifications = Array.isArray(data) ? data : [];
-          } catch (parseErr) {
-            // Response is not JSON (probably HTML error page) - just use empty array
+            backendNotifications = Array.isArray(data) ? data : (Array.isArray(data?.notifications) ? data.notifications : []);
+          } else if (res.status === 404) {
+            // Backend route not implemented yet - gracefully handle
             backendNotifications = [];
           }
         }
       } catch (err) {
-        // Network error or other issue - gracefully handle
-        console.error("Error fetching backend notifications:", err);
+        // Network error or other issue - gracefully handle silently
+        // Don't log to avoid console spam since this endpoint may not exist
         backendNotifications = [];
       }
       
@@ -620,6 +619,7 @@ function EventOfficeDashboard() {
         overflow: "hidden",
       }}
     >
+      <Navbar />
       <div
         style={{
           paddingTop: "120px",
@@ -792,21 +792,6 @@ function EventOfficeDashboard() {
                     🎤 Create Conference
                   </button>
                   <button
-                    onClick={() => handleCreateEvent("booth")}
-                    style={{
-                      width: "100%",
-                      padding: "12px 20px",
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
-                    }}
-                  >
-                    🏬 Create/edit Booth
-                  </button>
-                  <button
                     onClick={() => handleCreateEvent("gym")}
                     style={{
                       width: "100%",
@@ -874,10 +859,13 @@ function EventOfficeDashboard() {
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
               display: "flex",
+              flexDirection: "column",
               gap: spacing.md,
               border: `1px solid ${colors.gray200}`,
             }}
           >
+            {/* First Row of Tabs */}
+            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("browse")}
               style={{
@@ -941,77 +929,68 @@ function EventOfficeDashboard() {
               )}
             </button>
             <button
-      onClick={() => {
-        setActiveTab("vendor-documents"); 
-        navigate("/admin/vendor-documents"); 
-      }}
-      style={{
-        flex: 1,
-        minWidth: "150px",
-        padding: "15px 30px",
-        background:
-          activeTab === "vendor-documents"
-            ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-            : "transparent",
-        color: activeTab === "vendor-documents" ? "#003366" : "#6b7280",
-        border: "none",
-        borderRadius: "15px",
-        fontSize: "1rem",
-        fontWeight: "700",
-        cursor: "pointer",
-        transition: "all 0.3s",
-      }}
-    >
-      📄 Vendor Documents
-    </button>
-<button
-  onClick={() => {
-    setActiveTab("attendees-report"); 
-    navigate("/admin/attendees-report"); 
-  }}
-  style={{
-    flex: 1,
-    minWidth: "150px",
-    padding: "15px 30px",
-    background:
-      activeTab === "attendees-report"
-        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-        : "transparent",
-    color: activeTab === "attendees-report" ? "#003366" : "#6b7280",
-    border: "none",
-    borderRadius: "15px",
-    fontSize: "1rem",
-    fontWeight: "700",
-    cursor: "pointer",
-    transition: "all 0.3s",
-  }}
->
-  📊 Attendees Report
-</button>
-  <button
-  onClick={() => {
-    setActiveTab("sales-report");
-    navigate("/admin/sales-report");
-  }}
-  style={{
-    flex: 1,
-    minWidth: "150px",
-    padding: "15px 30px",
-    background:
-      activeTab === "sales-report"
-        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-        : "transparent",
-    color: activeTab === "sales-report" ? "#003366" : "#6b7280",
-    border: "none",
-    borderRadius: "15px",
-    fontSize: "1rem",
-    fontWeight: "700",
-    cursor: "pointer",
-    transition: "all 0.3s",
-  }}
->
-  💰 Sales Report
-</button>
+              onClick={() => setActiveTab("vendor-documents")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "vendor-documents"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "vendor-documents" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              📄 Vendor Documents
+            </button>
+            <button
+              onClick={() => setActiveTab("attendees-report")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "attendees-report"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "attendees-report" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              📊 Attendees Report
+            </button>
+            <button
+              onClick={() => setActiveTab("sales-report")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "sales-report"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "sales-report" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              💰 Sales Report
+            </button>
 
 
 
@@ -1076,6 +1055,73 @@ function EventOfficeDashboard() {
                   {pendingWorkshops.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab("polls")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "polls"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "polls" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              📊 Booth Polls
+            </button>
+
+            <button
+              onClick={() => setActiveTab("loyalty")}
+              style={{
+                flex: 1,
+                minWidth: "150px",
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "loyalty"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              ⭐ Loyalty Partners
+            </button>
+            </div>
+
+            {/* Second Row of Tabs - Archived, Notifications, Reminders */}
+            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setActiveTab("archived")}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing['2xl']}`,
+                background:
+                  activeTab === "archived"
+                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
+                    : "transparent",
+                color: activeTab === "archived" ? colors.primary : colors.gray500,
+                border: "none",
+                borderRadius: borderRadius.xl,
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                cursor: "pointer",
+                transition: transitions.normal,
+              }}
+            >
+              📦 Archived Events
             </button>
             <button
               onClick={() => {
@@ -1168,77 +1214,22 @@ function EventOfficeDashboard() {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => setActiveTab("polls")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
-                background:
-                  activeTab === "polls"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "polls" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-            >
-              📊 Booth Polls
-            </button>
-
-            <button
-              onClick={() => setActiveTab("loyalty")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: "15px 30px",
-                background:
-                  activeTab === "loyalty"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "loyalty" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-              }}
-            >
-              ⭐ Loyalty Partners
-              onClick={() => setActiveTab("archived")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "archived"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "archived" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📦 Archived Events
-            </button>
+            </div>
           </div>
 
           {/* Content */}
           {activeTab === "browse" && (
-            <EventsList 
-              onGenerateQR={(event) => setQrCodeEvent(event)} 
+            <EventList 
+              enableFavorites={false} 
+              hideArchived={true}
             />
           )}
-          {activeTab === "browse" && <EventList enableFavorites={false} hideArchived={true} />}
-          {activeTab === "archived" && <EventList enableFavorites={false} showArchivedOnly={true} />}
+          {activeTab === "archived" && (
+            <EventList 
+              enableFavorites={false} 
+              showArchivedOnly={true} 
+            />
+          )}
 
           {activeTab === "vendor-requests" && (
             <div
@@ -1454,85 +1445,12 @@ function EventOfficeDashboard() {
                             Go to Polls
                           </button>
                         </div>
-              {vendorRequests.length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No pending vendor requests</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {vendorRequests.map((request) => (
-                    <div
-                      key={request._id}
-                      style={{
-                        padding: spacing.xl,
-                        background: colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: `1px solid ${colors.gray200}`,
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        boxShadow: shadows.sm,
-                      }}
-                    >
-                      <div>
-                        <h3 style={{ 
-                          color: colors.primary, 
-                          marginBottom: spacing.sm,
-                          fontSize: typography.fontSize.lg,
-                          fontWeight: typography.fontWeight.bold,
-                        }}>
-                          {request.organizationName || "Vendor"}
-                        </h3>
-                        <p style={{ 
-                          color: colors.gray500, 
-                          margin: `${spacing.xs} 0`,
-                          fontSize: typography.fontSize.base,
-                        }}>
-                          Event: {request.eventTitle || "N/A"}
-                        </p>
-                        <p style={{ 
-                          color: colors.gray500, 
-                          margin: `${spacing.xs} 0`,
-                          fontSize: typography.fontSize.base,
-                        }}>
-                          Status: {request.status}
-                        </p>
-                      </div>
-                      <div style={{ display: "flex", gap: spacing.md }}>
-                        <button
-                          onClick={() => handleVendorRequestAction(request._id, "approve")}
-                          style={{
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            background: colors.success,
-                            color: colors.white,
-                            border: "none",
-                            borderRadius: borderRadius.md,
-                            cursor: "pointer",
-                            fontWeight: typography.fontWeight.semibold,
-                            fontSize: typography.fontSize.sm,
-                          }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleVendorRequestAction(request._id, "reject")}
-                          style={{
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            background: colors.error,
-                            color: colors.white,
-                            border: "none",
-                            borderRadius: borderRadius.md,
-                            cursor: "pointer",
-                            fontWeight: typography.fontWeight.semibold,
-                            fontSize: typography.fontSize.sm,
-                          }}
-                        >
-                          Reject
-                        </button>
                       </div>
                     ))}
                   </div>
                 )}
+                </div>
               </div>
-            </div>
           )}
 
           {activeTab === "workshop-approvals" && (
@@ -1715,9 +1633,12 @@ function EventOfficeDashboard() {
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
+                maxHeight: "80vh",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
                 <h2 style={{ 
                   color: colors.primary, 
                   margin: 0,
@@ -1747,7 +1668,14 @@ function EventOfficeDashboard() {
               {reminders.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+                <div style={{ 
+                  display: "flex", 
+                  flexDirection: "column", 
+                  gap: spacing.lg,
+                  overflowY: "auto",
+                  flex: 1,
+                  minHeight: 0,
+                }}>
                   {reminders.map((reminder) => {
                     const isRead = reminder.read || reminder.isRead;
                     return (
@@ -1887,11 +1815,33 @@ function EventOfficeDashboard() {
           )}
 
           {activeTab === "polls" && (
-            <BoothPollManager />
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: spacing['3xl'],
+                borderRadius: borderRadius['2xl'],
+                boxShadow: shadows.lg,
+                border: `1px solid ${colors.gray200}`,
+              }}
+            >
+              <BoothPollManager />
+            </div>
           )}
 
           {activeTab === "loyalty" && (
             <LoyaltyPartnersList />
+          )}
+
+          {activeTab === "vendor-documents" && (
+            <VendorDocumentsPage hideBackButton={true} />
+          )}
+
+          {activeTab === "attendees-report" && (
+            <AttendeesReport hideBackButton={true} />
+          )}
+
+          {activeTab === "sales-report" && (
+            <SalesReport hideBackButton={true} />
           )}
 
           {activeTab === "notifications" && (
@@ -1902,9 +1852,13 @@ function EventOfficeDashboard() {
                 borderRadius: borderRadius['2xl'],
                 boxShadow: shadows.lg,
                 border: `1px solid ${colors.gray200}`,
+                maxHeight: "80vh",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
                 <h2 style={{ 
                   color: colors.primary, 
                   margin: 0,
@@ -1933,7 +1887,14 @@ function EventOfficeDashboard() {
               {notifications.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+                <div style={{ 
+                  display: "flex", 
+                  flexDirection: "column", 
+                  gap: spacing.lg,
+                  overflowY: "auto",
+                  flex: 1,
+                  minHeight: 0,
+                }}>
                   {notifications.map((notif) => {
                     const isRead = notif.read || notif.isRead;
                     const isFrontend = notif.id && !notif._id; // Frontend notifications have id but not _id

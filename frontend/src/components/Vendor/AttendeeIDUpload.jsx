@@ -212,7 +212,7 @@ function AttendeeIDUpload() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div>
       <div style={{ 
         marginBottom: '30px'
       }}>

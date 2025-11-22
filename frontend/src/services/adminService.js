@@ -29,5 +29,9 @@ export const listLoyaltyApplications = (status = null) => {
   return fetchJson(url);
 };
 export const reviewLoyaltyApplication = (id, action, notes) => fetchJson(`${API_BASE}/admin/loyalty-applications/${id}/status`, { method: 'PATCH', body: JSON.stringify({ action, notes }) });
+export const getUnreadVendorNotificationsCount = (pendingOnly = false) => {
+  const url = `${API_BASE}/admin/notifications/unread-count${pendingOnly ? '?pendingOnly=true' : ''}`;
+  return fetchJson(url);
+};
 
-export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, listLoyaltyApplications, reviewLoyaltyApplication };
+export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, listLoyaltyApplications, reviewLoyaltyApplication, getUnreadVendorNotificationsCount };

@@ -224,7 +224,7 @@ function Navbar({ onLogout }) {
                   e.target.style.transform = 'translateY(0)';
                 }}
               >
-                <span>🔑</span> Login
+                🔑 Login
               </button>
               <button
                 onClick={() => handleNavigation("/ChooseRole")}
@@ -252,7 +252,7 @@ function Navbar({ onLogout }) {
                   e.target.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.3)';
                 }}
               >
-                <span>➕</span> Sign Up
+                ➕ Sign Up
               </button>
             </>
           )}

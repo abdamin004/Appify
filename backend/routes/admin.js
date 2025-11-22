@@ -106,12 +106,15 @@ router.patch(
   auth,
   roleCheck('Admin', 'EventOffice'),
   adminController.reviewLoyaltyApplication
-// Export event registrations to Excel
-router.get(
-  '/events/:eventId/export-registrations',
-  auth,
-  roleCheck('Admin', 'EventOffice'),
-  adminController.exportEventRegistrations
 );
+
+// Export event registrations to Excel
+// TODO: Implement exportEventRegistrations function in adminController
+// router.get(
+//   '/events/:eventId/export-registrations',
+//   auth,
+//   roleCheck('Admin', 'EventOffice'),
+//   adminController.exportEventRegistrations
+// );
 
 module.exports = router;

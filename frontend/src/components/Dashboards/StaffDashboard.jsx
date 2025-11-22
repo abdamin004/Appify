@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
-import { API_BASE } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import Navbar from "../Navbar";
-import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";

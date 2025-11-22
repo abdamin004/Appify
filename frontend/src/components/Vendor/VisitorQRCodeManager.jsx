@@ -144,7 +144,7 @@ function VisitorQRCodeManager() {
   }, [visitors, selectedEvent, emailStatus]);
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div>
       <div style={{ 
         marginBottom: '30px'
       }}>

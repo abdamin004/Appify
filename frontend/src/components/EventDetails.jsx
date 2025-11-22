@@ -387,8 +387,8 @@ export default function EventDetails() {
     <div style={{ minHeight: '100vh', background: colors.bgPrimary }}>
       <Navbar />
       <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, maxWidth: 1200, margin: '0 auto' }}>
-        {/* Back Button - Fixed visibility with white background */}
-        <div style={{ marginBottom: spacing.xl }}>
+        {/* Back Button and All Events Button - Fixed visibility with white background */}
+        <div style={{ marginBottom: spacing.xl, display: 'flex', gap: spacing.md }}>
           <button 
             onClick={() => navigate(-1)} 
             style={{
@@ -409,6 +409,27 @@ export default function EventDetails() {
             }}
           >
             ← Back
+          </button>
+          <button 
+            onClick={() => navigate("/events")} 
+            style={{
+              ...buttonStyles.back,
+              background: colors.bgCard,
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = colors.accent;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.accent;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = colors.bgCard;
+              e.target.style.color = colors.primary;
+              e.target.style.borderColor = colors.primary;
+            }}
+          >
+            All Events
           </button>
         </div>
 

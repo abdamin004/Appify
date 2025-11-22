@@ -12,7 +12,6 @@ const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEm
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
-const LoyaltyApplication = require('../models/LoyaltyApplication');
 
 // List all users with optional filtering
 exports.listAllUsers = async (req, res) => {
