@@ -3,8 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createConference, listConferences, updateEvent, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -27,7 +26,7 @@ function ConferencesManager({ editOnly = false }) {
     fundingSource: 'internal', // Changed from 'GUC' to 'internal'
     extraRequiredResourses: false,
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [confs, setConfs] = useState([]);
@@ -86,6 +85,7 @@ function ConferencesManager({ editOnly = false }) {
           fundingSource: conf.fundingSource || 'internal',
           extraRequiredResourses: !!conf.extraRequiredResourses,
         });
+        setAllowedRoles(Array.isArray(conf.allowedRoles) ? conf.allowedRoles : []);
         setEditing(id);
       } else {
         showToast.error('Conference not found');
@@ -124,16 +124,15 @@ function ConferencesManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { ...form, location: 'N/A' };
+      const payload = { 
+        ...form, 
+        location: 'N/A',
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
       const createdConference = await createConference(payload);
-      setSuccess('Conference created');
+      showToast.success('Conference created successfully');
       
-      // Save user restrictions if any
       const conferenceEvent = createdConference?.event || createdConference;
-      const eventId = conferenceEvent?._id || conferenceEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        setRestrictedUsers(eventId, restrictedUserIds);
-      }
       
       setForm({
         title: '',
@@ -148,7 +147,7 @@ function ConferencesManager({ editOnly = false }) {
         fundingSource: 'internal', // Changed from 'GUC' to 'internal'
         extraRequiredResourses: false,
       });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (conferenceEvent && (conferenceEvent.status === 'published' || payload.status === 'published')) {
@@ -179,16 +178,21 @@ function ConferencesManager({ editOnly = false }) {
       fundingSource: row.fundingSource || 'internal', // Changed from 'GUC' to 'internal'
       extraRequiredResourses: !!row.extraRequiredResourses,
     });
+    setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
   };
 
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { ...editData };
+      const payload = { 
+        ...editData,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
       await updateEvent(id, payload);
       showToast.success('Conference updated successfully');
       setEditing(null); 
       setEditData({});
+      setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
@@ -320,10 +324,10 @@ function ConferencesManager({ editOnly = false }) {
             />
             <span>Extra Required Resources</span>
           </label>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 
@@ -563,6 +567,11 @@ function ConferencesManager({ editOnly = false }) {
                     fontSize: typography.fontSize.base,
                   }}>Extra Required Resources</span>
                 </div>
+                <RoleSelector 
+                  selectedRoles={allowedRoles}
+                  onChange={setAllowedRoles}
+                  label="Restrict Event to Specific Roles"
+                />
                 <div style={{ 
                   display: 'flex', 
                   gap: spacing.md, 

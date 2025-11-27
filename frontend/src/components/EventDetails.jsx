@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent } from '../services/eventService';
+import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations } from '../services/eventService';
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
 import { showToast, confirmDialog } from '../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../utils/designSystem';
@@ -22,6 +22,7 @@ export default function EventDetails() {
   const [userRating, setUserRating] = useState(0);
   const [ratingHover, setRatingHover] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Define these before useEffect to avoid initialization errors
   const tokenPresent = (() => {
@@ -203,6 +204,27 @@ export default function EventDetails() {
       navigate(-1); // Go back after archiving
     } catch (err) {
       showToast.error('Failed to archive event');
+    }
+  }
+
+  async function handleExportRegistrations() {
+    if (!event) return;
+    
+    // Don't allow export for conferences
+    if (event.type === 'Conference') {
+      showToast.error('Cannot export registrations for Conference events');
+      return;
+    }
+
+    try {
+      setExporting(true);
+      const eventId = event._id || event.id;
+      await exportEventRegistrations(eventId);
+      showToast.success('Registrations exported successfully');
+    } catch (err) {
+      showToast.error(err.message || 'Failed to export registrations');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -654,6 +676,45 @@ export default function EventDetails() {
                         📦 Archive
                       </button>
                     )}
+                    
+                    {/* Export Registrations Button - EventOffice/Admin can export (except conferences) */}
+                    {isEventOffice && event && event.type !== 'Conference' && (
+                      <button
+                        onClick={handleExportRegistrations}
+                        disabled={exporting}
+                        style={{
+                          padding: `${spacing.sm} ${spacing.lg}`,
+                          background: exporting ? colors.gray400 : colors.success,
+                          color: colors.white,
+                          border: 'none',
+                          borderRadius: borderRadius.xl,
+                          fontWeight: typography.fontWeight.bold,
+                          fontSize: typography.fontSize.sm,
+                          cursor: exporting ? 'not-allowed' : 'pointer',
+                          transition: transitions.normal,
+                          boxShadow: shadows.sm,
+                          whiteSpace: 'nowrap',
+                          opacity: exporting ? 0.7 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!exporting) {
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.boxShadow = shadows.md;
+                            e.target.style.opacity = 0.9;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!exporting) {
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = shadows.sm;
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      >
+                        {exporting ? '⏳ Exporting...' : '📊 Export Registrations'}
+                      </button>
+                    )}
+                    
                     {canArchive && isArchived && (
                       <button
                         onClick={handleUnarchiveEvent}

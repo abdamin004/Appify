@@ -52,7 +52,9 @@ function StudentPollVoting() {
       await voteOnPoll(pollId, vendorApplicationId, userId);
       await loadPolls(); // Refresh to show updated vote counts
     } catch (err) {
-      alert('Failed to vote: ' + err.message);
+      const errorMsg = err?.message || err?.error?.message || 'Failed to vote';
+      alert('Failed to vote: ' + errorMsg);
+      console.error('Vote error:', err);
     }
   };
 
@@ -101,7 +103,7 @@ function StudentPollVoting() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {polls.map(poll => (
           <PollCard
-            key={poll.id}
+            key={poll._id || poll.id}
             poll={poll}
             userId={userId}
             onVote={handleVote}
@@ -116,17 +118,24 @@ function PollCard({ poll, userId, onVote }) {
   const [userVote, setUserVote] = useState(null);
 
   useEffect(() => {
-    const vote = getUserVoteForPoll(poll.id, userId);
+    const pollId = poll._id || poll.id;
+    const vote = getUserVoteForPoll(pollId, userId);
     setUserVote(vote);
-  }, [poll.id, userId]);
+  }, [poll._id, poll.id, userId]);
 
   const handleVoteClick = (vendorApplicationId) => {
-    onVote(poll.id, vendorApplicationId);
+    const pollId = poll._id || poll.id;
+    onVote(pollId, vendorApplicationId);
     setUserVote(vendorApplicationId);
   };
 
   const getVoteCount = (vendorId) => {
-    return poll.voteCounts?.[vendorId] || 0;
+    // voteCounts uses string IDs, so convert to string for lookup
+    const vendorIdStr = String(vendorId);
+    // Check both the direct key and try to find by matching _id or id
+    return poll.voteCounts?.[vendorIdStr] || 
+           poll.voteCounts?.[vendorId] || 
+           0;
   };
 
   const totalVotes = poll.totalVotes || 0;
@@ -169,13 +178,14 @@ function PollCard({ poll, userId, onVote }) {
           Vote for a Vendor:
         </h4>
         {poll.vendorApplications.map((vendorApp, index) => {
-          const voteCount = getVoteCount(vendorApp.id);
+          const vendorAppId = vendorApp._id || vendorApp.id;
+          const voteCount = getVoteCount(vendorAppId);
           const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
-          const isVoted = userVote === vendorApp.id;
+          const isVoted = userVote === vendorAppId;
 
           return (
             <div
-              key={vendorApp.id || index}
+              key={vendorAppId || index}
               style={{
                 padding: '18px',
                 marginBottom: '15px',
@@ -218,7 +228,7 @@ function PollCard({ poll, userId, onVote }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleVoteClick(vendorApp.id)}
+                  onClick={() => handleVoteClick(vendorAppId)}
                   disabled={isVoted}
                   style={{
                     padding: '12px 24px',

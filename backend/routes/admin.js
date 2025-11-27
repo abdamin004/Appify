@@ -47,11 +47,11 @@ router.get(
   adminController.getUnreadNotificationsCount
 );
 
-router.patch(
-  '/notifications/:id/read',
+router.get(
+  '/notifications',
   auth,
   roleCheck('Admin', 'EventOffice'),
-  adminController.markNotificationRead
+  adminController.listAdminNotifications
 );
 
 router.patch(
@@ -59,6 +59,20 @@ router.patch(
   auth,
   roleCheck('Admin', 'EventOffice'),
   adminController.markAllAdminNotificationsRead
+);
+
+router.patch(
+  '/notifications/:id/read',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.markNotificationRead
+);
+
+router.delete(
+  '/notifications/:id',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.deleteNotification
 );
 
 // Get attendees report
@@ -109,12 +123,11 @@ router.patch(
 );
 
 // Export event registrations to Excel
-// TODO: Implement exportEventRegistrations function in adminController
-// router.get(
-//   '/events/:eventId/export-registrations',
-//   auth,
-//   roleCheck('Admin', 'EventOffice'),
-//   adminController.exportEventRegistrations
-// );
+router.get(
+  '/events/:eventId/export-registrations',
+  auth,
+  roleCheck('Admin', 'EventOffice'),
+  adminController.exportEventRegistrations
+);
 
 module.exports = router;

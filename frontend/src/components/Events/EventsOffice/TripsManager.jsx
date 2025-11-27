@@ -3,8 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createTrip, listTrips, updateEvent, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers, getRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -25,7 +24,7 @@ function TripsManager({ editOnly = false }) {
     registrationDeadline: '',
     status: 'published',
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [trips, setTrips] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -41,25 +40,17 @@ function TripsManager({ editOnly = false }) {
 
   async function refresh() { 
     if (!editOnly) {
-      const rows = await listTrips(); 
-      setTrips(rows); 
+      try {
+        const rows = await listTrips(); 
+        setTrips(Array.isArray(rows) ? rows : []); 
+      } catch (err) {
+        console.error('Error refreshing trips:', err);
+        setTrips([]);
+      }
     }
   }
   useEffect(() => { 
     refresh(); 
-    // Debug: Check authentication status
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    if (token && user) {
-      try {
-        const userObj = JSON.parse(user);
-        console.log('🔐 Current user:', userObj.email, 'Role:', userObj.role);
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-      }
-    } else {
-      console.warn('⚠️ No authentication token or user data found');
-    }
   }, [editOnly]);
 
   // Load event for editing when in edit-only mode
@@ -85,6 +76,7 @@ function TripsManager({ editOnly = false }) {
           registrationDeadline: trip.registrationDeadline ? trip.registrationDeadline.slice(0,16) : '',
           status: trip.status || 'published'
         });
+        setAllowedRoles(Array.isArray(trip.allowedRoles) ? trip.allowedRoles : []);
         setEditing(id);
       } else {
         showToast.error('Trip not found');
@@ -123,38 +115,19 @@ function TripsManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      // Check if user is logged in
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
+      const payload = { 
+        ...form, 
+        price: Number(form.price || 0), 
+        capacity: Number(form.capacity || 0),
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
+      const createdTrip = await createTrip(payload);
+      showToast.success('Trip created successfully');
       
-      if (!token || !user) {
-        showToast.error('You must be logged in to create a trip. Please log in and try again.');
-        setLoading(false);
-        return;
-      }
-      
-      // Log user info for debugging
-      try {
-        const userObj = JSON.parse(user);
-        console.log('Creating trip as user:', userObj.email, 'Role:', userObj.role);
-      } catch (e) {}
-      
-      const createdTrip = await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
-      setSuccess('Trip created');
-      
-      // Save user restrictions if any
       const tripEvent = createdTrip?.event || createdTrip;
-      const eventId = tripEvent?._id || tripEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        console.log('Saving restrictions for event:', eventId, 'Users:', restrictedUserIds);
-        setRestrictedUsers(eventId, restrictedUserIds);
-        // Verify it was saved
-        const saved = getRestrictedUsers(eventId);
-        console.log('Verified saved restrictions:', saved);
-      }
       
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (tripEvent && (tripEvent.status === 'published' || form.status === 'published')) {
@@ -165,33 +138,42 @@ function TripsManager({ editOnly = false }) {
       await refresh();
       // Redirect to Event Office dashboard
       navigate('/EventOfficeDashboard');
-    } catch (err) { 
-      console.error('Error creating trip:', err);
-      const errorMsg = err.message || 'Failed to create trip';
-      if (errorMsg.includes('Forbidden') || errorMsg.includes('403')) {
-        showToast.error('Access denied. Please ensure you are logged in as an Event Office, Admin, or Professor account.');
-      } else if (errorMsg.includes('Unauthorized') || errorMsg.includes('401')) {
-        showToast.error('Session expired. Please log in again.');
-      } else {
-        showToast.error(errorMsg);
-      }
+    } catch (err) {
+      showToast.error(err.message || 'Failed to create trip');
+    } finally { 
+      setLoading(false); 
     }
-    finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { setEditing(row._id); setEditData({
-    title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || '', price: row.price || 0, capacity: row.capacity || 0,
-    startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
-    registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', status: row.status || 'published'
-  }); };
+  const startEdit = (row) => { 
+    setEditing(row._id); 
+    setEditData({
+      title: row.title || '', 
+      shortDescription: row.shortDescription || '', 
+      location: row.location || '', 
+      price: row.price || 0, 
+      capacity: row.capacity || 0,
+      startDate: row.startDate ? row.startDate.slice(0,16) : '', 
+      endDate: row.endDate ? row.endDate.slice(0,16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', 
+      status: row.status || 'published'
+    });
+    setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
+  };
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { ...editData, price: Number(editData.price || 0), capacity: Number(editData.capacity || 0) };
+      const payload = { 
+        ...editData, 
+        price: Number(editData.price || 0), 
+        capacity: Number(editData.capacity || 0),
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
       await updateEvent(id, payload);
       showToast.success('Trip updated successfully');
       setEditing(null); 
       setEditData({});
+      setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
@@ -298,10 +280,10 @@ function TripsManager({ editOnly = false }) {
             <input className="input" type="number" required value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
             <span>Capacity</span>
           </label>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 
@@ -497,6 +479,11 @@ function TripsManager({ editOnly = false }) {
                     />
                   </label>
                 </div>
+                <RoleSelector 
+                  selectedRoles={allowedRoles}
+                  onChange={setAllowedRoles}
+                  label="Restrict Event to Specific Roles"
+                />
                 <div style={{ 
                   display: 'flex', 
                   gap: spacing.md, 

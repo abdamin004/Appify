@@ -61,6 +61,18 @@ export default function AdminNotifications() {
     }
   };
 
+  const deleteNotif = async (id) => {
+    const confirmed = await confirmDialog('Delete this notification?', 'Confirm');
+    if (!confirmed) return;
+    try { 
+      await adminService.deleteNotification(id); 
+      load(); 
+      showToast.success('Notification deleted');
+    } catch (err) { 
+      showToast.error(err.message || 'Failed to delete notification');
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
       <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
@@ -196,8 +208,8 @@ export default function AdminNotifications() {
                   color: colors.gray500, 
                   marginTop: spacing.sm 
                 }}>{new Date(n.createdAt).toLocaleString()}</div>
-                {!n.isRead && (
-                  <div style={{ marginTop: spacing.md }}>
+                <div style={{ marginTop: spacing.md, display: 'flex', gap: spacing.sm }}>
+                  {!n.isRead && (
                     <button 
                       onClick={()=>markRead(n._id)} 
                       style={{ 
@@ -206,8 +218,27 @@ export default function AdminNotifications() {
                         fontSize: typography.fontSize.sm
                       }}
                     >Mark read</button>
-                  </div>
-                )}
+                  )}
+                  <button 
+                    onClick={()=>deleteNotif(n._id)} 
+                    style={{ 
+                      ...buttonStyles.secondary,
+                      padding: `${spacing.sm} ${spacing.lg}`,
+                      fontSize: typography.fontSize.sm,
+                      background: colors.errorLight,
+                      color: colors.error,
+                      borderColor: colors.error
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.error;
+                      e.target.style.color = colors.white;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = colors.errorLight;
+                      e.target.style.color = colors.error;
+                    }}
+                  >Delete</button>
+                </div>
               </li>
               ))}
             </ul>

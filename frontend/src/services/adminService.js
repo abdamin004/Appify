@@ -24,6 +24,7 @@ export const reviewVendorApplication = (id, action, notes) => fetchJson(`${API_B
 export const listAdminNotifications = (unreadOnly = false) => fetchJson(`${API_BASE}/admin/notifications${unreadOnly ? '?unreadOnly=true' : ''}`);
 export const markNotificationRead = (id) => fetchJson(`${API_BASE}/admin/notifications/${id}/read`, { method: 'PATCH' });
 export const markAllNotificationsRead = () => fetchJson(`${API_BASE}/admin/notifications/read-all`, { method: 'PATCH' });
+export const deleteNotification = (id) => fetchJson(`${API_BASE}/admin/notifications/${id}`, { method: 'DELETE' });
 export const listLoyaltyApplications = (status = null) => {
   const url = status ? `${API_BASE}/admin/loyalty-applications?status=${status}` : `${API_BASE}/admin/loyalty-applications`;
   return fetchJson(url);
@@ -34,4 +35,4 @@ export const getUnreadVendorNotificationsCount = (pendingOnly = false) => {
   return fetchJson(url);
 };
 
-export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, listLoyaltyApplications, reviewLoyaltyApplication, getUnreadVendorNotificationsCount };
+export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, listLoyaltyApplications, reviewLoyaltyApplication, getUnreadVendorNotificationsCount };
