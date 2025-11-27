@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const Court = require('./Court');
 
 // === CONFIG ===
-const MONGO_URI = 'mongodb://admin:admin123@localhost:27017/university_events?authSource=admin';
 const SLOT_START_HOUR = 6;   // start time (6 AM)
 const SLOT_END_HOUR = 22;    // end time (10 PM)
 const DAYS_AHEAD = 7;        // generate 7 days of availability
@@ -70,14 +69,25 @@ const courts = [
 // === Main seeding function ===
 async function seedCourts() {
   try {
-    await mongoose.connect(MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
-    console.log('✅ Connected to MongoDB');
+    // Check if mongoose is already connected
+    if (mongoose.connection.readyState !== 1) {
+      console.log('⏳ Waiting for database connection...');
+      // Wait for connection (with timeout)
+      let attempts = 0;
+      while (mongoose.connection.readyState !== 1 && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        attempts++;
+      }
+      if (mongoose.connection.readyState !== 1) {
+        throw new Error('Database connection not available');
+      }
+    }
 
-    await Court.deleteMany({});
-    console.log('🧹 Cleared existing courts');
+    console.log('✅ Database connection ready, starting court seeding...');
+
+    // Delete all existing courts first
+    const deleteResult = await Court.deleteMany({});
+    console.log(`🧹 Cleared ${deleteResult.deletedCount} existing court(s)`);
 
     // Add weekly availability to each court
     const courtsWithAvailability = courts.map(court => ({
@@ -85,16 +95,13 @@ async function seedCourts() {
       availability: generateWeeklyAvailability()
     }));
 
-    await Court.insertMany(courtsWithAvailability);
-    console.log('✅ Courts inserted successfully with 7 days of availability');
+    const insertResult = await Court.insertMany(courtsWithAvailability);
+    console.log(`✅ ${insertResult.length} court(s) inserted successfully with 7 days of availability`);
 
   } catch (err) {
     console.error('❌ Error seeding courts:', err);
-  } finally {
-    await mongoose.connection.close();
-    console.log('🔒 MongoDB connection closed');
+    // Don't throw - allow server to continue even if seeding fails
   }
 }
 
-// Run the seeder
-seedCourts();
+module.exports = seedCourts;

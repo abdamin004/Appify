@@ -221,10 +221,9 @@ module.exports = {
                         type: 'NewEventPublished',
                         message: `A new ${event.type || 'event'} has been added: ${event.title}`,
                         event: event._id,
-                        recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+                        recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
                     });
                 } catch (notifyErr) {
-                    console.error('Failed to create new event notification:', notifyErr);
                     // do NOT fail the request
                 }
             }
@@ -388,7 +387,6 @@ module.exports = {
                 workshops: workshopsInfo
             });
         } catch (err) {
-            console.error('Error fetching workshop registrations:', err);
             res.status(500).json({
                 success: false,
                 message: err.message
@@ -420,7 +418,6 @@ module.exports = {
 
             // Find the event
             const event = await Event.findById(eventId);
-            console.log('Registering user', userId, 'for event', eventId);
             if (!event) {
                 return res.status(404).json({ 
                     success: false,
@@ -510,7 +507,6 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error('Registration error:', err);
             res.status(500).json({ 
                 success: false,
                 message: err.message 
@@ -575,7 +571,6 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error('Unregistration error:', err);
             res.status(500).json({ 
                 success: false,
                 message: err.message 
@@ -680,7 +675,6 @@ module.exports = {
                             try {
                                 return sendGymSessionCancellationEmail(user, updatedEvent || event);
                             } catch (emailError) {
-                                console.error(`Failed to send cancellation email to ${user.email}:`, emailError);
                                 return Promise.resolve(); // Don't fail the whole operation
                             }
                         });
@@ -731,7 +725,6 @@ module.exports = {
                                 try {
                                     return sendGymSessionUpdateEmail(user, updatedEvent || event, changes);
                                 } catch (emailError) {
-                                    console.error(`Failed to send update email to ${user.email}:`, emailError);
                                     return Promise.resolve(); // Don't fail the whole operation
                                 }
                             });
@@ -791,7 +784,6 @@ module.exports = {
                 event
             });
         } catch (err) {
-            console.error('archiveEvent error:', err);
             res.status(500).json({
                 success: false,
                 message: err.message
@@ -858,7 +850,6 @@ module.exports = {
             return res.status(400).json({ error: 'Invalid action. Use "accept" or "reject".' });
 
         } catch (err) {
-            console.error(err);
             res.status(500).json({ error: err.message });
         }
     },
@@ -906,7 +897,6 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error(err);
             res.status(500).json({ error: err.message });
         }
     },
@@ -964,10 +954,9 @@ module.exports = {
                 type: 'NewEventPublished',
                 message: `A new ${event.type || 'event'} has been published: ${event.title}`,
                 event: event._id,
-                recipientsRoles: ['Student', 'Staff', 'EventsOffice', 'TA', 'Professor']
+                recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
             });
         } catch (notifyErr) {
-            console.error('Failed to create publish event notification:', notifyErr);
             // don't fail the request because of a notification error
         }
         res.status(200).json({
@@ -1200,7 +1189,6 @@ module.exports = {
                 }
             });
         } catch (err) {
-            console.error('addEventToFavorites error:', err);
             return res.status(500).json({
                 success: false,
                 message: err.message
@@ -1235,7 +1223,6 @@ module.exports = {
                 events: enriched
             });
         } catch (err) {
-            console.error('getMyFavoriteEvents error:', err);
             return res.status(500).json({
                 success: false,
                 message: err.message

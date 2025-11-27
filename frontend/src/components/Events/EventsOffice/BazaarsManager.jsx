@@ -3,8 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createBazaar, listBazaars, updateEvent, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -23,7 +22,7 @@ function BazaarsManager({ editOnly = false }) {
     registrationDeadline: '',
     status: 'published',
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [bazaars, setBazaars] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
@@ -39,9 +38,9 @@ function BazaarsManager({ editOnly = false }) {
 
   async function refresh() {
     if (!editOnly) {
-      const rows = await listBazaars();
-      setBazaars(rows);
-    }
+    const rows = await listBazaars();
+    setBazaars(rows);
+  }
   }
   useEffect(() => { refresh(); }, [editOnly]);
 
@@ -66,6 +65,7 @@ function BazaarsManager({ editOnly = false }) {
           registrationDeadline: bazaar.registrationDeadline ? bazaar.registrationDeadline.slice(0,16) : '',
           status: bazaar.status || 'published'
         });
+        setAllowedRoles(Array.isArray(bazaar.allowedRoles) ? bazaar.allowedRoles : []);
         setEditing(id);
       } else {
         showToast.error('Bazaar not found');
@@ -104,18 +104,18 @@ function BazaarsManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const createdBazaar = await createBazaar(form);
-      setSuccess('Bazaar created');
+      // Include allowedRoles in the form data
+      const payload = {
+        ...form,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
+      const createdBazaar = await createBazaar(payload);
+      showToast.success('Bazaar created successfully');
       
-      // Save user restrictions if any
       const bazaarEvent = createdBazaar?.event || createdBazaar;
-      const eventId = bazaarEvent?._id || bazaarEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        setRestrictedUsers(eventId, restrictedUserIds);
-      }
       
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
@@ -131,19 +131,31 @@ function BazaarsManager({ editOnly = false }) {
     } finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { setEditing(row._id); setEditData({
-    title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || '',
-    startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
-    registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', status: row.status || 'published'
-  }); };
+  const startEdit = (row) => { 
+    setEditing(row._id); 
+    setEditData({
+      title: row.title || '', 
+      shortDescription: row.shortDescription || '', 
+      location: row.location || '',
+      startDate: row.startDate ? row.startDate.slice(0,16) : '', 
+      endDate: row.endDate ? row.endDate.slice(0,16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', 
+      status: row.status || 'published'
+    });
+    setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
+  };
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { ...editData };
+      const payload = { 
+        ...editData,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
       await updateEvent(id, payload);
       showToast.success('Bazaar updated successfully');
       setEditing(null); 
       setEditData({});
+      setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
@@ -223,7 +235,7 @@ function BazaarsManager({ editOnly = false }) {
               marginBottom: spacing.lg,
             }}>Create Bazaar</h2>
             {!editing && (
-          <form className="form managerForm" onSubmit={onCreate}>
+        <form className="form managerForm" onSubmit={onCreate}>
           <label>
             <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
             <span>Title</span>
@@ -254,10 +266,10 @@ function BazaarsManager({ editOnly = false }) {
               <span>Registration Deadline</span>
             </label>
           </div>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 
@@ -417,6 +429,11 @@ function BazaarsManager({ editOnly = false }) {
                     />
                   </label>
                 </div>
+                <RoleSelector 
+                  selectedRoles={allowedRoles}
+                  onChange={setAllowedRoles}
+                  label="Restrict Event to Specific Roles"
+                />
                 <div style={{ 
                   display: 'flex', 
                   gap: spacing.md, 
@@ -540,8 +557,8 @@ function BazaarsManager({ editOnly = false }) {
                 </div>
               )}
             </div>
-              ))}
-            </div>
+          ))}
+        </div>
           </>
         )}
       </div>

@@ -38,13 +38,23 @@ exports.listAllUsers = async (req, res) => {
     }
     
     const users = await User.find(filter)
-      .select('-password -verificationToken')
+      .select('-password')
       .sort({ createdAt: -1 });
+    
+    // Map users to include verificationTokenSent flag (without exposing the actual token)
+    const usersWithStatus = users.map(user => {
+      const userObj = user.toObject();
+      // Include flag indicating if verification email was sent (token exists)
+      userObj.verificationTokenSent = !!userObj.verificationToken;
+      // Remove the actual token from response for security
+      delete userObj.verificationToken;
+      return userObj;
+    });
     
     res.status(200).json({ 
       success: true, 
-      count: users.length, 
-      users 
+      count: usersWithStatus.length, 
+      users: usersWithStatus 
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -79,48 +89,77 @@ exports.assignUserRole = async (req, res) => {
             });
         }
 
+        const previousRole = user.role;
         user.role = role;
         
         // For Staff, TA, and Professor: generate verification token and send email after admin approval
         // Students get email on signup, so no need to send again
         // Admin and EventOffice don't need email verification
         const rolesRequiringEmailVerification = ['Staff', 'TA', 'Professor'];
+        let emailSent = false;
+        let message = '';
+        
         if (rolesRequiringEmailVerification.includes(role)) {
-            // Generate verification token 3ashan el email verification
-            const verificationToken = crypto.randomBytes(32).toString('hex');
-            user.verificationToken = verificationToken;
-            // Don't set isVerified to true yet - user needs to verify email first
-            user.isVerified = false;
-            
-            await user.save();
-            
-            // Send verification email
-            try {
-                await sendVerificationEmail(user, verificationToken);
-            } catch (emailError) {
-                console.error('Error sending verification email:', emailError);
-                // Continue even if email fails
+            // Check if verification email was already sent (token exists) AND role hasn't changed
+            // If role changed, allow sending new verification email for the new role
+            if (user.verificationToken && previousRole === role) {
+                // Email already sent for this role, don't resend - return error
+                return res.status(400).json({
+                    message: `Verification email was already sent to ${user.email} for role '${role}'. User must verify their email first before a new verification email can be sent.`,
+                    user: {
+                        id: user._id,
+                        email: user.email,
+                        role: user.role,
+                        isVerified: user.isVerified,
+                        verificationTokenSent: true
+                    }
+                });
+            } else {
+                // Either no token exists, or role changed - generate new token and send email
+                if (previousRole !== role && user.verificationToken) {
+                    // Role changed, clear old token
+                    user.verificationToken = undefined;
+                }
+                // Generate new verification token and send email
+                const verificationToken = crypto.randomBytes(32).toString('hex');
+                user.verificationToken = verificationToken;
+                // Don't set isVerified to true yet - user needs to verify email first
+                user.isVerified = false;
+                
+                await user.save();
+                
+                // Send verification email
+                try {
+                    await sendVerificationEmail(user, verificationToken);
+                    emailSent = true;
+                    message = `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`;
+                } catch (emailError) {
+                    console.error('Error sending verification email:', emailError);
+                    message = `Role '${role}' assigned successfully, but failed to send verification email. Please try again.`;
+                    // Continue even if email fails
+                }
             }
         } else if (role === 'Student') {
             // For Students: they already got email on signup, just keep their current verification status
             // Don't change isVerified or verificationToken - let them verify via email they already received
             await user.save();
+            message = `Role '${role}' assigned successfully.`;
         } else {
             // For Admin and EventOffice, verify immediately without email
             user.isVerified = true;
             user.verificationToken = undefined;
             await user.save();
+            message = `Role '${role}' assigned successfully.`;
         }
 
         return res.status(200).json({
-            message: rolesRequiringEmailVerification.includes(role)
-                ? `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`
-                : `Role '${role}' assigned successfully.`,
+            message: message,
             user: {
                 id: user._id,
                 email: user.email,
                 role: user.role,
-                isVerified: user.isVerified
+                isVerified: user.isVerified,
+                verificationTokenSent: emailSent || !!user.verificationToken
             }
         });
 
@@ -448,24 +487,47 @@ exports.reviewLoyaltyApplication = async (req, res) => {
 // Get unread notifications count for admins
 exports.getUnreadNotificationsCount = async (req, res) => {
   try {
+    const userId = req.user._id;
     const pendingOnly = (req.query.pendingOnly || '').toString().toLowerCase() === 'true';
     
     const filter = { 
       recipientsRoles: { $in: ['Admin', 'EventOffice'] },
-      isRead: false
+      $or: [
+        { 'userStatus.userId': { $ne: userId } },
+        { 'userStatus': { $elemMatch: { userId: userId, isDeleted: false, isRead: false } } },
+        { 'userStatus': { $size: 0 } }
+      ]
     };
+    
+    // Exclude notifications deleted by this user
+    filter.$and = [
+      {
+        $or: [
+          { 'userStatus': { $size: 0 } },
+          { 'userStatus': { $not: { $elemMatch: { userId: userId, isDeleted: true } } } }
+        ]
+      }
+    ];
     
     // If pendingOnly is true, only count VendorApplicationSubmitted notifications
     if (pendingOnly) {
       filter.type = 'VendorApplicationSubmitted';
     }
 
-    const count = await Notification.countDocuments(filter);
+    const notifications = await Notification.find(filter);
+    
+    // Filter by user status in memory for accurate count
+    const unreadCount = notifications.filter(notif => {
+      const userStatus = notif.userStatus?.find(s => String(s.userId) === String(userId));
+      if (userStatus?.isDeleted) return false;
+      if (!userStatus) return true; // New notification, not read
+      return !userStatus.isRead;
+    }).length;
 
     res.status(200).json({ 
       success: true, 
-      unreadCount: count,
-      pendingVendorRequests: pendingOnly ? count : undefined
+      unreadCount,
+      pendingVendorRequests: pendingOnly ? unreadCount : undefined
     });
   } catch (error) {
     console.error('Error getting unread notifications count:', error);
@@ -476,12 +538,33 @@ exports.getUnreadNotificationsCount = async (req, res) => {
 exports.markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const notif = await Notification.findByIdAndUpdate(
-      id,
-      { isRead: true, readAt: new Date() },
-      { new: true }
-    );
+    const userId = req.user._id;
+    
+    const notif = await Notification.findById(id);
     if (!notif) return res.status(404).json({ message: 'Notification not found' });
+    
+    // Check if user status already exists
+    const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
+    const now = new Date();
+    
+    if (userStatusIndex >= 0) {
+      // Update existing user status
+      notif.userStatus[userStatusIndex].isRead = true;
+      notif.userStatus[userStatusIndex].readAt = now;
+      notif.userStatus[userStatusIndex].isDeleted = false; // Restore if previously deleted
+      notif.userStatus[userStatusIndex].deletedAt = undefined;
+    } else {
+      // Create new user status
+      notif.userStatus.push({
+        userId: userId,
+        isRead: true,
+        readAt: now,
+        isDeleted: false
+      });
+    }
+    
+    await notif.save();
+    
     res.status(200).json({ success: true, notification: notif });
   } catch (error) {
     console.error('Error marking notification read:', error);
@@ -491,13 +574,131 @@ exports.markNotificationRead = async (req, res) => {
 
 exports.markAllAdminNotificationsRead = async (req, res) => {
   try {
-    const result = await Notification.updateMany(
-      { recipientsRoles: { $in: ['Admin', 'EventOffice'] }, isRead: false },
-      { $set: { isRead: true, readAt: new Date() } }
-    );
-    res.status(200).json({ success: true, updated: result.modifiedCount });
+    const userId = req.user._id;
+    const now = new Date();
+    
+    // Find all notifications for Admin/EventOffice that are not deleted by this user
+    const notifications = await Notification.find({
+      recipientsRoles: { $in: ['Admin', 'EventOffice'] },
+      $or: [
+        { 'userStatus': { $size: 0 } },
+        { 'userStatus': { $not: { $elemMatch: { userId: userId, isDeleted: true } } } }
+      ]
+    });
+    
+    let updatedCount = 0;
+    
+    for (const notif of notifications) {
+      const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
+      
+      if (userStatusIndex >= 0) {
+        // Update existing user status
+        if (!notif.userStatus[userStatusIndex].isRead) {
+          notif.userStatus[userStatusIndex].isRead = true;
+          notif.userStatus[userStatusIndex].readAt = now;
+          notif.userStatus[userStatusIndex].isDeleted = false;
+          notif.userStatus[userStatusIndex].deletedAt = undefined;
+          updatedCount++;
+        }
+      } else {
+        // Create new user status
+        notif.userStatus.push({
+          userId: userId,
+          isRead: true,
+          readAt: now,
+          isDeleted: false
+        });
+        updatedCount++;
+      }
+      
+      await notif.save();
+    }
+    
+    res.status(200).json({ success: true, updated: updatedCount });
   } catch (error) {
     console.error('Error marking all notifications read:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// List notifications for the current user (Admin/EventOffice)
+exports.listAdminNotifications = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userRole = req.user.role;
+    
+    // Find notifications for Admin/EventOffice roles
+    const notifications = await Notification.find({
+      recipientsRoles: { $in: ['Admin', 'EventOffice'] }
+    })
+    .populate('application', 'organization vendorUser event')
+    .populate('event', 'title type startDate endDate')
+    .sort({ createdAt: -1 });
+    
+    // Filter by user status - exclude deleted, include all others
+    const filteredNotifications = notifications
+      .filter(notif => {
+        const userStatus = notif.userStatus?.find(s => String(s.userId) === String(userId));
+        return !userStatus || !userStatus.isDeleted;
+      })
+      .map(notif => {
+        const userStatus = notif.userStatus?.find(s => String(s.userId) === String(userId));
+        return {
+          ...notif.toObject(),
+          isRead: userStatus?.isRead || false,
+          readAt: userStatus?.readAt || null
+        };
+      });
+    
+    res.status(200).json({ 
+      success: true, 
+      count: filteredNotifications.length,
+      notifications: filteredNotifications 
+    });
+  } catch (error) {
+    console.error('Error listing notifications:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};
+
+// Delete a notification for the current user (soft delete - per user)
+exports.deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    
+    const notif = await Notification.findById(id);
+    if (!notif) return res.status(404).json({ message: 'Notification not found' });
+    
+    // Check if user has permission to see this notification
+    const userRole = req.user.role;
+    if (!notif.recipientsRoles.includes(userRole)) {
+      return res.status(403).json({ message: 'You do not have permission to delete this notification' });
+    }
+    
+    // Check if user status already exists
+    const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
+    const now = new Date();
+    
+    if (userStatusIndex >= 0) {
+      // Update existing user status
+      notif.userStatus[userStatusIndex].isDeleted = true;
+      notif.userStatus[userStatusIndex].deletedAt = now;
+    } else {
+      // Create new user status with deleted flag
+      notif.userStatus.push({
+        userId: userId,
+        isRead: false,
+        isDeleted: true,
+        deletedAt: now
+      });
+    }
+    
+    await notif.save();
+    
+    res.status(200).json({ success: true, message: 'Notification deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 };
@@ -1057,6 +1258,90 @@ exports.listLoyaltyApplications = async (req, res) => {
       success: false,
       message: 'Internal Server Error',
       error: error.message
+    });
+  }
+};
+
+// Export registered users for an event to Excel
+exports.exportEventRegistrations = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId)
+      .populate('registeredUsers', 'firstName lastName email role studentStaffId')
+      .select('title type startDate endDate location registeredUsers');
+    
+    if (!event) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Event not found' 
+      });
+    }
+    
+    // Exclude conferences as per requirement
+    if (event.type === 'Conference') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Cannot export registrations for Conference events' 
+      });
+    }
+    
+    const registeredUsers = event.registeredUsers || [];
+    
+    if (registeredUsers.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No registered users found for this event' 
+      });
+    }
+    
+    // Prepare Excel data
+    const excelData = registeredUsers.map((user, index) => ({
+      'No.': index + 1,
+      'First Name': user.firstName || '',
+      'Last Name': user.lastName || '',
+      'Full Name': `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      'Email': user.email || '',
+      'Role': user.role || '',
+      'Student/Staff ID': user.studentStaffId || ''
+    }));
+    
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 5 },   // No.
+      { wch: 15 },  // First Name
+      { wch: 15 },  // Last Name
+      { wch: 25 },  // Full Name
+      { wch: 30 },  // Email
+      { wch: 15 },  // Role
+      { wch: 18 }   // Student/Staff ID
+    ];
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registered Users');
+    
+    // Generate Excel buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // Generate filename
+    const filename = `${event.title.replace(/[^a-z0-9]/gi, '_')}_Registrations_${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Send the Excel file
+    res.send(excelBuffer);
+  } catch (error) {
+    console.error('Error exporting event registrations:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
     });
   }
 };

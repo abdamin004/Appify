@@ -6,9 +6,11 @@ import {
   deletePoll, 
   voteOnPoll, 
   getUserVoteForPoll,
-  getActivePolls 
+  getActivePolls,
+  getVendorApplicationsForPoll
 } from '../../services/pollService';
 import adminService from '../../services/adminService';
+import { showToast } from '../../utils/toast';
 
 function BoothPollManager() {
   const [polls, setPolls] = useState([]);
@@ -36,10 +38,8 @@ function BoothPollManager() {
 
   const loadVendorRequests = async () => {
     try {
-      const [pendingRes, approvedRes] = await Promise.all([
-        adminService.listPendingVendorApplications(),
-        adminService.listApprovedVendorApplications(),
-      ]);
+      // Only load pending vendor applications (approved should not appear in polls)
+      const pendingRes = await adminService.listPendingVendorApplications();
 
       const pendingList = Array.isArray(pendingRes?.applications)
         ? pendingRes.applications
@@ -47,39 +47,15 @@ function BoothPollManager() {
           ? pendingRes
           : [];
 
-      const approvedDocs = Array.isArray(approvedRes?.vendorDocuments)
-        ? approvedRes.vendorDocuments
-        : Array.isArray(approvedRes)
-          ? approvedRes
-          : [];
+      // Filter to only include pending applications and ensure status is pending
+      const normalizedPending = pendingList
+        .filter(req => (req.status || 'pending') === 'pending')
+        .map((req) => ({
+          ...req,
+          status: 'pending', // Ensure status is explicitly pending
+        }));
 
-      const normalizedPending = pendingList.map((req) => ({
-        ...req,
-        status: req.status || 'pending',
-      }));
-
-      const normalizedApproved = approvedDocs.map((doc) => ({
-        _id: doc.applicationId || doc._id,
-        status: 'approved',
-        organization: doc.organization || doc.vendor?.companyName || 'Vendor',
-        boothSize: doc.boothSize,
-        attendees: doc.attendees || [],
-        event: {
-          _id: doc.event?.id || doc.event?._id,
-          title: doc.event?.title,
-          type: doc.event?.type,
-          startDate: doc.event?.startDate,
-          location: doc.event?.location,
-        },
-        vendorUser: {
-          email: doc.vendor?.email,
-          companyName: doc.vendor?.companyName,
-          _id: doc.vendor?.id || doc.vendor?._id,
-        },
-        notes: doc.notes,
-      }));
-
-      setVendorRequests([...normalizedApproved, ...normalizedPending]);
+      setVendorRequests(normalizedPending);
     } catch (err) {
       console.error('Error loading vendor requests:', err);
       setVendorRequests([]);
@@ -97,19 +73,21 @@ function BoothPollManager() {
     }
 
     try {
+      // Prepare data in the format expected by the backend API
+      const vendorApplicationIds = selectedRequests.map(req => req._id || req.id);
+      
+      // Set voting dates (default to now + 7 days for end date)
+      const votingStartDate = new Date();
+      const votingEndDate = new Date();
+      votingEndDate.setDate(votingEndDate.getDate() + 7); // 7 days from now
+
       const pollData = {
         title: pollTitle,
-        description: pollDescription,
+        description: pollDescription || '',
         eventId: selectedEventId,
-        vendorApplications: selectedRequests.map(req => ({
-          id: req._id || req.id,
-          organization: req.organization,
-          boothSize: req.boothSize,
-          attendees: req.attendees || [],
-          notes: req.notes || '',
-        })),
-        voteCounts: {},
-        totalVotes: 0,
+        vendorApplicationIds: vendorApplicationIds, // Array of IDs, not objects
+        votingStartDate: votingStartDate.toISOString(),
+        votingEndDate: votingEndDate.toISOString(),
       };
 
       await createPoll(pollData);
@@ -149,16 +127,28 @@ function BoothPollManager() {
   const handleDeletePoll = async (pollId) => {
     if (!confirm('Are you sure you want to delete this poll?')) return;
     try {
-      await deletePoll(pollId);
-      loadPolls();
+      const result = await deletePoll(pollId);
+      if (result && result.success !== false) {
+        showToast.success('Poll deleted successfully!');
+        loadPolls();
+      } else {
+        showToast.error('Failed to delete poll: ' + (result?.message || 'Unknown error'));
+      }
     } catch (err) {
-      alert('Failed to delete poll: ' + err.message);
+      const errorMsg = err?.message || err?.error?.message || 'Failed to delete poll';
+      showToast.error('Failed to delete poll: ' + errorMsg);
+      console.error('Delete poll error:', err);
     }
   };
 
+  // Filter out any non-pending applications (safety check - only pending should be used in polls)
+  const pendingOnlyRequests = vendorRequests.filter(req => 
+    (req.status || 'pending') === 'pending'
+  );
+
   // Group vendor requests by event
   const requestsByEvent = {};
-  vendorRequests.forEach(req => {
+  pendingOnlyRequests.forEach(req => {
     const eventId = req.event?._id || req.event || 'unknown';
     if (!requestsByEvent[eventId]) {
       requestsByEvent[eventId] = {
@@ -386,10 +376,10 @@ function BoothPollManager() {
         ) : (
           polls.map(poll => (
             <PollCard 
-              key={poll.id} 
+              key={poll._id || poll.id} 
               poll={poll} 
-              onClose={() => handleClosePoll(poll.id)}
-              onDelete={() => handleDeletePoll(poll.id)}
+              onClose={() => handleClosePoll(poll._id || poll.id)}
+              onDelete={() => handleDeletePoll(poll._id || poll.id)}
               onRefresh={loadPolls}
             />
           ))
@@ -406,13 +396,15 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
   const userId = user?._id || user?.id || 'anonymous';
 
   useEffect(() => {
-    const vote = getUserVoteForPoll(poll.id, userId);
+    const pollId = poll._id || poll.id;
+    const vote = getUserVoteForPoll(pollId, userId);
     setUserVote(vote);
-  }, [poll.id, userId]);
+  }, [poll._id, poll.id, userId]);
 
   const handleVote = (vendorApplicationId) => {
     try {
-      voteOnPoll(poll.id, vendorApplicationId, userId);
+      const pollId = poll._id || poll.id;
+      voteOnPoll(pollId, vendorApplicationId, userId);
       setUserVote(vendorApplicationId);
       onRefresh();
     } catch (err) {
@@ -421,11 +413,16 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
   };
 
   const getVoteCount = (vendorId) => {
-    return poll.voteCounts?.[vendorId] || 0;
+    // Backend uses String(_id) as key in voteCounts
+    const vendorIdStr = String(vendorId);
+    return poll.voteCounts?.[vendorIdStr] || poll.voteCounts?.[vendorId] || 0;
   };
 
   const totalVotes = poll.totalVotes || 0;
-  const maxVotes = Math.max(...poll.vendorApplications.map(va => getVoteCount(va.id)), 0);
+  const maxVotes = Math.max(...poll.vendorApplications.map(va => {
+    const appId = va._id || va.id;
+    return getVoteCount(appId);
+  }), 0);
 
   return (
     <div style={{
@@ -495,14 +492,15 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
 
       <div style={{ marginTop: '20px' }}>
         {poll.vendorApplications.map((vendorApp, index) => {
-          const voteCount = getVoteCount(vendorApp.id);
+          const vendorAppId = vendorApp._id || vendorApp.id;
+          const voteCount = getVoteCount(vendorAppId);
           const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
-          const isVoted = userVote === vendorApp.id;
+          const isVoted = String(userVote) === String(vendorAppId);
           const isWinner = poll.status === 'closed' && voteCount === maxVotes && maxVotes > 0;
 
           return (
             <div
-              key={vendorApp.id || index}
+              key={vendorAppId || index}
               style={{
                 padding: '15px',
                 marginBottom: '12px',
@@ -544,7 +542,7 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
                 </div>
                 {poll.status === 'active' && (
                   <button
-                    onClick={() => handleVote(vendorApp.id)}
+                    onClick={() => handleVote(vendorAppId)}
                     disabled={isVoted}
                     style={{
                       padding: '10px 20px',

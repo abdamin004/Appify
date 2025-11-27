@@ -1,6 +1,49 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 export { API_BASE };
 
+// Export event registrations to Excel
+export async function exportEventRegistrations(eventId) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  if (!token) {
+    throw new Error('You must be logged in to export registrations');
+  }
+
+  const response = await fetch(`${API_BASE}/admin/events/${eventId}/export-registrations`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Failed to export registrations (${response.status})`);
+  }
+
+  // Get the filename from Content-Disposition header or use default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `event_registrations_${eventId}.xlsx`;
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+    if (filenameMatch) {
+      filename = decodeURIComponent(filenameMatch[1]);
+    }
+  }
+
+  // Create blob and download
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+
+  return { success: true, filename };
+}
+
 async function http(method, url, body) {
   const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
   const headers = { 'Content-Type': 'application/json' };
