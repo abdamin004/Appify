@@ -557,10 +557,8 @@ function BazaarsManager({ editOnly = false }) {
                     </div>
                   )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
           </>
         )}
       </div>

@@ -967,6 +967,11 @@ module.exports = {
         } catch (notifyErr) {
             // don't fail the request because of a notification error
         }
+
+        res.status(200).json({ success: true, message: 'Event published successfully', event });
+        } catch (err) {
+            res.status(500).json({ success: false, error: err.message });
+        }
     },
     async addComment(req, res) {
         try {
