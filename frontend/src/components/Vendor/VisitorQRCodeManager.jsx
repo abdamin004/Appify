@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getEventById } from '../../services/eventService';
 import vendorService from '../../services/vendorService';
+import { showToast } from '../../utils/toast';
 
 function VisitorQRCodeManager() {
   const [approvedApplications, setApprovedApplications] = useState([]);
@@ -69,7 +70,7 @@ function VisitorQRCodeManager() {
       setEmailStatus(emailStatusData);
     } catch (err) {
       console.error('Error loading visitors:', err);
-      alert('Failed to load visitors: ' + err.message);
+      showToast.error('Failed to load visitors: ' + err.message);
     } finally {
       setLoading(false);
     }

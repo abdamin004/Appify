@@ -9,6 +9,7 @@ import {
   getActivePolls 
 } from '../../services/pollService';
 import adminService from '../../services/adminService';
+import { showToast, confirmDialog } from '../../utils/toast';
 
 function BoothPollManager() {
   const [polls, setPolls] = useState([]);
@@ -88,11 +89,11 @@ function BoothPollManager() {
 
   const handleCreatePoll = async () => {
     if (!pollTitle.trim()) {
-      alert('Please enter a poll title');
+      showToast.warning('Please enter a poll title');
       return;
     }
     if (selectedRequests.length < 2) {
-      alert('Please select at least 2 vendor requests for the poll');
+      showToast.warning('Please select at least 2 vendor requests for the poll');
       return;
     }
 
@@ -119,9 +120,9 @@ function BoothPollManager() {
       setSelectedRequests([]);
       setSelectedEventId('');
       loadPolls();
-      alert('Poll created successfully!');
+      showToast.success('Poll created successfully!');
     } catch (err) {
-      alert('Failed to create poll: ' + err.message);
+      showToast.error('Failed to create poll: ' + err.message);
     }
   };
 
@@ -137,22 +138,26 @@ function BoothPollManager() {
   };
 
   const handleClosePoll = async (pollId) => {
-    if (!confirm('Are you sure you want to close this poll?')) return;
+    const confirmed = await confirmDialog('Are you sure you want to close this poll?', 'Close Poll');
+    if (!confirmed) return;
     try {
       await updatePoll(pollId, { status: 'closed' });
       loadPolls();
+      showToast.success('Poll closed successfully');
     } catch (err) {
-      alert('Failed to close poll: ' + err.message);
+      showToast.error('Failed to close poll: ' + err.message);
     }
   };
 
   const handleDeletePoll = async (pollId) => {
-    if (!confirm('Are you sure you want to delete this poll?')) return;
+    const confirmed = await confirmDialog('Are you sure you want to delete this poll?', 'Delete Poll');
+    if (!confirmed) return;
     try {
       await deletePoll(pollId);
       loadPolls();
+      showToast.success('Poll deleted successfully');
     } catch (err) {
-      alert('Failed to delete poll: ' + err.message);
+      showToast.error('Failed to delete poll: ' + err.message);
     }
   };
 
@@ -410,13 +415,14 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
     setUserVote(vote);
   }, [poll.id, userId]);
 
-  const handleVote = (vendorApplicationId) => {
+  const handleVote = async (vendorApplicationId) => {
     try {
-      voteOnPoll(poll.id, vendorApplicationId, userId);
+      await voteOnPoll(poll.id, vendorApplicationId, userId);
       setUserVote(vendorApplicationId);
       onRefresh();
+      showToast.success('Vote submitted successfully!');
     } catch (err) {
-      alert('Failed to vote: ' + err.message);
+      showToast.error('Failed to vote: ' + err.message);
     }
   };
 

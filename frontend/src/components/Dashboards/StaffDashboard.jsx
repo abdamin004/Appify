@@ -13,7 +13,8 @@ import {
   createStudentNotification, 
   markStudentNotificationRead, 
   markAllStudentNotificationsRead, 
-  deleteStudentNotification, 
+  deleteStudentNotification,
+  deleteAllStudentNotifications,
   getSeenEventIds,
   markEventsAsSeen,
   getSentReminders,
@@ -164,14 +165,27 @@ function StaffDashboard() {
 
   const initializeSeenEvents = async () => {
     try {
-      const res = await fetch(`${API_BASE}/events`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const res = await fetch(`${API_BASE}/events`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        return; // Silently fail - not critical
+      }
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
       const eventIds = publishedEvents.map(e => String(e._id || e.id));
       markEventsAsSeen(eventIds);
     } catch (err) {
-      console.error('Error initializing seen events:', err);
+      if (err.name !== 'AbortError') {
+        console.warn('Error initializing seen events:', err);
+      }
+      // Silently fail - not critical functionality
     }
   };
 
@@ -380,9 +394,15 @@ function StaffDashboard() {
     try {
       setLoading(true);
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      
       if (!res.ok) {
         try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch(_) {}
         setRegisteredEvents([]);
@@ -571,24 +591,34 @@ function StaffDashboard() {
               </div>
               <div
                 style={{
-                  flex: "0 0 260px",
                   display: "flex",
                   flexDirection: "column",
                   gap: spacing.md,
-                  alignItems: "stretch",
+                  alignItems: "center",
+                  flexShrink: 0,
+                  justifyContent: "center",
                 }}
               >
-                {statCards.map((card) => (
-                  <div key={card.label} style={statCardBase}>
-                    <div style={statValueStyle}>{card.value}</div>
-                    <div style={statLabelStyle}>{card.label}</div>
-                  </div>
-                ))}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: spacing.md,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {statCards.map((card) => (
+                    <div key={card.label} style={statCardBase}>
+                      <div style={statValueStyle}>{card.value}</div>
+                      <div style={statLabelStyle}>{card.label}</div>
+                    </div>
+                  ))}
+                </div>
                 <WalletBadge
                   balance={walletBalance}
                   currency="EGP"
                   onTopUp={() => setTopUpOpen(true)}
-                  style={{ width: "100%" }}
+                  style={{ width: "auto" }}
                 />
               </div>
             </div>
@@ -840,20 +870,57 @@ function StaffDashboard() {
                 }}>
                   Notifications
                 </h2>
-                {notifications.filter(n => !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      markAllStudentNotificationsRead();
-                      fetchNotifications();
-                    }}
-                    style={{
-                      ...pillButtonStyles.neutral,
-                      fontSize: typography.fontSize.sm,
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: spacing.md }}>
+                  {notifications.filter(n => !n.isRead).length > 0 && (
+                    <button
+                      onClick={() => {
+                        markAllStudentNotificationsRead();
+                        fetchNotifications();
+                      }}
+                      style={{
+                        ...pillButtonStyles.neutral,
+                        fontSize: typography.fontSize.sm,
+                      }}
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                        if (confirmed) {
+                          deleteAllStudentNotifications();
+                          fetchNotifications();
+                        }
+                      }}
+                      style={{
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        background: colors.error,
+                        color: colors.white,
+                        border: 'none',
+                        borderRadius: borderRadius.lg,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.semibold,
+                        cursor: 'pointer',
+                        transition: transitions.fast,
+                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-1px)';
+                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                        e.target.style.background = '#b91c1c';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                        e.target.style.background = colors.error;
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>

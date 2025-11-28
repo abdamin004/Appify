@@ -6,13 +6,14 @@ import MyEventsList from "../Functions/MyEventsList";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
-import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, deleteAllEventOfficeNotifications, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
 import VendorDocumentsPage from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import { statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -722,8 +723,9 @@ function EventOfficeDashboard() {
               style={{
                 display: "flex",
                 gap: spacing.lg,
-                alignItems: "center",
+                alignItems: "flex-start",
                 flexWrap: "wrap",
+                justifyContent: "flex-end",
               }}
             >
               <div style={{ position: "relative" }}>
@@ -877,32 +879,14 @@ function EventOfficeDashboard() {
               </div>
               <div
                 style={{
-                  padding: `${spacing.md} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
-                  borderRadius: borderRadius.xl,
-                  textAlign: "center",
-                  border: `1px solid ${colors.primary}`,
+                  ...statCardBase,
                   position: "relative",
-                  boxShadow: shadows.md,
                 }}
               >
-                <div
-                  style={{
-                    fontSize: typography.fontSize['2xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.white,
-                  }}
-                >
+                <div style={statValueStyle}>
                   {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
                 </div>
-                <div
-                  style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.accent,
-                    marginTop: spacing.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
+                <div style={statLabelStyle}>
                   Notifications
                 </div>
               </div>
@@ -910,378 +894,101 @@ function EventOfficeDashboard() {
           </div>
 
           {/* Tabs */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: spacing.md,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              flexDirection: "column",
-              gap: spacing.md,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            {/* First Row of Tabs - 6 tabs */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-            <button
-              onClick={() => setActiveTab("browse")}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "browse"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "browse" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              🎯 Browse Events
-            </button>
-            <button
-              onClick={() => setActiveTab("vendor-requests")}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "vendor-requests"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "vendor-requests" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              📝 Vendor Requests
-              {vendorRequests.length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {vendorRequests.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("vendor-documents")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "vendor-documents"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "vendor-documents" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📄 Vendor Documents
-            </button>
-            <button
-              onClick={() => setActiveTab("attendees-report")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "attendees-report"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "attendees-report" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📊 Attendees Report
-            </button>
-            <button
-              onClick={() => setActiveTab("sales-report")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "sales-report"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "sales-report" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              💰 Sales Report
-            </button>
+          {(() => {
+            const tabButtons = [
+              { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
+              {
+                key: "vendor-requests",
+                label: "📝 Vendor Requests",
+                onClick: () => setActiveTab("vendor-requests"),
+                badgeCount: vendorRequests.length,
+              },
+              { key: "vendor-documents", label: "📄 Vendor Documents", onClick: () => setActiveTab("vendor-documents") },
+              { key: "attendees-report", label: "📊 Attendees Report", onClick: () => setActiveTab("attendees-report") },
+              { key: "sales-report", label: "💰 Sales Report", onClick: () => setActiveTab("sales-report") },
+              { key: "gym-sessions", label: "💪 Gym Sessions", onClick: () => setActiveTab("gym-sessions") },
+              {
+                key: "workshop-approvals",
+                label: "🎓 Workshop Approvals",
+                onClick: () => setActiveTab("workshop-approvals"),
+                badgeCount: pendingWorkshops.length,
+              },
+              { key: "polls", label: "📊 Booth Polls", onClick: () => setActiveTab("polls") },
+              { key: "loyalty", label: "⭐ Loyalty Partners", onClick: () => setActiveTab("loyalty") },
+              { key: "archived", label: "📦 Archived Events", onClick: () => setActiveTab("archived") },
+              {
+                key: "notifications",
+                label: "🔔 Notifications",
+                onClick: () => {
+                  setActiveTab("notifications");
+                  fetchNotifications();
+                },
+                badgeCount: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length,
+              },
+              {
+                key: "reminders",
+                label: "⏰ Reminders",
+                onClick: () => {
+                  setActiveTab("reminders");
+                  fetchReminders();
+                },
+                badgeCount: reminders.filter(n => !n.isRead).length,
+              },
+            ];
 
+            const firstRowCount = Math.ceil(tabButtons.length / 2);
+            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
 
+            const renderTabButton = (tab) => {
+              const isActive = activeTab === tab.key;
+              const style = getTabButtonStyle(isActive, tab.variant);
+              return (
+                <button key={tab.key} onClick={tab.onClick} style={style}>
+                  {tab.label}
+                  {tab.badgeCount > 0 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: spacing.sm,
+                        right: spacing.sm,
+                        background: colors.error,
+                        color: colors.white,
+                        borderRadius: borderRadius.full,
+                        width: "20px",
+                        height: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
+                    >
+                      {tab.badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            };
 
-            <button
-              onClick={() => setActiveTab("gym-sessions")}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "gym-sessions"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "gym-sessions" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              💪 Gym Sessions
-            </button>
-            </div>
-
-            {/* Second Row of Tabs - 6 tabs */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-            <button
-              onClick={() => setActiveTab("workshop-approvals")}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "workshop-approvals"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "workshop-approvals" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              🎓 Workshop Approvals
-              {pendingWorkshops.length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {pendingWorkshops.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("polls")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "polls"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "polls" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📊 Booth Polls
-            </button>
-
-            <button
-              onClick={() => setActiveTab("loyalty")}
-              style={{
-                flex: 1,
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "loyalty"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              ⭐ Loyalty Partners
-            </button>
-            <button
-              onClick={() => setActiveTab("archived")}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "archived"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "archived" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📦 Archived Events
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("notifications");
-                fetchNotifications();
-              }}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "notifications"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "notifications" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              🔔 Notifications
-              {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("reminders");
-                fetchReminders();
-              }}
-              style={{
-                flex: "1 1 calc(16.666% - 10px)",
-                minWidth: "150px",
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "reminders"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "reminders" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              ⏰ Reminders
-              {reminders.filter(n => !n.isRead).length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {reminders.filter(n => !n.isRead).length}
-                </span>
-              )}
-            </button>
-            </div>
-          </div>
+            return (
+              <div
+                style={{
+                  background: colors.bgCard,
+                  padding: spacing.md,
+                  borderRadius: borderRadius['2xl'],
+                  boxShadow: shadows.lg,
+                  marginBottom: spacing['2xl'],
+                  border: `1px solid ${colors.gray200}`,
+                }}
+              >
+                {tabRows.map((row, idx) => (
+                  <div key={idx} style={tabRowStyle}>
+                    {row.map(renderTabButton)}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Content */}
           {activeTab === "browse" && (
@@ -1984,22 +1691,59 @@ function EventOfficeDashboard() {
                 }}>
                   Notifications
                 </h2>
-                {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                  <button
-                    onClick={() => {
-                      // Mark all frontend notifications as read
-                      markAllEventOfficeNotificationsRead();
-                      fetchNotifications();
-                    }}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      fontSize: typography.fontSize.sm,
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: spacing.md }}>
+                  {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Mark all frontend notifications as read
+                        markAllEventOfficeNotificationsRead();
+                        fetchNotifications();
+                      }}
+                      style={{
+                        ...buttonStyles.primary,
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        fontSize: typography.fontSize.sm,
+                      }}
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                  {notifications.filter(n => n.type !== 'EventReminder').length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                        if (confirmed) {
+                          deleteAllEventOfficeNotifications();
+                          fetchNotifications();
+                        }
+                      }}
+                      style={{
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        background: colors.error,
+                        color: colors.white,
+                        border: 'none',
+                        borderRadius: borderRadius.lg,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.semibold,
+                        cursor: 'pointer',
+                        transition: transitions.fast,
+                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-1px)';
+                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                        e.target.style.background = '#b91c1c';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                        e.target.style.background = colors.error;
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
@@ -2324,7 +2068,6 @@ function EventOfficeDashboard() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Edit Request Modal */}
       {editRequestModal.open && (
@@ -2423,6 +2166,7 @@ function EventOfficeDashboard() {
       )}
 
       {/* QR Code Generator Modal */}
+      </div>
     </div>
   );
 }

@@ -19,9 +19,9 @@ try {
 }
 
 const sendVerificationEmail = async (user, token) => {
-  const frontendUrl =
-    (process.env.FRONTEND_URL && process.env.FRONTEND_URL.replace(/\/$/, '')) ||
-    'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.replace(/\/$/, '')
+    : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
   const verifyFrontendURL = `${frontendUrl}/verify/${token}`;
 
   await transporter.sendMail({
@@ -128,7 +128,10 @@ const sendVendorApplicationApprovalEmail = async (vendor, application, event) =>
   const eventLocation = event.location || 'TBA';
   const participationFee = application.participationFee || 0;
   const paymentDeadline = application.paymentDeadline ? new Date(application.paymentDeadline).toLocaleDateString() : 'N/A';
-  const paymentUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/vendor/payment/${application._id}`;
+  const frontendUrl = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.replace(/\/$/, '')
+    : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
+  const paymentUrl = `${frontendUrl}/vendor/payment/${application._id}`;
 
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,

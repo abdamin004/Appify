@@ -11,6 +11,7 @@ import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
 import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 import { payApplicationWithWallet, getWalletBalance, createCheckoutSession, confirmStripeReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import WalletBadge from "../Wallet/WalletBadge";
@@ -570,16 +571,8 @@ function VendorDashboard() {
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                flexWrap: "wrap",
-                gap: spacing.lg,
-              }}
-            >
-              <div>
+            <div style={headerContainerStyle}>
+              <div style={{ flex: "1 1 520px", minWidth: 320 }}>
                 <h1
                   style={{
                     fontSize: typography.fontSize['3xl'],
@@ -599,252 +592,147 @@ function VendorDashboard() {
                 >
                   View and manage bazaars and booths
                 </p>
+                <div style={{ height: spacing.md }} />
               </div>
               <div
                 style={{
                   display: "flex",
+                  flexDirection: "column",
                   gap: spacing.md,
-                  flexWrap: "wrap",
-                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  flexShrink: 0,
+                  justifyContent: "center",
                 }}
               >
-                <button
-                  onClick={handleRequestBooth}
-                  style={{
-                    ...buttonStyles.primary,
-                    padding: `${spacing.md} ${spacing['2xl']}`,
-                    minWidth: 220,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.boxShadow = shadows.accentHover;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.boxShadow = shadows.accent;
-                  }}
-                >
-                  + Request Booth/Bazaar
-                </button>
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: spacing.lg,
-                flexWrap: "wrap",
-              }}
-            >
-              {vendorStatCards.map((stat) => (
                 <div
-                  key={stat.label}
                   style={{
-                    padding: `${spacing.md} ${spacing.xl}`,
-                    background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
-                    borderRadius: borderRadius.xl,
-                    textAlign: "center",
-                    border: `1px solid ${colors.primary}`,
-                    boxShadow: shadows.md,
-                    minWidth: 160,
-                    flex: "1 1 180px",
+                    display: "flex",
+                    gap: spacing.md,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <button
+                    onClick={handleRequestBooth}
+                    style={{
+                      ...buttonStyles.primary,
+                      padding: `${spacing.md} ${spacing['2xl']}`,
+                      minWidth: 220,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.boxShadow = shadows.accentHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.boxShadow = shadows.accent;
+                    }}
+                  >
+                    + Request Booth/Bazaar
+                  </button>
+                  {vendorStatCards.map((stat) => (
+                    <div
+                      key={stat.label}
+                      style={statCardBase}
+                    >
+                      <div style={statValueStyle}>
+                        {stat.value}
+                      </div>
+                      <div style={statLabelStyle}>
+                        {stat.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    width: "100%",
+                    position: "relative",
                   }}
                 >
                   <div
                     style={{
-                      fontSize: typography.fontSize['2xl'],
-                      fontWeight: typography.fontWeight.bold,
-                      color: colors.white,
+                      transform: "translateX(60px)",
                     }}
                   >
-                    {stat.value}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: typography.fontSize.sm,
-                      color: colors.accent,
-                      marginTop: spacing.xs,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {stat.label}
+                    <WalletBadge
+                      balance={walletBalance}
+                      currency="USD"
+                      onTopUp={() => setTopUpOpen(true)}
+                      label="Wallet Balance"
+                      style={{ width: "auto" }}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                width: "100%",
-              }}
-            >
-              <WalletBadge
-                balance={walletBalance}
-                currency="USD"
-                onTopUp={() => setTopUpOpen(true)}
-                label="Wallet Balance"
-                style={{ minWidth: 260 }}
-              />
+              </div>
             </div>
           </div>
 
           {/* Tabs */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: spacing.md,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              gap: spacing.md,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            <button
-              onClick={() => setActiveTab("browse")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "browse"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "browse" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              🏪 Browse Bazaars & Booths
-            </button>
-            <button
-              onClick={() => setActiveTab("upcoming")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "upcoming"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "upcoming" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📅 Upcoming Events
-            </button>
-            <button
-              onClick={() => setActiveTab("my-applications")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "my-applications"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "my-applications" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📋 My Applications
-            </button>
-            <button
-              onClick={() => setActiveTab("loyalty")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "loyalty"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              ⭐ Loyalty Program
-            </button>
-            <button
-              onClick={() => setActiveTab("visitor-qrcodes")}
-              style={{
-                flex: 1,
-                padding: "15px 20px",
-                background:
-                  activeTab === "visitor-qrcodes"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "visitor-qrcodes" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
-              }}
-            >
-              📧 Visitor QR Codes
-            </button>
-            <button
-              onClick={() => setActiveTab("company-documents")}
-              style={{
-                flex: 1,
-                padding: "15px 20px",
-                background:
-                  activeTab === "company-documents"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "company-documents" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
-              }}
-            >
-              📄 Company Documents
-            </button>
-            <button
-              onClick={() => setActiveTab("attendee-ids")}
-              style={{
-                flex: 1,
-                padding: "15px 20px",
-                background:
-                  activeTab === "attendee-ids"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "attendee-ids" ? "#003366" : "#6b7280",
-                border: "none",
-                borderRadius: "15px",
-                fontSize: "1rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                minWidth: "180px",
-              }}
-            >
-              🆔 Attendee IDs
-            </button>
-          </div>
+          {(() => {
+            const tabButtons = [
+              { key: "browse", label: "🏪 Browse Bazaars & Booths", onClick: () => setActiveTab("browse") },
+              { key: "upcoming", label: "📅 Upcoming Events", onClick: () => setActiveTab("upcoming") },
+              { key: "my-applications", label: "📋 My Applications", onClick: () => setActiveTab("my-applications") },
+              { key: "loyalty", label: "⭐ Loyalty Program", onClick: () => setActiveTab("loyalty") },
+              { key: "visitor-qrcodes", label: "📧 Visitor QR Codes", onClick: () => setActiveTab("visitor-qrcodes"), variant: "gold" },
+              { key: "company-documents", label: "📄 Company Documents", onClick: () => setActiveTab("company-documents"), variant: "gold" },
+              { key: "attendee-ids", label: "🆔 Attendee IDs", onClick: () => setActiveTab("attendee-ids"), variant: "gold" },
+            ];
+
+            const firstRowCount = Math.ceil(tabButtons.length / 2);
+            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
+
+            const renderTabButton = (tab) => {
+              const isActive = activeTab === tab.key;
+              const style = getTabButtonStyle(isActive, tab.variant);
+              return (
+                <button key={tab.key} onClick={tab.onClick} style={style}>
+                  {tab.label}
+                  {tab.badgeCount > 0 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: spacing.sm,
+                        right: spacing.sm,
+                        background: colors.error,
+                        color: colors.white,
+                        borderRadius: borderRadius.full,
+                        width: "20px",
+                        height: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
+                    >
+                      {tab.badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            };
+
+            return (
+              <div
+                style={{
+                  background: colors.bgCard,
+                  padding: spacing.md,
+                  borderRadius: borderRadius['2xl'],
+                  boxShadow: shadows.lg,
+                  marginBottom: spacing['2xl'],
+                  border: `1px solid ${colors.gray200}`,
+                }}
+              >
+                {tabRows.map((row, idx) => (
+                  <div key={idx} style={tabRowStyle}>
+                    {row.map(renderTabButton)}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Upcoming Events Sub-Tabs */}
           {activeTab === "upcoming" && (

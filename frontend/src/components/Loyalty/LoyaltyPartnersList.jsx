@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { showToast } from '../../utils/toast';
 
 function LoyaltyPartnersList() {
   const [partners, setPartners] = useState([]);
@@ -101,9 +102,9 @@ function LoyaltyPartnersList() {
 
   const copyToClipboard = (text, type) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert(`${type} copied to clipboard!`);
+      showToast.success(`${type} copied to clipboard!`);
     }).catch(() => {
-      alert('Failed to copy to clipboard');
+      showToast.error('Failed to copy to clipboard');
     });
   };
 

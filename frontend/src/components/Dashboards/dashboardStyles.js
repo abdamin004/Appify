@@ -9,12 +9,14 @@ export const headerContainerStyle = {
 };
 
 export const statCardBase = {
-  padding: `${spacing.sm} ${spacing.lg}`,
-  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.9) 0%, rgba(26, 51, 77, 0.95) 100%)`,
-  borderRadius: borderRadius.lg,
-  border: `1px solid rgba(255,255,255,0.2)`,
-  boxShadow: "0 12px 24px rgba(0,0,0,0.2)",
-  minWidth: 180,
+  padding: `${spacing.md} ${spacing.lg}`,
+  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
+  borderRadius: borderRadius.xl,
+  textAlign: "center",
+  border: `1px solid ${colors.primary}`,
+  boxShadow: shadows.md,
+  width: "100px",
+  flex: "0 0 auto",
 };
 
 export const statValueStyle = {
@@ -87,4 +89,5 @@ export const tabRowStyle = {
   flexWrap: "wrap",
   width: "100%",
 };
+
 

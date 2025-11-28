@@ -82,6 +82,17 @@ export function deleteNotification(professorId, notificationId) {
   }
 }
 
+// Delete all notifications
+export function deleteAllNotifications(professorId) {
+  if (!professorId || typeof localStorage === 'undefined') return;
+  try {
+    const key = `${NOTIFICATION_KEY_PREFIX}${professorId}`;
+    localStorage.setItem(key, JSON.stringify([]));
+  } catch (err) {
+    console.error('Error deleting all notifications:', err);
+  }
+}
+
 // Get unread count
 export function getUnreadCount(professorId) {
   const notifications = getProfessorNotifications(professorId);
@@ -164,6 +175,16 @@ export function deleteEventOfficeNotification(notificationId) {
     localStorage.setItem(EVENT_OFFICE_NOTIFICATION_KEY, JSON.stringify(updated));
   } catch (err) {
     console.error('Error deleting Events Office notification:', err);
+  }
+}
+
+// Delete all notifications
+export function deleteAllEventOfficeNotifications() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(EVENT_OFFICE_NOTIFICATION_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.error('Error deleting all Events Office notifications:', err);
   }
 }
 
@@ -250,6 +271,16 @@ export function deleteStudentNotification(notificationId) {
     localStorage.setItem(STUDENT_NOTIFICATION_KEY, JSON.stringify(updated));
   } catch (err) {
     console.error('Error deleting student notification:', err);
+  }
+}
+
+// Delete all notifications
+export function deleteAllStudentNotifications() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(STUDENT_NOTIFICATION_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.error('Error deleting all student notifications:', err);
   }
 }
 

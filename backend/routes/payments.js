@@ -97,7 +97,10 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       return res.status(400).json({ message: 'eventId or applicationId is required' });
     }
 
-    const successBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const frontendUrl = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.replace(/\/$/, '')
+      : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
+    const successBase = frontendUrl;
     // For vendor applications, default to vendor dashboard
     let returnPath = req.body?.returnPath || (applicationId ? '/vendor-dashboard' : '/student-dashboard');
     if (typeof returnPath !== 'string' || !returnPath.startsWith('/')) {
