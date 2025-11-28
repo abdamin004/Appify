@@ -525,6 +525,43 @@ function MyEventsList({ events, showRefundButton = false }) {
                 )}
               </div>
 
+              {/* View Details Button - Always visible */}
+              <div style={{ marginTop: 16, marginBottom: 12 }}>
+                <button
+                  onClick={() => navigate(`/events/${id}`)}
+                  style={{
+                    width: '100%',
+                    padding: `${spacing.sm} ${spacing.md}`,
+                    background: 'transparent',
+                    color: colors.primary,
+                    border: `1.5px solid ${colors.primary}`,
+                    borderRadius: borderRadius.lg,
+                    fontWeight: typography.fontWeight.semibold,
+                    fontSize: typography.fontSize.sm,
+                    cursor: 'pointer',
+                    transition: transitions.fast,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.xs,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = colors.primary;
+                    e.target.style.color = colors.white;
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = `0 4px 8px rgba(0, 51, 102, 0.2)`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'transparent';
+                    e.target.style.color = colors.primary;
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  View Details
+                </button>
+              </div>
+
               {/* Rating + Comments (frontend-only rating; comments fetched from API) */}
               <div
                 style={{

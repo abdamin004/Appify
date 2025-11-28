@@ -368,29 +368,14 @@ function EventOfficeDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      // Fetch backend notifications for Event Office
+      // Fetch backend notifications for Event Office using admin endpoint
       let backendNotifications = [];
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-        const token = localStorage.getItem("token");
-        if (token) {
-          // Try the user notifications endpoint first (Event Office is a user role)
-          const res = await fetch(`${API_BASE}/users/me/notifications`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            backendNotifications = Array.isArray(data) ? data : (Array.isArray(data?.notifications) ? data.notifications : []);
-          } else if (res.status === 404) {
-            // Backend route not implemented yet - gracefully handle
-            backendNotifications = [];
-          }
-        }
+        const res = await adminService.listAdminNotifications();
+        backendNotifications = Array.isArray(res?.notifications) ? res.notifications : (Array.isArray(res) ? res : []);
       } catch (err) {
-        // Network error or other issue - gracefully handle silently
-        // Don't log to avoid console spam since this endpoint may not exist
+        // Network error or other issue - gracefully handle
+        console.error("Error fetching backend notifications:", err);
         backendNotifications = [];
       }
 
@@ -405,7 +390,36 @@ function EventOfficeDashboard() {
         _id: n.id,
       }));
 
-      setNotifications([...formattedFrontend, ...backendNotifications]);
+      // Deduplicate: If there's a frontend "NewEvent" notification and a backend "NewEventPublished" 
+      // notification for the same event, only keep the frontend one (the one with the icon)
+      const deduplicated = [];
+      const seenEventIds = new Set();
+      
+      // First pass: Add all frontend notifications (they have icons)
+      formattedFrontend.forEach(notif => {
+        if (notif.eventId) {
+          seenEventIds.add(String(notif.eventId));
+        }
+        deduplicated.push(notif);
+      });
+      
+      // Second pass: Add backend notifications, but skip "NewEventPublished" if we already have a "NewEvent" for the same event
+      backendNotifications.forEach(notif => {
+        // Skip backend NewEventPublished if we already have a frontend NewEvent for the same event
+        if (notif.type === 'NewEventPublished') {
+          // Get event ID from backend notification (event can be populated object or just ID)
+          const eventId = notif.event 
+            ? String(notif.event._id || notif.event.id || notif.event)
+            : null;
+          
+          if (eventId && seenEventIds.has(eventId)) {
+            return; // Skip this duplicate - we already have the frontend one with icon
+          }
+        }
+        deduplicated.push(notif);
+      });
+
+      setNotifications(deduplicated);
     } catch (err) {
       console.error("Error fetching notifications:", err);
       setNotifications([]);
@@ -1703,10 +1717,18 @@ function EventOfficeDashboard() {
                 <div style={{ display: "flex", gap: spacing.md }}>
                   {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
                     <button
-                      onClick={() => {
-                        // Mark all frontend notifications as read
-                        markAllEventOfficeNotificationsRead();
-                        fetchNotifications();
+                      onClick={async () => {
+                        try {
+                          // Mark all frontend notifications as read
+                          markAllEventOfficeNotificationsRead();
+                          // Mark all backend notifications as read
+                          await adminService.markAllNotificationsRead();
+                          fetchNotifications();
+                          showToast.success('All notifications marked as read');
+                        } catch (err) {
+                          console.error('Error marking all as read:', err);
+                          showToast.error(err?.message || 'Failed to mark all notifications as read');
+                        }
                       }}
                       style={{
                         ...buttonStyles.primary,
@@ -1721,9 +1743,34 @@ function EventOfficeDashboard() {
                     <button
                       onClick={async () => {
                         const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                        if (confirmed) {
+                        if (!confirmed) return;
+                        
+                        try {
+                          // Delete all backend notifications (delete each one individually)
+                          // Backend notifications have _id from MongoDB, frontend have id (and we add _id: id)
+                          // So backend notifications are those that have _id but the _id doesn't match the id field
+                          const backendNotifs = notifications.filter(n => {
+                            // Backend notifications: have _id, and either no id field, or _id !== id
+                            return n._id && (n.id === undefined || String(n._id) !== String(n.id));
+                          });
+                          
+                          // Delete all backend notifications
+                          const deletePromises = backendNotifs.map(notif => 
+                            adminService.deleteNotification(notif._id).catch(err => {
+                              console.error(`Error deleting notification ${notif._id}:`, err);
+                              return null; // Continue even if one fails
+                            })
+                          );
+                          await Promise.all(deletePromises);
+                          
+                          // Delete all frontend notifications
                           deleteAllEventOfficeNotifications();
+                          
                           fetchNotifications();
+                          showToast.success('All notifications deleted');
+                        } catch (err) {
+                          console.error('Error deleting all notifications:', err);
+                          showToast.error(err?.message || 'Failed to delete all notifications');
                         }
                       }}
                       style={{
@@ -1767,7 +1814,10 @@ function EventOfficeDashboard() {
                 }}>
                   {notifications.map((notif) => {
                     const isRead = notif.read || notif.isRead;
-                    const isFrontend = notif.id && !notif._id; // Frontend notifications have id but not _id
+                    // Frontend notifications: have id, and _id matches id (we set _id: n.id in fetchNotifications)
+                    // Backend notifications: have _id from MongoDB, and either no id or _id !== id
+                    const isFrontend = notif.id && notif._id && String(notif._id) === String(notif.id);
+                    const isBackend = notif._id && (!notif.id || String(notif._id) !== String(notif.id));
                     return (
                       <div
                         key={notif.id || notif._id}
@@ -1866,8 +1916,60 @@ function EventOfficeDashboard() {
                             )}
                             {isFrontend && (
                               <button
-                                onClick={() => {
+                                onClick={async () => {
+                                  // Delete frontend notification
                                   deleteEventOfficeNotification(notif.id);
+                                  
+                                  // If this is a "NewEvent" notification, also delete the corresponding backend "NewEventPublished" notification
+                                  if (notif.type === 'NewEvent' && notif.eventId) {
+                                    try {
+                                      // Fetch backend notifications separately to find the duplicate
+                                      // (it might not be in the current notifications array due to deduplication)
+                                      const backendRes = await adminService.listAdminNotifications();
+                                      const allBackendNotifs = Array.isArray(backendRes?.notifications) 
+                                        ? backendRes.notifications 
+                                        : (Array.isArray(backendRes) ? backendRes : []);
+                                      
+                                      const eventIdToMatch = String(notif.eventId);
+                                      
+                                      // Find the backend notification for the same event
+                                      const backendNotif = allBackendNotifs.find(n => {
+                                        if (n.type !== 'NewEventPublished' || !n._id) return false;
+                                        
+                                        // Get event ID from backend notification
+                                        // Event can be: populated object {_id: ...}, just an ID string, or ObjectId
+                                        let backendEventId = null;
+                                        if (n.event) {
+                                          if (typeof n.event === 'string') {
+                                            backendEventId = n.event;
+                                          } else if (n.event._id) {
+                                            backendEventId = String(n.event._id);
+                                          } else if (n.event.id) {
+                                            backendEventId = String(n.event.id);
+                                          }
+                                        }
+                                        
+                                        // Also check if event is stored directly as a field (not populated)
+                                        if (!backendEventId && n.eventId) {
+                                          backendEventId = String(n.eventId);
+                                        }
+                                        
+                                        return backendEventId && String(backendEventId) === eventIdToMatch;
+                                      });
+                                      
+                                      if (backendNotif && backendNotif._id) {
+                                        // Delete the backend duplicate
+                                        await adminService.deleteNotification(backendNotif._id);
+                                        console.log('Deleted backend duplicate notification:', backendNotif._id);
+                                      } else {
+                                        console.log('No backend duplicate found for event:', eventIdToMatch);
+                                      }
+                                    } catch (err) {
+                                      console.error('Error deleting backend duplicate notification:', err);
+                                      showToast.error('Failed to delete duplicate notification');
+                                    }
+                                  }
+                                  
                                   fetchNotifications();
                                 }}
                                 style={{
@@ -1894,6 +1996,70 @@ function EventOfficeDashboard() {
                                 }}
                               >
                                 🗑️ Delete
+                              </button>
+                            )}
+                            {isBackend && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await adminService.deleteNotification(notif._id);
+                                    fetchNotifications();
+                                    showToast.success('Notification deleted');
+                                  } catch (err) {
+                                    console.error('Error deleting backend notification:', err);
+                                    showToast.error(err?.message || 'Failed to delete notification');
+                                  }
+                                }}
+                                style={{
+                                  padding: `${spacing.xs} ${spacing.md}`,
+                                  background: colors.error,
+                                  color: colors.white,
+                                  border: 'none',
+                                  borderRadius: borderRadius.lg,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
+                                  cursor: 'pointer',
+                                  transition: transitions.fast,
+                                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.target.style.transform = 'translateY(-1px)';
+                                  e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                                  e.target.style.background = '#b91c1c';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.transform = 'translateY(0)';
+                                  e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                                  e.target.style.background = colors.error;
+                                }}
+                              >
+                                🗑️ Delete
+                              </button>
+                            )}
+                            {!isRead && isBackend && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await adminService.markNotificationRead(notif._id);
+                                    fetchNotifications();
+                                    showToast.success('Notification marked as read');
+                                  } catch (err) {
+                                    console.error('Error marking notification as read:', err);
+                                    showToast.error(err?.message || 'Failed to mark notification as read');
+                                  }
+                                }}
+                                style={{
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  background: colors.success,
+                                  color: colors.white,
+                                  border: "none",
+                                  borderRadius: borderRadius.md,
+                                  fontSize: typography.fontSize.sm,
+                                  fontWeight: typography.fontWeight.semibold,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Mark Read
                               </button>
                             )}
                           </div>
