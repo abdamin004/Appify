@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { getEventComments, addEventComment, rateEvent } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
 import { FaStar } from "react-icons/fa";
-import PayDialog from "../Payments/PayDialog";
-import { refundAndCancel } from "../../services/paymentService";
+import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance } from "../../services/paymentService";
+import PaymentActions from "../Payments/PaymentActions";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 
@@ -91,7 +91,8 @@ function MyEventsList({ events, showRefundButton = false }) {
   const [commentsLoading, setCommentsLoading] = useState({}); // { [eventId]: boolean }
   const [commentsError, setCommentsError] = useState({}); // { [eventId]: string }
   const [newCommentByEvent, setNewCommentByEvent] = useState({}); // { [eventId]: string }
-  const [payEvent, setPayEvent] = useState(null); // payment modal state
+  const [payingId, setPayingId] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(undefined);
   const [paidLocal, setPaidLocal] = useState(new Set());
   const [refundedSet, setRefundedSet] = useState(new Set());
 
@@ -115,6 +116,25 @@ function MyEventsList({ events, showRefundButton = false }) {
 
   useEffect(() => {
     setRatings(loadRatings());
+    let active = true;
+    async function loadWallet() {
+      try {
+        const res = await getWalletBalance();
+        if (!active) return;
+        const balance = (res && typeof res.balance === 'number') ? res.balance : undefined;
+        setWalletBalance(balance);
+      } catch (_) {
+        if (!active) return;
+        setWalletBalance(undefined);
+      }
+    }
+    loadWallet();
+    const handler = () => loadWallet();
+    window.addEventListener('wallet:updated', handler);
+    return () => {
+      active = false;
+      window.removeEventListener('wallet:updated', handler);
+    };
   }, []);
 
   // Helpers to normalize event fields
@@ -132,6 +152,58 @@ function MyEventsList({ events, showRefundButton = false }) {
       ?? (evt?.price ?? evt?.amount ?? evt?.requiredBudget)
       ?? 0;
     return Number(p) || 0;
+  };
+
+  const handleCardPay = async (evt) => {
+    const eventId = getEventId(evt);
+    if (!eventId) {
+      showToast.error('Event id missing');
+      return;
+    }
+    try {
+      setPayingId(eventId);
+      const { url } = await createCheckoutSession(eventId);
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      showToast.error('Could not start card checkout. Please try again.');
+    } catch (err) {
+      showToast.error(err?.message || 'Checkout failed');
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const handleWalletPay = async (evt) => {
+    const eventId = getEventId(evt);
+    if (!eventId) {
+      showToast.error('Event id missing');
+      return;
+    }
+    const price = getPrice(evt);
+    if (typeof walletBalance === 'number' && walletBalance < price) {
+      showToast.error('Insufficient wallet balance');
+      return;
+    }
+    try {
+      setPayingId(eventId);
+      const res = await payWithWallet(eventId);
+      if (res && (res.success || res.status === 'paid' || res.paid)) {
+        setPaidLocal(prev => new Set(prev).add(String(eventId)));
+        try {
+          window.dispatchEvent(new CustomEvent('wallet:updated', { detail: { reason: 'wallet-pay', amount: price } }));
+          window.dispatchEvent(new CustomEvent('payment:success', { detail: { method: 'Wallet', amount: price } }));
+        } catch (_) {}
+        showToast.success('Payment completed successfully!');
+        return;
+      }
+      throw new Error(res?.message || 'Wallet payment failed');
+    } catch (err) {
+      showToast.error(err?.message || 'Wallet payment failed');
+    } finally {
+      setPayingId(null);
+    }
   };
 
   async function handleRefundAndCancel(eventId) {
@@ -324,8 +396,25 @@ function MyEventsList({ events, showRefundButton = false }) {
         const price = getPrice(evt);
         const serverPaid = Boolean(evt?.paymentStatus || evt?.paid || evt?.event?.paymentStatus || evt?.event?.paid);
         const isPaid = (serverPaid && !refundedSet.has(String(id))) || paidLocal.has(String(id));
-        // Show payment for any registered event that is not paid and not past
-        const isPayable = !isPaid && !hasEventEnded(evt);
+        // Show payment only for registered events that require payment, are not paid, and not past
+        const requiresPayment = (getPrice(evt) || 0) > 0;
+        const isPayable = isRegistered(evt) && requiresPayment && !isPaid && !hasEventEnded(evt);
+        const canRefund =
+          showRefundButton &&
+          isPaid &&
+          !hasEventEnded(evt) &&
+          (() => {
+            try {
+              const start = getStart(evt);
+              if (!start) return false;
+              const diffDays = (new Date(start).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+              return diffDays >= 14;
+            } catch (_) {
+              return false;
+            }
+          })();
+        const canUseWallet = typeof walletBalance === 'number' && walletBalance >= price;
+        const walletDisabled = payingId === id || !canUseWallet;
 
         return (
           <div
@@ -476,22 +565,15 @@ function MyEventsList({ events, showRefundButton = false }) {
                   {attendedSet.has(String(id)) ? 'Attended' : 'Mark Attended'}
                 </button>
                 {isPayable && (
-                  <button
-                    type="button"
-                    onClick={() => setPayEvent(evt)}
-                    style={{
-                      marginLeft: 'auto',
-                      padding: '8px 12px',
-                      background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                      color: '#003366',
-                      border: 'none',
-                      borderRadius: 8,
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Pay Now
-                  </button>
+                  <div style={{ width: '100%', marginTop: spacing.sm }}>
+                    <PaymentActions
+                      paying={payingId === id}
+                      disabled={false}
+                      walletDisabled={walletDisabled}
+                      onPayCard={() => handleCardPay(evt)}
+                      onPayWallet={() => handleWalletPay(evt)}
+                    />
+                  </div>
                 )}
                 <button
                   type="button"
@@ -509,7 +591,7 @@ function MyEventsList({ events, showRefundButton = false }) {
                 >
                   {openComments[id] ? 'Hide Comments' : 'Show Comments'}
                 </button>
-                {showRefundButton && isPaid && (
+                {canRefund && (
                   <button
                     type="button"
                     onClick={() => handleRefundAndCancel(id)}
@@ -525,6 +607,28 @@ function MyEventsList({ events, showRefundButton = false }) {
                   >
                     Cancel & Refund
                   </button>
+                )}
+                {showRefundButton && isPaid && !canRefund && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
+                    <button
+                      type="button"
+                      disabled
+                      style={{
+                        padding: '8px 12px',
+                        background: colors.gray100,
+                        color: colors.gray400,
+                        border: `1px solid ${colors.gray200}`,
+                        borderRadius: 8,
+                        fontWeight: 800,
+                        cursor: 'not-allowed'
+                      }}
+                    >
+                      Cancel & Refund (window closed)
+                    </button>
+                    <span style={{ color: '#9ca3af', fontSize: 12, fontStyle: 'italic' }}>
+                      Cancellation only available ≥ 14 days before start.
+                    </span>
+                  </div>
                 )}
                 {canEditWorkshop(evt) && (
                   <button
@@ -618,16 +722,6 @@ function MyEventsList({ events, showRefundButton = false }) {
           </div>
         );
       })}
-      {payEvent && (
-        <PayDialog
-          open={!!payEvent}
-          event={payEvent}
-          onClose={() => setPayEvent(null)}
-          onSuccess={({ eventId }) => {
-            setPaidLocal(prev => new Set(prev).add(String(eventId)));
-          }}
-        />
-      )}
     </div>
   );
 }

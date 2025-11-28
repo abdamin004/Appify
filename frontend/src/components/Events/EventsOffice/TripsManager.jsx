@@ -124,6 +124,7 @@ function TripsManager({ editOnly = false }) {
       const createdTrip = await createTrip(payload);
       showToast.success('Trip created successfully');
       
+      // Save user restrictions if any
       const tripEvent = createdTrip?.event || createdTrip;
       
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });

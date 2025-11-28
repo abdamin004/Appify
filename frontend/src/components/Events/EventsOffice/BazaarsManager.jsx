@@ -298,9 +298,10 @@ function BazaarsManager({ editOnly = false }) {
           </>
         )}
 
-        {editing && (() => {
-          const bz = bazaars.find(b => b._id === editing);
-          if (!bz) return null;
+        {(editing || (editOnly && editId)) && (() => {
+          const bz = editOnly && editId ? null : bazaars.find(b => b._id === editing);
+          const currentEditId = editOnly ? editId : editing;
+          if (!currentEditId) return null;
           return (
             <div style={{
               background: colors.white,
@@ -441,9 +442,9 @@ function BazaarsManager({ editOnly = false }) {
                   paddingTop: spacing.lg,
                   borderTop: `1px solid ${colors.gray200}`,
                 }}>
-                  <button
-                    type="button"
-                    onClick={() => onSave(editing)}
+                  <button 
+                    type="button" 
+                    onClick={() => onSave(currentEditId)} 
                     disabled={loading}
                     style={{
                       ...buttonStyles.primary,

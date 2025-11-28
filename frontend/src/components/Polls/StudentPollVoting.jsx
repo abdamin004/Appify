@@ -51,9 +51,10 @@ function StudentPollVoting() {
     try {
       await voteOnPoll(pollId, vendorApplicationId, userId);
       await loadPolls(); // Refresh to show updated vote counts
+      showToast.success('Vote submitted successfully!');
     } catch (err) {
       const errorMsg = err?.message || err?.error?.message || 'Failed to vote';
-      alert('Failed to vote: ' + errorMsg);
+      showToast.error('Failed to vote: ' + errorMsg);
       console.error('Vote error:', err);
     }
   };

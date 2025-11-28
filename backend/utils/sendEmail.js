@@ -19,9 +19,9 @@ try {
 }
 
 const sendVerificationEmail = async (user, token) => {
-  const frontendUrl =
-    (process.env.FRONTEND_URL && process.env.FRONTEND_URL.replace(/\/$/, '')) ||
-    'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.replace(/\/$/, '')
+    : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
   const verifyFrontendURL = `${frontendUrl}/verify/${token}`;
 
   await transporter.sendMail({
@@ -126,6 +126,12 @@ const sendGymSessionUpdateEmail = async (user, gymSession, changes) => {
 const sendVendorApplicationApprovalEmail = async (vendor, application, event) => {
   const eventDate = event.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
   const eventLocation = event.location || 'TBA';
+  const participationFee = application.participationFee || 0;
+  const paymentDeadline = application.paymentDeadline ? new Date(application.paymentDeadline).toLocaleDateString() : 'N/A';
+  const frontendUrl = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.replace(/\/$/, '')
+    : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
+  const paymentUrl = `${frontendUrl}/vendor/payment/${application._id}`;
 
   await transporter.sendMail({
     from: `"Appify Events" <${process.env.EMAIL_USER}>`,
@@ -145,6 +151,15 @@ const sendVendorApplicationApprovalEmail = async (vendor, application, event) =>
         ${application.setupLocation ? `<p><strong>Setup Location:</strong> ${application.setupLocation}</p>` : ''}
         ${application.setupDurationWeeks ? `<p><strong>Setup Duration:</strong> ${application.setupDurationWeeks} week(s)</p>` : ''}
       </div>
+      
+      <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 5px; margin: 15px 0;">
+        <h4 style="color: #92400e; margin-top: 0;">Payment Required</h4>
+        <p><strong>Participation Fee:</strong> $${participationFee.toFixed(2)}</p>
+        <p><strong>Payment Deadline:</strong> ${paymentDeadline}</p>
+        <p style="color: #92400e; font-weight: bold;">Please complete your payment within 3 days to secure your participation.</p>
+        <p><a href="${paymentUrl}" style="display: inline-block; background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Pay Now</a></p>
+      </div>
+      
       ${application.notes ? `<p><strong>Notes from reviewer:</strong> ${application.notes}</p>` : ''}
       <p>We look forward to your participation. Please prepare accordingly and arrive on time.</p>
       <p>If you have any questions, please don't hesitate to contact us.</p>
@@ -179,6 +194,26 @@ const sendVendorApplicationRejectionEmail = async (vendor, application, event) =
   });
 };
 
+const buildQrAttachment = (qrImageDataUrl, filenameBase, cidPrefix = 'qr') => {
+  if (!qrImageDataUrl || !qrImageDataUrl.startsWith('data:image')) {
+    return { attachment: null, cid: null };
+  }
+
+  const base64 = qrImageDataUrl.split(',')[1];
+  if (!base64) return { attachment: null, cid: null };
+
+  const cid = `${cidPrefix}-${Date.now()}-${Math.random().toString(16).slice(2)}@appify`;
+  return {
+    attachment: {
+      filename: `${filenameBase || 'qr-code'}.png`,
+      content: Buffer.from(base64, 'base64'),
+      contentType: 'image/png',
+      cid
+    },
+    cid
+  };
+};
+
 const sendVendorVisitorPassesEmail = async (vendor, event, organization, passes) => {
   if (!vendor?.email || !Array.isArray(passes) || passes.length === 0) return;
 
@@ -197,21 +232,16 @@ const sendVendorVisitorPassesEmail = async (vendor, event, organization, passes)
 
   const attachments = [];
   const qrBlocks = passes.map((p, idx) => {
-    const cid = `qr${idx}@appify`;
-    let imgTag = '<div style="color:#dc2626;">QR unavailable</div>';
+    const { attachment, cid } = buildQrAttachment(
+      p.qrImageDataUrl,
+      `${(p.visitorName || 'visitor').replace(/[^a-z0-9]/gi, '_') || 'qr'}-${p.passCode || idx}`,
+      `qr-vendor-${idx}`
+    );
+    if (attachment) attachments.push(attachment);
 
-    if (p.qrImageDataUrl && p.qrImageDataUrl.startsWith('data:image')) {
-      const base64 = p.qrImageDataUrl.split(',')[1];
-      if (base64) {
-        attachments.push({
-          filename: `${(p.visitorName || 'visitor').replace(/[^a-z0-9]/gi, '_') || 'qr'}-${p.passCode || idx}.png`,
-          content: Buffer.from(base64, 'base64'),
-          contentType: 'image/png',
-          cid
-        });
-        imgTag = `<img src="cid:${cid}" alt="QR for ${p.visitorName || 'visitor'}" style="width:180px; height:180px; border:1px solid #d1d5db; padding:6px; background:#fff;" />`;
-      }
-    }
+    const imgTag = cid
+      ? `<img src="cid:${cid}" alt="QR for ${p.visitorName || 'visitor'}" style="width:180px; height:180px; border:1px solid #d1d5db; padding:6px; background:#fff;" />`
+      : '<div style="color:#dc2626;">QR unavailable</div>';
 
     return `
       <div style="display:inline-block; margin:12px; text-align:center;">
@@ -256,6 +286,44 @@ const sendVendorVisitorPassesEmail = async (vendor, event, organization, passes)
       </div>
       <p>Please forward these passes to your visitors. Each QR must be shown at the entrance for quick check-in.</p>
       <p>Best regards,<br/>Appify Events Team</p>
+    `,
+    attachments
+  });
+};
+
+const sendIndividualVisitorPassEmail = async (pass, event, organization) => {
+  if (!pass?.visitorEmail) return;
+
+  const eventDate = event?.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
+  const eventLocation = event?.location || 'TBA';
+
+  const safeName = (pass.visitorName || 'visitor').replace(/[^a-z0-9]/gi, '_') || 'visitor';
+  const { attachment, cid } = buildQrAttachment(pass.qrImageDataUrl, `${safeName}-${pass.passCode || 'qr'}`, `qr-visitor-${safeName}`);
+
+  const attachments = attachment ? [attachment] : [];
+  const qrPreview = cid
+    ? `<img src="cid:${cid}" alt="QR code" style="width:220px;height:220px;border:1px solid #d1d5db;padding:8px;background:#fff;" />`
+    : '<div style="color:#dc2626;font-weight:bold;">QR preview unavailable. Please contact the event office.</div>';
+
+  await transporter.sendMail({
+    from: `"Appify Events" <${process.env.EMAIL_USER}>`,
+    to: pass.visitorEmail,
+    subject: `Your visitor QR pass — ${event?.title || 'Event'}`,
+    html: `
+      <p>Hello ${pass.visitorName || 'Guest'},</p>
+      <p>You have been registered to attend <strong>${event?.title || 'an event'}</strong> for ${organization || 'a vendor'}.</p>
+      <div style="margin:12px 0; padding:12px; background:#f9fafb; border-radius:8px;">
+        <p style="margin:0;"><strong>Event:</strong> ${event?.title || 'Event'}</p>
+        <p style="margin:0;"><strong>Date:</strong> ${eventDate}</p>
+        <p style="margin:0;"><strong>Location:</strong> ${eventLocation}</p>
+        <p style="margin:0;"><strong>Pass Code:</strong> ${pass.passCode}</p>
+      </div>
+      <p style="margin:16px 0;">Present the QR code below at the entrance:</p>
+      <div style="text-align:center; margin-bottom:16px;">
+        ${qrPreview}
+      </div>
+      <p>If you lose this email, contact the vendor or Event Office to resend your pass.</p>
+      <p>See you there!<br/>Appify Events Team</p>
     `,
     attachments
   });
@@ -334,5 +402,6 @@ module.exports = {
   sendVendorApplicationRejectionEmail,
   sendPaymentReceiptEmail,
   sendVendorVisitorPassesEmail,
+  sendIndividualVisitorPassEmail,
   sendCertificateEmail,
 };

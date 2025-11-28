@@ -6,14 +6,15 @@ import MyEventsList from "../Functions/MyEventsList";
 import QRCodeGenerator from "../QRCode/QRCodeGenerator";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
-import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
-import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
+import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, deleteAllEventOfficeNotifications, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
 import VendorDocumentsPage from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import { statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ function EventOfficeDashboard() {
   const [approvedVendorRequests, setApprovedVendorRequests] = useState([]);
   const [approvedVendorsLoading, setApprovedVendorsLoading] = useState(false);
   const [approvedVendorsError, setApprovedVendorsError] = useState("");
+  const [generatePassesLoadingId, setGeneratePassesLoadingId] = useState(null);
   const [gymSessions, setGymSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -579,13 +581,66 @@ function EventOfficeDashboard() {
 
   const handleVendorRequestAction = async (requestId, action) => {
     try {
-      const notes = window.prompt('Optional notes (press Enter to skip)') || undefined;
+      const isApprove = action === "approve";
+      const confirmed = await confirmDialog(
+        isApprove
+          ? "Are you sure you want to approve this vendor application?"
+          : "Are you sure you want to reject this vendor application?",
+        isApprove ? "Approve Vendor Request" : "Reject Vendor Request"
+      );
+      if (!confirmed) return;
+
+      let notes = undefined;
+      if (!isApprove) {
+        notes = window.prompt("Optional notes or rejection reason (press Enter to skip)") || undefined;
+      }
+
       await adminService.reviewVendorApplication(requestId, action, notes);
-      showToast.success(`Vendor request ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      showToast.success(`Vendor request ${isApprove ? "approved" : "rejected"} successfully!`);
       fetchVendorRequests();
     } catch (err) {
       console.error("Error updating vendor request:", err);
       showToast.error(err?.message || "Error updating vendor request");
+    }
+  };
+
+  const handleGenerateVisitorPasses = async (request) => {
+    if (!request?._id) {
+      showToast.error("Invalid vendor application selected.");
+      return;
+    }
+
+    if (!Array.isArray(request.attendees) || request.attendees.length === 0) {
+      showToast.warning("This vendor application has no listed visitors yet.");
+      return;
+    }
+
+    const confirmed = await confirmDialog(
+      `Generate QR codes for ${request.attendees.length} visitor(s) of ${request.organizationName || "this vendor"}? They will be emailed directly to the vendor contact.`,
+      "Generate Visitor QR Codes"
+    );
+    if (!confirmed) return;
+
+    try {
+      setGeneratePassesLoadingId(request._id);
+      const res = await generateVendorAttendeePasses(request._id);
+      const createdCount = typeof res?.createdCount === "number"
+        ? res.createdCount
+        : Array.isArray(res?.passes)
+          ? res.passes.length
+          : 0;
+      if (createdCount > 0) {
+        showToast.success(`Generated and emailed ${createdCount} visitor QR code${createdCount === 1 ? "" : "s"}.`);
+      } else {
+        showToast.success("Visitor QR codes are up to date.");
+      }
+      fetchVendorRequests();
+    } catch (err) {
+      console.error("Error generating visitor passes:", err);
+      const message = err?.message || err?.error || "Failed to generate visitor QR codes.";
+      showToast.error(message);
+    } finally {
+      setGeneratePassesLoadingId(null);
     }
   };
 
@@ -677,8 +732,9 @@ function EventOfficeDashboard() {
               style={{
                 display: "flex",
                 gap: spacing.lg,
-                alignItems: "center",
+                alignItems: "flex-start",
                 flexWrap: "wrap",
+                justifyContent: "flex-end",
               }}
             >
               <div style={{ position: "relative" }}>
@@ -743,16 +799,23 @@ function EventOfficeDashboard() {
                     onClick={() => handleCreateEvent("booth")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    🏬 Create/edit Booth
+                    🏬 Create Booth
                   </button>
                   <button
                     onClick={() => handleCreateEvent("trip")}
@@ -825,32 +888,14 @@ function EventOfficeDashboard() {
               </div>
               <div
                 style={{
-                  padding: `${spacing.md} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
-                  borderRadius: borderRadius.xl,
-                  textAlign: "center",
-                  border: `1px solid ${colors.primary}`,
+                  ...statCardBase,
                   position: "relative",
-                  boxShadow: shadows.md,
                 }}
               >
-                <div
-                  style={{
-                    fontSize: typography.fontSize['2xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.white,
-                  }}
-                >
+                <div style={statValueStyle}>
                   {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
                 </div>
-                <div
-                  style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.accent,
-                    marginTop: spacing.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
+                <div style={statLabelStyle}>
                   Notifications
                 </div>
               </div>
@@ -858,371 +903,101 @@ function EventOfficeDashboard() {
           </div>
 
           {/* Tabs */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: spacing.md,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              flexDirection: "column",
-              gap: spacing.md,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            {/* First Row of Tabs */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-              <button
-                onClick={() => setActiveTab("browse")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "browse"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "browse" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                🎯 Browse Events
-              </button>
-              <button
-                onClick={() => setActiveTab("vendor-requests")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "vendor-requests"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "vendor-requests" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                  position: "relative",
-                }}
-              >
-                📝 Vendor Requests
-                {vendorRequests.length > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: spacing.sm,
-                      right: spacing.sm,
-                      background: colors.error,
-                      color: colors.white,
-                      borderRadius: borderRadius.full,
-                      width: "20px",
-                      height: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: typography.fontSize.xs,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {vendorRequests.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("vendor-documents")}
-                style={{
-                  flex: 1,
-                  minWidth: "150px",
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "vendor-documents"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "vendor-documents" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                📄 Vendor Documents
-              </button>
-              <button
-                onClick={() => setActiveTab("attendees-report")}
-                style={{
-                  flex: 1,
-                  minWidth: "150px",
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "attendees-report"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "attendees-report" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                📊 Attendees Report
-              </button>
-              <button
-                onClick={() => setActiveTab("sales-report")}
-                style={{
-                  flex: 1,
-                  minWidth: "150px",
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "sales-report"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "sales-report" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                💰 Sales Report
-              </button>
-
-
-
-              <button
-                onClick={() => setActiveTab("gym-sessions")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "gym-sessions"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "gym-sessions" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                💪 Gym Sessions
-              </button>
-              <button
-                onClick={() => setActiveTab("workshop-approvals")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "workshop-approvals"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "workshop-approvals" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                  position: "relative",
-                }}
-              >
-                🎓 Workshop Approvals
-                {pendingWorkshops.length > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: spacing.sm,
-                      right: spacing.sm,
-                      background: colors.error,
-                      color: colors.white,
-                      borderRadius: borderRadius.full,
-                      width: "20px",
-                      height: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: typography.fontSize.xs,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {pendingWorkshops.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab("polls")}
-                style={{
-                  flex: 1,
-                  minWidth: "150px",
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "polls"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "polls" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                📊 Booth Polls
-              </button>
-
-              <button
-                onClick={() => setActiveTab("loyalty")}
-                style={{
-                  flex: 1,
-                  minWidth: "150px",
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "loyalty"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "loyalty" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                ⭐ Loyalty Partners
-              </button>
-            </div>
-
-            {/* Second Row of Tabs - Archived, Notifications, Reminders */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-              <button
-                onClick={() => setActiveTab("archived")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "archived"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "archived" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                📦 Archived Events
-              </button>
-              <button
-                onClick={() => {
+          {(() => {
+            const tabButtons = [
+              { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
+              {
+                key: "vendor-requests",
+                label: "📝 Vendor Requests",
+                onClick: () => setActiveTab("vendor-requests"),
+                badgeCount: vendorRequests.length,
+              },
+              { key: "vendor-documents", label: "📄 Vendor Documents", onClick: () => setActiveTab("vendor-documents") },
+              { key: "attendees-report", label: "📊 Attendees Report", onClick: () => setActiveTab("attendees-report") },
+              { key: "sales-report", label: "💰 Sales Report", onClick: () => setActiveTab("sales-report") },
+              { key: "gym-sessions", label: "💪 Gym Sessions", onClick: () => setActiveTab("gym-sessions") },
+              {
+                key: "workshop-approvals",
+                label: "🎓 Workshop Approvals",
+                onClick: () => setActiveTab("workshop-approvals"),
+                badgeCount: pendingWorkshops.length,
+              },
+              { key: "polls", label: "📊 Booth Polls", onClick: () => setActiveTab("polls") },
+              { key: "loyalty", label: "⭐ Loyalty Partners", onClick: () => setActiveTab("loyalty") },
+              { key: "archived", label: "📦 Archived Events", onClick: () => setActiveTab("archived") },
+              {
+                key: "notifications",
+                label: "🔔 Notifications",
+                onClick: () => {
                   setActiveTab("notifications");
                   fetchNotifications();
-                }}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "notifications"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "notifications" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                  position: "relative",
-                }}
-              >
-                🔔 Notifications
-                {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: spacing.sm,
-                      right: spacing.sm,
-                      background: colors.error,
-                      color: colors.white,
-                      borderRadius: borderRadius.full,
-                      width: "20px",
-                      height: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: typography.fontSize.xs,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => {
+                },
+                badgeCount: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length,
+              },
+              {
+                key: "reminders",
+                label: "⏰ Reminders",
+                onClick: () => {
                   setActiveTab("reminders");
                   fetchReminders();
-                }}
+                },
+                badgeCount: reminders.filter(n => !n.isRead).length,
+              },
+            ];
+
+            const firstRowCount = Math.ceil(tabButtons.length / 2);
+            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
+
+            const renderTabButton = (tab) => {
+              const isActive = activeTab === tab.key;
+              const style = getTabButtonStyle(isActive, tab.variant);
+              return (
+                <button key={tab.key} onClick={tab.onClick} style={style}>
+                  {tab.label}
+                  {tab.badgeCount > 0 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: spacing.sm,
+                        right: spacing.sm,
+                        background: colors.error,
+                        color: colors.white,
+                        borderRadius: borderRadius.full,
+                        width: "20px",
+                        height: "20px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.bold,
+                      }}
+                    >
+                      {tab.badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            };
+
+            return (
+              <div
                 style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeTab === "reminders"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeTab === "reminders" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                  position: "relative",
+                  background: colors.bgCard,
+                  padding: spacing.md,
+                  borderRadius: borderRadius['2xl'],
+                  boxShadow: shadows.lg,
+                  marginBottom: spacing['2xl'],
+                  border: `1px solid ${colors.gray200}`,
                 }}
               >
-                ⏰ Reminders
-                {reminders.filter(n => !n.isRead).length > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: spacing.sm,
-                      right: spacing.sm,
-                      background: colors.error,
-                      color: colors.white,
-                      borderRadius: borderRadius.full,
-                      width: "20px",
-                      height: "20px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: typography.fontSize.xs,
-                      fontWeight: typography.fontWeight.bold,
-                    }}
-                  >
-                    {reminders.filter(n => !n.isRead).length}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
+                {tabRows.map((row, idx) => (
+                  <div key={idx} style={tabRowStyle}>
+                    {row.map(renderTabButton)}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Content */}
           {activeTab === "browse" && (
@@ -1383,77 +1158,118 @@ function EventOfficeDashboard() {
                   </p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                    {approvedVendorRequests.map((request) => (
-                      <div
-                        key={request._id}
-                        style={{
-                          padding: "20px",
-                          background: "rgba(16, 185, 129, 0.1)",
-                          borderRadius: "12px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          border: "1px solid rgba(16, 185, 129, 0.3)",
-                        }}
-                      >
-                        <div>
-                          <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
-                            {request.organizationName || "Vendor"}
-                          </h3>
-                          <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
-                            ✅ Approved & ready for polls
-                          </p>
-                          <p style={{ color: "#065f46", margin: "4px 0" }}>
-                            Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
-                          </p>
-                          {request.eventStart && (
-                            <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Date: {new Date(request.eventStart).toLocaleString()}
+                    {approvedVendorRequests.map((request) => {
+                      const isGenerating = generatePassesLoadingId === request._id;
+                      const visitorCount = Array.isArray(request.attendees) ? request.attendees.length : 0;
+                      const eventType = (request.eventType || '').toLowerCase();
+                      const canGenerateVisitorQR = eventType === 'bazaar';
+                      return (
+                        <div
+                          key={request._id}
+                          style={{
+                            padding: "20px",
+                            background: "rgba(16, 185, 129, 0.1)",
+                            borderRadius: "12px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: spacing.lg,
+                            alignItems: "stretch",
+                            border: "1px solid rgba(16, 185, 129, 0.3)",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 260 }}>
+                            <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
+                              {request.organizationName || "Vendor"}
+                            </h3>
+                            <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
+                              ✅ Approved & ready for polls
                             </p>
-                          )}
-                          {request.eventLocation && (
                             <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Location: {request.eventLocation}
+                              Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
                             </p>
-                          )}
-                          <p style={{ color: "#065f46", margin: "4px 0" }}>
-                            Booth Size: {request.boothSize || "—"}
-                          </p>
-                          {request.vendorEmail && (
+                            {request.eventStart && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Date: {new Date(request.eventStart).toLocaleString()}
+                              </p>
+                            )}
+                            {request.eventLocation && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Location: {request.eventLocation}
+                              </p>
+                            )}
                             <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Vendor Email: {request.vendorEmail}
+                              Booth Size: {request.boothSize || "—"}
                             </p>
-                          )}
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
-                            Use in Booth Polls tab ➜
-                          </p>
-                          <button
-                            onClick={() => {
-                              setActiveTab("polls");
-                              setTimeout(() => {
-                                const el = document.getElementById("booth-polls-section");
-                                if (el) {
-                                  el.scrollIntoView({ behavior: "smooth" });
-                                }
-                              }, 200);
-                            }}
+                            <p style={{ color: "#065f46", margin: "4px 0" }}>
+                              Listed Visitors: {visitorCount || "No visitors added yet"}
+                            </p>
+                            {request.vendorEmail && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Vendor Email: {request.vendorEmail}
+                              </p>
+                            )}
+                          </div>
+                          <div
                             style={{
-                              padding: "10px 20px",
-                              background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontWeight: "600",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "space-between",
+                              gap: spacing.md,
+                              minWidth: 220,
+                              textAlign: "right",
                             }}
                           >
-                            Go to Polls
-                          </button>
+                            {canGenerateVisitorQR && (
+                              <button
+                                onClick={() => handleGenerateVisitorPasses(request)}
+                                disabled={isGenerating}
+                                style={{
+                                  padding: "10px 20px",
+                                  background: isGenerating ? "#9ca3af" : "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  cursor: isGenerating ? "not-allowed" : "pointer",
+                                  fontWeight: "600",
+                                  boxShadow: isGenerating ? "none" : "0 8px 20px rgba(37, 99, 235, 0.25)",
+                                  transition: "background 0.2s ease",
+                                }}
+                              >
+                                {isGenerating ? "Generating…" : "Generate Visitor QR Codes"}
+                              </button>
+                            )}
+                            <div>
+                              <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
+                                Use in Booth Polls tab ➜
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setActiveTab("polls");
+                                  setTimeout(() => {
+                                    const el = document.getElementById("booth-polls-section");
+                                    if (el) {
+                                      el.scrollIntoView({ behavior: "smooth" });
+                                    }
+                                  }, 200);
+                                }}
+                                style={{
+                                  padding: "10px 20px",
+                                  background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                Go to Polls
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1884,22 +1700,59 @@ function EventOfficeDashboard() {
                 }}>
                   Notifications
                 </h2>
-                {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                  <button
-                    onClick={() => {
-                      // Mark all frontend notifications as read
-                      markAllEventOfficeNotificationsRead();
-                      fetchNotifications();
-                    }}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      fontSize: typography.fontSize.sm,
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: spacing.md }}>
+                  {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Mark all frontend notifications as read
+                        markAllEventOfficeNotificationsRead();
+                        fetchNotifications();
+                      }}
+                      style={{
+                        ...buttonStyles.primary,
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        fontSize: typography.fontSize.sm,
+                      }}
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                  {notifications.filter(n => n.type !== 'EventReminder').length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                        if (confirmed) {
+                          deleteAllEventOfficeNotifications();
+                          fetchNotifications();
+                        }
+                      }}
+                      style={{
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        background: colors.error,
+                        color: colors.white,
+                        border: 'none',
+                        borderRadius: borderRadius.lg,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.semibold,
+                        cursor: 'pointer',
+                        transition: transitions.fast,
+                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-1px)';
+                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                        e.target.style.background = '#b91c1c';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                        e.target.style.background = colors.error;
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
@@ -2224,7 +2077,6 @@ function EventOfficeDashboard() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Edit Request Modal */}
       {editRequestModal.open && (
@@ -2329,6 +2181,7 @@ function EventOfficeDashboard() {
           onClose={() => setQrCodeEvent(null)}
         />
       )}
+      </div>
     </div>
   );
 }

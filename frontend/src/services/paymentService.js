@@ -23,7 +23,7 @@ async function http(method, url, body) {
 }
 
 // Try a few common endpoint shapes to maximize compatibility
-export async function createCheckoutSession(eventId) {
+export async function createCheckoutSession(eventId, applicationId = null) {
   const candidates = [
     `${API_BASE}/payments/create-checkout-session`,
     `${API_BASE}/payments/checkout-session`,
@@ -33,8 +33,17 @@ export async function createCheckoutSession(eventId) {
   for (const url of candidates) {
     try {
       let returnPath = '/student-dashboard';
-      try { if (typeof window !== 'undefined' && window.location && window.location.pathname) { returnPath = window.location.pathname; } } catch (_) {}
-      const res = await http('POST', url, { eventId, returnPath });
+      try { 
+        if (typeof window !== 'undefined' && window.location && window.location.pathname) { 
+          returnPath = window.location.pathname;
+        }
+        // For vendor applications, ensure return path is vendor dashboard
+        if (applicationId) {
+          returnPath = '/vendor-dashboard';
+        }
+      } catch (_) {}
+      const body = applicationId ? { applicationId, returnPath } : { eventId, returnPath };
+      const res = await http('POST', url, body);
       const urlCandidate = res?.url || res?.sessionUrl || res?.checkoutUrl || res?.session?.url;
       if (urlCandidate) return { url: urlCandidate };
       // Fallback if backend returns full session without url
@@ -86,4 +95,8 @@ export function topupWallet(amount, currency = 'EGP') {
 
 export function sendManualReceipt(eventId) {
   return http('POST', `${API_BASE}/payments/receipt/manual`, { eventId });
+}
+
+export async function payApplicationWithWallet(applicationId) {
+  return await http('POST', `${API_BASE}/payments/wallet/pay-application`, { applicationId });
 }

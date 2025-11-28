@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { confirmDialog } from '../../utils/toast';
 
 function AttendeeIDUpload() {
   const [approvedApplications, setApprovedApplications] = useState([]);
@@ -181,8 +182,9 @@ function AttendeeIDUpload() {
     }
   };
 
-  const handleRemoveId = (applicationId, attendeeId, attendeeName) => {
-    if (!window.confirm(`Remove ID document for ${attendeeName}?`)) return;
+  const handleRemoveId = async (applicationId, attendeeId, attendeeName) => {
+    const confirmed = await confirmDialog(`Remove ID document for ${attendeeName}?`, 'Remove ID Document');
+    if (!confirmed) return;
 
     setUploadedIds(prev => {
       const updated = { ...prev };

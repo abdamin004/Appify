@@ -58,6 +58,7 @@ app.use((err, req, res, next) => {
 });
 
 require('./cron/eventReminderCron')(); // Start the event reminder cron job
+require('./cron/workshopCertificateCron')(); // Send workshop certificates after completion
 // Start server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {

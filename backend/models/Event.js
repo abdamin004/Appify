@@ -17,6 +17,7 @@ const eventSchema = new Schema({
   // Capacity & Registration
   capacity: { type: Number, default: 0, min: 0 },
   registeredUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  certificateIssuedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   registrationDeadline: { type: Date },
 
   allowedRoles: [{
@@ -29,6 +30,8 @@ const eventSchema = new Schema({
     type: String, 
     enum: ['draft', 'published', 'cancelled', 'completed', 'archived'], 
     default: 'published', 
+    lowercase: true,
+    trim: true,
     index: true 
   },
   // Event type - This must be defined for the discriminator to work correctly

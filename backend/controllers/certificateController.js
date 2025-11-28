@@ -14,8 +14,20 @@ exports.sendCertificate = async (req, res) => {
         // Check if user attended (or is registered)
         // Assuming 'registeredUsers' contains the user
         // Ideally we should have an 'attended' status, but for now we check registration
-        if (!workshop.registeredUsers.includes(userId)) {
+        const isRegistered = (workshop.registeredUsers || []).some(id => String(id) === String(userId));
+        if (!isRegistered) {
             return res.status(400).json({ message: 'User not registered for this workshop' });
+        }
+
+        const now = new Date();
+        const effectiveEnd = workshop.endDate || workshop.startDate;
+        if (!effectiveEnd || effectiveEnd > now) {
+            return res.status(400).json({ message: 'Workshop has not finished yet' });
+        }
+
+        const alreadyIssued = (workshop.certificateIssuedUsers || []).some(id => String(id) === String(userId));
+        if (alreadyIssued) {
+            return res.status(400).json({ message: 'Certificate already sent to this user' });
         }
 
         const user = await User.findById(userId);
@@ -24,6 +36,11 @@ exports.sendCertificate = async (req, res) => {
         }
 
         await sendCertificateEmail(user, workshop);
+        const updatePayload = { $addToSet: { certificateIssuedUsers: user._id } };
+        if (workshop.status === 'published') {
+            updatePayload.$set = { status: 'completed' };
+        }
+        await Workshop.updateOne({ _id: workshop._id }, updatePayload);
 
         res.status(200).json({ message: 'Certificate sent successfully' });
     } catch (error) {

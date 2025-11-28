@@ -13,9 +13,14 @@ function computeAmount(entity, type = 'event') {
 
   if (type === 'application') {
     // entity is VendorApplication with populated event
-    const event = entity.event;
-    if (!event) return { amount: 0, currency: 'egp' };
-    return { amount: event.participationFee || 0, currency: 'egp' };
+    // Use participationFee from application if available, otherwise calculate
+    if (entity.participationFee && entity.participationFee > 0) {
+      return { amount: entity.participationFee, currency: 'usd' };
+    }
+    // Fallback: calculate fee if not set
+    const { calculateParticipationFee } = require('../utils/paymentCalculator');
+    const fee = calculateParticipationFee(entity, entity.event);
+    return { amount: fee, currency: 'usd' };
   }
 
   // Trip: use price; Workshop: fallback to requiredBudget; Bazaar/Booth: participationFee
@@ -35,15 +40,29 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     let entity, type, amount, currency, title, description;
 
     if (applicationId) {
-      entity = await VendorApplication.findById(applicationId).populate('event');
+      entity = await VendorApplication.findById(applicationId).populate('event').populate('vendorUser');
       if (!entity) return res.status(404).json({ message: 'Application not found' });
-      if (String(entity.vendorUser) !== String(req.user._id) && req.user.role !== 'Admin') { // Allow admin or owner
-        // Check if user is the vendor associated
-        // Actually vendorUser is a Vendor object, but we need to check if req.user owns it?
-        // Simplified: check if req.user.email matches vendor email or something?
-        // For now, assuming req.user is the vendor user (User model) linked to Vendor?
-        // The Vendor model has `user` field? Let's assume standard auth check passes for now.
+      
+      // Authorization check: Only the vendor who owns the application can pay
+      // Check if req.user is a Vendor and matches the application's vendorUser
+      const isVendor = req.user.companyName !== undefined || (req.user.role && req.user.role.toLowerCase() === 'vendor');
+      const isOwner = String(entity.vendorUser._id || entity.vendorUser) === String(req.user._id);
+      const isAdmin = req.user.role === 'Admin';
+      
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: 'You are not authorized to pay for this application' });
       }
+      
+      // Check if application is approved (required for payment)
+      if (entity.status !== 'approved') {
+        return res.status(400).json({ message: 'Payment is only available for approved applications' });
+      }
+      
+      // Check if already paid
+      if (entity.paid) {
+        return res.status(400).json({ message: 'Application already paid' });
+      }
+      
       type = 'application';
       const computed = computeAmount(entity, 'application');
       amount = computed.amount;
@@ -51,8 +70,23 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       title = `Vendor Fee: ${entity.event.title}`;
       description = `Booth: ${entity.boothSize}`;
     } else if (eventId) {
-      entity = await Event.findById(eventId);
+      entity = await Event.findById(eventId).populate('registeredUsers');
       if (!entity) return res.status(404).json({ message: 'Event not found' });
+      
+      // Authorization check: Only registered users can pay for events
+      const isRegistered = entity.registeredUsers && entity.registeredUsers.some(
+        user => String(user._id || user) === String(req.user._id)
+      );
+      const isAdmin = req.user.role === 'Admin';
+      
+      // Skip check for events that don't require payment (price/amount is 0 or undefined)
+      const { amount: eventAmount } = computeAmount(entity, 'event');
+      if (eventAmount > 0 && !isRegistered && !isAdmin) {
+        return res.status(403).json({ 
+          message: 'You must be registered for this event before making a payment' 
+        });
+      }
+      
       type = 'event';
       const computed = computeAmount(entity, 'event');
       amount = computed.amount;
@@ -63,9 +97,15 @@ router.post('/create-checkout-session', auth, async (req, res) => {
       return res.status(400).json({ message: 'eventId or applicationId is required' });
     }
 
-    const successBase = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-    let returnPath = req.body?.returnPath || '/student-dashboard';
-    if (typeof returnPath !== 'string' || !returnPath.startsWith('/')) returnPath = '/student-dashboard';
+    const frontendUrl = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.replace(/\/$/, '')
+      : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
+    const successBase = frontendUrl;
+    // For vendor applications, default to vendor dashboard
+    let returnPath = req.body?.returnPath || (applicationId ? '/vendor-dashboard' : '/student-dashboard');
+    if (typeof returnPath !== 'string' || !returnPath.startsWith('/')) {
+      returnPath = applicationId ? '/vendor-dashboard' : '/student-dashboard';
+    }
 
     // Construct success/cancel URLs
     const successUrl = `${successBase}${returnPath}?status=success&session_id={CHECKOUT_SESSION_ID}`;
@@ -121,9 +161,27 @@ router.post('/create-checkout-session', auth, async (req, res) => {
 // Wallet endpoints (simple stubs – adapt to your data model)
 router.get('/wallet/balance', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    const balance = user ? user.walletBalance : 0;
-    return res.json({ balance: balance || 0 });
+    // Handle vendors - they authenticate as Vendor but wallet is on User model
+    // Try to find User account by email if req.user is a Vendor
+    let userAccount = null;
+    if (req.user.companyName !== undefined) {
+      // This is a Vendor, find corresponding User account by email
+      userAccount = await User.findOne({ email: req.user.email });
+      if (!userAccount) {
+        // Vendor doesn't have User account yet, return 0 balance (don't create here, let top-up create it)
+        return res.json({ balance: 0 });
+      }
+    } else {
+      // Regular User
+      userAccount = await User.findById(req.user._id);
+    }
+    
+    if (!userAccount) {
+      return res.json({ balance: 0 });
+    }
+    
+    const balance = userAccount.walletBalance || 0;
+    return res.json({ balance });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to fetch wallet balance' });
   }
@@ -149,17 +207,38 @@ router.post('/wallet/topup', auth, async (req, res) => {
       return res.status(400).json({ message: 'amount must be a positive number' });
     }
 
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(401).json({ message: 'User not found' });
-    user.walletBalance = Number((user.walletBalance || 0) + amount);
-    await user.save();
+    // Handle vendors - they authenticate as Vendor but wallet is on User model
+    let userAccount = null;
+    if (req.user.companyName !== undefined) {
+      // This is a Vendor, find or create corresponding User account
+      userAccount = await User.findOne({ email: req.user.email });
+      if (!userAccount) {
+        // Create a User account for the vendor to hold wallet balance
+        userAccount = await User.create({
+          email: req.user.email,
+          firstName: req.user.companyName || 'Vendor',
+          lastName: 'Account', // Required field - this is a wallet-only account
+          password: 'vendor-wallet-only-' + Date.now(), // Dummy password, vendor won't use this to login
+          role: 'Vendor',
+          walletBalance: 0,
+        });
+      }
+    } else {
+      // Regular User
+      userAccount = await User.findById(req.user._id);
+    }
+    
+    if (!userAccount) return res.status(401).json({ message: 'User account not found' });
+    
+    userAccount.walletBalance = Number((userAccount.walletBalance || 0) + amount);
+    await userAccount.save();
 
     // Send top-up receipt email
     try {
-      await sendPaymentReceiptEmail(user, { title: 'Wallet Top-Up' }, { amount, currency: currency.toUpperCase(), method: 'Wallet Top-Up', reference: `TOPUP-${Date.now()}` });
+      await sendPaymentReceiptEmail(userAccount, { title: 'Wallet Top-Up' }, { amount, currency: currency.toUpperCase(), method: 'Wallet Top-Up', reference: `TOPUP-${Date.now()}` });
     } catch (e) { console.error('Top-up email failed:', e?.message || e); }
 
-    return res.json({ success: true, balance: user.walletBalance });
+    return res.json({ success: true, balance: userAccount.walletBalance });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to top up wallet' });
   }
@@ -169,10 +248,25 @@ router.post('/wallet/pay', auth, async (req, res) => {
   try {
     const eventId = req.body?.eventId || req.body?.id;
     if (!eventId) return res.status(400).json({ message: 'eventId is required' });
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventId).populate('registeredUsers');
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    
+    // Authorization check: Only registered users can pay for events
+    const isRegistered = event.registeredUsers && event.registeredUsers.some(
+      user => String(user._id || user) === String(req.user._id)
+    );
+    const isAdmin = req.user.role === 'Admin';
+    
+    // Skip check for events that don't require payment (price/amount is 0 or undefined)
+    const { amount: eventAmount } = computeAmount(event, 'event');
+    if (eventAmount > 0 && !isRegistered && !isAdmin) {
+      return res.status(403).json({ 
+        message: 'You must be registered for this event before making a payment' 
+      });
+    }
+    
     // Deduct from wallet and persist payment state
-    const { amount, currency } = computeAmount(event);
+    const { amount, currency } = computeAmount(event, 'event');
     const user = await User.findById(req.user._id);
     if (!user) return res.status(401).json({ message: 'User not found' });
     if ((user.walletBalance || 0) < amount) {
@@ -202,13 +296,57 @@ router.post('/wallet/pay-application', auth, async (req, res) => {
     const applicationId = req.body?.applicationId;
     if (!applicationId) return res.status(400).json({ message: 'applicationId is required' });
 
-    const application = await VendorApplication.findById(applicationId).populate('event');
+    const application = await VendorApplication.findById(applicationId).populate('event').populate('vendorUser');
     if (!application) return res.status(404).json({ message: 'Application not found' });
+
+    // Authorization check: Only the vendor who owns the application can pay
+    const isVendor = req.user.companyName !== undefined || (req.user.role && req.user.role.toLowerCase() === 'vendor');
+    const isOwner = String(application.vendorUser._id || application.vendorUser) === String(req.user._id);
+    const isAdmin = req.user.role === 'Admin';
+    
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You are not authorized to pay for this application' });
+    }
+    
+    // Check if application is approved (required for payment)
+    if (application.status !== 'approved') {
+      return res.status(400).json({ message: 'Payment is only available for approved applications' });
+    }
 
     if (application.paid) return res.status(400).json({ message: 'Application already paid' });
 
-    const { amount, currency } = computeAmount(application, 'application');
-    const user = await User.findById(req.user._id);
+    // Check if payment deadline has passed
+    if (application.paymentDeadline && new Date(application.paymentDeadline) < new Date()) {
+      return res.status(400).json({ message: 'Payment deadline has passed. Please contact support.' });
+    }
+
+    // Use participationFee if available, otherwise calculate
+    const amount = application.participationFee || (computeAmount(application, 'application').amount);
+    const currency = 'usd'; // Default currency
+    
+    // For vendors, we need to check if they have a User account with wallet
+    // Vendors authenticate as Vendor model, but wallet might be on User model
+    // Check if req.user is Vendor or User
+    let user;
+    if (isVendor) {
+      // Try to find User account by email (vendors might have linked User accounts)
+      user = await User.findOne({ email: req.user.email });
+      if (!user) {
+        // Create a User account for the vendor to hold wallet balance (same as top-up)
+        user = await User.create({
+          email: req.user.email,
+          firstName: req.user.companyName || 'Vendor',
+          lastName: 'Account', // Required field - this is a wallet-only account
+          password: 'vendor-wallet-only-' + Date.now(), // Dummy password, vendor won't use this to login
+          role: 'Vendor',
+          walletBalance: 0,
+        });
+      }
+    } else {
+      user = await User.findById(req.user._id);
+    }
+    
+    if (!user) return res.status(404).json({ message: 'User account not found' });
 
     if ((user.walletBalance || 0) < amount) {
       return res.status(400).json({ message: 'Insufficient wallet balance' });
@@ -217,7 +355,9 @@ router.post('/wallet/pay-application', auth, async (req, res) => {
     user.walletBalance = Number((user.walletBalance || 0) - amount);
     await user.save();
 
+    // Update application payment status
     application.paid = true;
+    application.paidAt = new Date();
     await application.save();
 
     await Payment.create({
@@ -244,7 +384,7 @@ router.post('/wallet/pay-application', auth, async (req, res) => {
 });
 
 // Verify Stripe session and send receipt (called by frontend after redirect)
-router.get('/receipt', async (req, res) => {
+router.get('/receipt', auth, async (req, res) => {
   try {
     const sessionId = req.query.session_id;
     if (!sessionId) return res.status(400).json({ message: 'session_id is required' });
@@ -279,7 +419,25 @@ router.get('/receipt', async (req, res) => {
     }
 
     let user = req.user;
-    if ((!user || !user.email) && userId) {
+    // Handle vendors - they authenticate as Vendor but need User account for payment records
+    if (req.user && req.user.companyName !== undefined) {
+      // This is a Vendor, find or create corresponding User account
+      user = await User.findOne({ email: req.user.email });
+      if (!user) {
+        // Create User account for vendor if it doesn't exist (same as top-up)
+        user = await User.create({
+          email: req.user.email,
+          firstName: req.user.companyName || 'Vendor',
+          lastName: 'Account', // Required field - this is a wallet-only account
+          password: 'vendor-wallet-only-' + Date.now(), // Dummy password, vendor won't use this to login
+          role: 'Vendor',
+          walletBalance: 0,
+        });
+      }
+      if (!user && userId) {
+        try { user = await User.findById(userId); } catch (_) { }
+      }
+    } else if ((!user || !user.email) && userId) {
       try { user = await User.findById(userId); } catch (_) { }
     }
     if (!user || !user.email) {
@@ -300,11 +458,13 @@ router.get('/receipt', async (req, res) => {
             currency,
             method: 'card',
             status: 'paid',
-            sessionId
+            sessionId,
+            metadata: application ? { applicationId: String(application._id) } : undefined
           });
 
           if (application) {
             application.paid = true;
+            application.paidAt = new Date();
             await application.save();
           }
         }
@@ -328,28 +488,106 @@ router.get('/receipt', async (req, res) => {
 router.post('/receipt/manual', auth, async (req, res) => {
   try {
     const eventId = req.body?.eventId || req.query?.eventId;
-    if (!eventId) return res.status(400).json({ message: 'eventId is required' });
+    const applicationId = req.body?.applicationId || req.query?.applicationId;
 
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
+    let event, application, amount, currency, user;
 
-    const user = req.user;
-    const { amount, currency } = computeAmount(event);
+    if (applicationId) {
+      // Handle vendor application payment
+      application = await VendorApplication.findById(applicationId).populate('event').populate('vendorUser');
+      if (!application) return res.status(404).json({ message: 'Application not found' });
+      
+      // Authorization check
+      const isVendor = req.user.companyName !== undefined || (req.user.role && req.user.role.toLowerCase() === 'vendor');
+      const isOwner = String(application.vendorUser._id || application.vendorUser) === String(req.user._id);
+      const isAdmin = req.user.role === 'Admin';
+      
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ message: 'You are not authorized to pay for this application' });
+      }
 
-    // Record a "card" payment to unify behavior with Stripe
-    try {
-      await Payment.create({ user: user._id, event: event._id, amount, currency, method: 'card', status: 'paid', sessionId: 'MOCK' });
-    } catch (e2) {
-      // ignore duplicate or other persistence errors
+      if (application.paid) {
+        return res.json({ success: true, message: 'Application already paid' });
+      }
+
+      event = application.event;
+      const computed = computeAmount(application, 'application');
+      amount = computed.amount;
+      currency = computed.currency;
+
+      // Handle vendors - find or create User account
+      if (isVendor) {
+        user = await User.findOne({ email: req.user.email });
+        if (!user) {
+          user = await User.create({
+            email: req.user.email,
+            firstName: req.user.companyName || 'Vendor',
+            lastName: 'Account',
+            password: 'vendor-wallet-only-' + Date.now(),
+            role: 'Vendor',
+            walletBalance: 0,
+          });
+        }
+      } else {
+        user = await User.findById(req.user._id);
+      }
+
+      // Mark application as paid
+      application.paid = true;
+      application.paidAt = new Date();
+      await application.save();
+
+      // Record payment
+      try {
+        await Payment.create({
+          user: user._id,
+          event: event ? event._id : undefined,
+          amount,
+          currency,
+          method: 'card',
+          status: 'paid',
+          sessionId: 'MOCK',
+          metadata: { applicationId: String(application._id) }
+        });
+      } catch (e2) {
+        console.error('Payment record failed (mock):', e2?.message || e2);
+      }
+
+      // Send receipt email
+      try {
+        await sendPaymentReceiptEmail(user, event || { title: 'Vendor Application' }, { amount, currency, method: 'Card', reference: 'MOCK' });
+      } catch (e) {
+        console.error('Manual receipt email failed:', e?.message || e);
+      }
+
+      return res.json({ success: true });
+    } else if (eventId) {
+      // Handle event payment (existing logic)
+      event = await Event.findById(eventId);
+      if (!event) return res.status(404).json({ message: 'Event not found' });
+
+      user = req.user;
+      const computed = computeAmount(event);
+      amount = computed.amount;
+      currency = computed.currency;
+
+      // Record a "card" payment to unify behavior with Stripe
+      try {
+        await Payment.create({ user: user._id, event: event._id, amount, currency, method: 'card', status: 'paid', sessionId: 'MOCK' });
+      } catch (e2) {
+        // ignore duplicate or other persistence errors
+      }
+
+      try {
+        await sendPaymentReceiptEmail(user, event, { amount, currency, method: 'Card', reference: 'MOCK' });
+      } catch (e) {
+        console.error('Manual receipt email failed:', e?.message || e);
+      }
+
+      return res.json({ success: true });
+    } else {
+      return res.status(400).json({ message: 'eventId or applicationId is required' });
     }
-
-    try {
-      await sendPaymentReceiptEmail(user, event, { amount, currency, method: 'Card', reference: 'MOCK' });
-    } catch (e) {
-      console.error('Manual receipt email failed:', e?.message || e);
-    }
-
-    return res.json({ success: true });
   } catch (err) {
     console.error('Manual receipt error:', err);
     return res.status(500).json({ message: err.message || 'Failed to send manual receipt' });

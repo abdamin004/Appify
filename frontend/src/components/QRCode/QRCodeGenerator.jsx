@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { showToast } from '../../utils/toast';
 
 function QRCodeGenerator({ event, onClose }) {
   const [qrUrl, setQrUrl] = useState('');
@@ -90,7 +91,7 @@ function QRCodeGenerator({ event, onClose }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading QR code:', err);
-      alert('Failed to download QR code. Please try again.');
+      showToast.error('Failed to download QR code. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -110,7 +111,7 @@ function QRCodeGenerator({ event, onClose }) {
         const printWindow = window.open('', '_blank');
         
         if (!printWindow) {
-          alert('Please allow popups to print the QR code');
+          showToast.warning('Please allow popups to print the QR code');
           return;
         }
         
@@ -181,7 +182,7 @@ function QRCodeGenerator({ event, onClose }) {
       reader.readAsDataURL(blob);
     } catch (err) {
       console.error('Error printing QR code:', err);
-      alert('Failed to print QR code. Please try downloading it instead.');
+      showToast.error('Failed to print QR code. Please try downloading it instead.');
     }
   };
 
@@ -296,8 +297,11 @@ function QRCodeGenerator({ event, onClose }) {
             />
             <button
               onClick={() => {
-                navigator.clipboard.writeText(registrationUrl);
-                alert('URL copied to clipboard!');
+                navigator.clipboard.writeText(registrationUrl).then(() => {
+                  showToast.success('URL copied to clipboard!');
+                }).catch(() => {
+                  showToast.error('Failed to copy URL to clipboard');
+                });
               }}
               style={{
                 marginTop: '8px',

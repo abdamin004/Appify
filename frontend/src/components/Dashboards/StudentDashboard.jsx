@@ -16,7 +16,8 @@ import {
   createStudentNotification, 
   markStudentNotificationRead, 
   markAllStudentNotificationsRead, 
-  deleteStudentNotification, 
+  deleteStudentNotification,
+  deleteAllStudentNotifications,
   getStudentUnreadCount,
   getSeenEventIds,
   markEventsAsSeen,
@@ -26,7 +27,9 @@ import {
 } from "../../services/notificationService";
 import userService from "../../services/userService";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
-import { showToast } from "../../utils/toast";
+import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, pillButtonStyles, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
+import WalletBadge from "../Wallet/WalletBadge";
+import { showToast, confirmDialog } from "../../utils/toast";
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("browse");
@@ -440,9 +443,15 @@ function StudentDashboard() {
   const fetchRegisteredEvents = async () => {
     try {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+      
       if (!res.ok) {
         // Likely unauthorized if no token; keep empty list gracefully
         try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
@@ -459,14 +468,102 @@ function StudentDashboard() {
       });
       setRegisteredEvents(filteredEvents);
     } catch (err) {
-      console.error(err);
+      if (err.name === 'AbortError') {
+        console.warn("Request timeout fetching registered events");
+      } else {
+        console.error(err);
+      }
       setRegisteredEvents([]);
     }
   };
 
+  const unreadNotifications = notifications.filter(n => !n.isRead && n.type !== 'EventReminder');
+  const unreadReminders = reminders.filter(n => !n.isRead);
+
+  const statCards = [
+    { label: "Registered Events", value: registeredEvents.length || 0 },
+    { label: "Unread Notifications", value: unreadNotifications.length || 0 },
+  ];
+
+  const tabButtons = [
+    { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
+    {
+      key: "gym-sessions",
+      label: "🏋️ Gym Sessions",
+      onClick: () => {
+        setActiveTab("gym-sessions");
+        fetchGymSessions();
+      },
+    },
+    { key: "registered", label: "✓ My Registered Events", onClick: () => setActiveTab("registered") },
+    { key: "favourites", label: "❤️ Favourites", onClick: () => setActiveTab("favourites") },
+    { key: "courts", label: "🏀 Courts", onClick: () => setActiveTab("courts") },
+    {
+      key: "notifications",
+      label: "🔔 Notifications",
+      onClick: () => {
+        setActiveTab("notifications");
+        fetchNotifications();
+      },
+      badgeCount: unreadNotifications.length,
+    },
+    {
+      key: "reminders",
+      label: "⏰ Reminders",
+      onClick: () => {
+        setActiveTab("reminders");
+        fetchReminders();
+      },
+      badgeCount: unreadReminders.length,
+    },
+    { key: "loyalty", label: "🤝 Loyalty Partners", onClick: () => setActiveTab("loyalty"), variant: "gold" },
+    { key: "polls", label: "🗳️ Student Polls", onClick: () => setActiveTab("polls") },
+  ];
+
+  const firstRowCount = Math.ceil(tabButtons.length / 2);
+  const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
+
+  const renderTabButton = (tab) => {
+    const isActive = activeTab === tab.key;
+    const style = getTabButtonStyle(isActive, tab.variant);
+    return (
+      <button key={tab.key} onClick={tab.onClick} style={style}>
+        {tab.label}
+        {tab.badgeCount > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              background: colors.error,
+              color: colors.white,
+              borderRadius: borderRadius.full,
+              width: "20px",
+              height: "20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: typography.fontSize.xs,
+              fontWeight: typography.fontWeight.bold,
+            }}
+          >
+            {tab.badgeCount}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   const fetchCourts = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/courts");
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const res = await fetch(`${API_BASE}/courts`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await res.json();
       const raw = Array.isArray(data) ? data : (Array.isArray(data.courts) ? data.courts : []);
       // normalize each court to include availabilityDates and available boolean
@@ -647,7 +744,6 @@ function StudentDashboard() {
           </div>
         )}
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header + Stats */}
           <div
             style={{
               background: colors.bgCard,
@@ -655,105 +751,63 @@ function StudentDashboard() {
               borderRadius: borderRadius['2xl'],
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing.xl,
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div>
-              <h1
-                style={{
-                  fontSize: typography.fontSize['3xl'],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                Welcome back, {user.firstName}! 👋
-              </h1>
-              <p
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  margin: 0,
-                }}
-              >
-                Discover and register for amazing events
-              </p>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: spacing.lg,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{
-                  padding: `${spacing.md} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
-                  borderRadius: borderRadius.xl,
-                  textAlign: "center",
-                  border: `1px solid ${colors.primary}`,
-                  boxShadow: shadows.md,
-                }}
-              >
-                <div
+            <div style={headerContainerStyle}>
+              <div style={{ flex: "1 1 520px", minWidth: 320 }}>
+                <h1
                   style={{
-                    fontSize: typography.fontSize['2xl'],
+                    fontSize: typography.fontSize['3xl'],
                     fontWeight: typography.fontWeight.bold,
-                    color: colors.white,
+                    color: colors.primary,
+                    marginBottom: spacing.sm,
                   }}
                 >
-                  {registeredEvents.length}
-                </div>
-                <div
+                  Welcome back, {user.firstName}! 👋
+                </h1>
+                <p
                   style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.accent,
-                    marginTop: spacing.xs,
-                    fontWeight: typography.fontWeight.bold,
+                    fontSize: typography.fontSize.lg,
+                    color: colors.gray500,
+                    margin: 0,
                   }}
                 >
-                  Registered Events
-                </div>
+                  Discover and register for amazing events
+                </p>
+                <div style={{ height: spacing.md }} />
               </div>
-
               <div
                 style={{
-                  padding: `${spacing.md} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
-                  borderRadius: borderRadius.xl,
-                  textAlign: "center",
-                  border: `1px solid ${colors.primary}`,
-                  boxShadow: shadows.md,
-                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: spacing.md,
+                  alignItems: "center",
+                  flexShrink: 0,
+                  justifyContent: "center",
                 }}
               >
                 <div
                   style={{
-                    fontSize: typography.fontSize['2xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.white,
+                    display: "flex",
+                    gap: spacing.md,
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
+                  {statCards.map((card) => (
+                    <div key={card.label} style={statCardBase}>
+                      <div style={statValueStyle}>{card.value}</div>
+                      <div style={statLabelStyle}>{card.label}</div>
+                    </div>
+                  ))}
                 </div>
-                <div
-                  style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.accent,
-                    marginTop: spacing.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  Notifications
-                </div>
+                <WalletBadge
+                  balance={walletBalance}
+                  currency="EGP"
+                  onTopUp={() => setTopUpOpen(true)}
+                  style={{ width: "auto" }}
+                />
               </div>
             </div>
           </div>
@@ -772,253 +826,11 @@ function StudentDashboard() {
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            {/* First Row of Tabs */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-            <button
-              onClick={() => setActiveTab("browse")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "browse"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "browse" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              🎯 Browse Events
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("gym-sessions");
-                fetchGymSessions();
-              }}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "gym-sessions"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "gym-sessions" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              🏋️ Gym Sessions
-            </button>
-
-            <button
-              onClick={() => setActiveTab("registered")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "registered"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "registered" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              ✓ My Registered Events
-            </button>
-
-            <button
-              onClick={() => setActiveTab("favourites")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "favourites"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "favourites" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              ❤️ Favourites
-            </button>
-
-            <button
-              onClick={() => setActiveTab("courts")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "courts"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "courts" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              🏀 Courts
-            </button>
-            </div>
-
-            {/* Second Row of Tabs - Notifications, Reminders, Loyalty, Polls */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
-            <button
-              onClick={() => {
-                setActiveTab("notifications");
-                fetchNotifications();
-              }}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "notifications"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "notifications" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              🔔 Notifications
-              {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("reminders");
-                fetchReminders();
-              }}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "reminders"
-                    ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                    : "transparent",
-                color: activeTab === "reminders" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-                position: "relative",
-              }}
-            >
-              ⏰ Reminders
-              {reminders.filter(n => !n.isRead).length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: spacing.sm,
-                    right: spacing.sm,
-                    background: colors.error,
-                    color: colors.white,
-                    borderRadius: borderRadius.full,
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.bold,
-                  }}
-                >
-                  {reminders.filter(n => !n.isRead).length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("loyalty")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "loyalty"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "loyalty" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              ⭐ Loyalty Partners
-            </button>
-
-            <button
-              onClick={() => setActiveTab("polls")}
-              style={{
-                flex: 1,
-                padding: `${spacing.md} ${spacing['2xl']}`,
-                background:
-                  activeTab === "polls"
-                    ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                    : "transparent",
-                color: activeTab === "polls" ? colors.primary : colors.gray500,
-                border: "none",
-                borderRadius: borderRadius.xl,
-                fontSize: typography.fontSize.base,
-                fontWeight: typography.fontWeight.bold,
-                cursor: "pointer",
-                transition: transitions.normal,
-              }}
-            >
-              📊 Vote for Vendors
-            </button>
-            </div>
+            {tabRows.map((row, idx) => (
+              <div key={`tab-row-${idx}`} style={tabRowStyle}>
+                {row.map(renderTabButton)}
+              </div>
+            ))}
           </div>
 
           {/* Content */}
@@ -1299,8 +1111,7 @@ function StudentDashboard() {
                       fetchReminders();
                     }}
                     style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.sm} ${spacing.md}`,
+                      ...pillButtonStyles.neutral,
                       fontSize: typography.fontSize.sm,
                     }}
                   >
@@ -1404,8 +1215,7 @@ function StudentDashboard() {
                                 fetchReminders();
                               }}
                               style={{
-                                ...buttonStyles.success,
-                                padding: `${spacing.xs} ${spacing.md}`,
+                                ...pillButtonStyles.success,
                                 fontSize: typography.fontSize.sm,
                               }}
                             >
@@ -1497,21 +1307,57 @@ function StudentDashboard() {
                 }}>
                   Notifications
                 </h2>
-                {notifications.filter(n => !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      markAllStudentNotificationsRead();
-                      fetchNotifications();
-                    }}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      fontSize: typography.fontSize.sm,
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: spacing.md }}>
+                  {notifications.filter(n => !n.isRead).length > 0 && (
+                    <button
+                      onClick={() => {
+                        markAllStudentNotificationsRead();
+                        fetchNotifications();
+                      }}
+                      style={{
+                        ...pillButtonStyles.neutral,
+                        fontSize: typography.fontSize.sm,
+                      }}
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                        if (confirmed) {
+                          deleteAllStudentNotifications();
+                          fetchNotifications();
+                        }
+                      }}
+                      style={{
+                        padding: `${spacing.sm} ${spacing.md}`,
+                        background: colors.error,
+                        color: colors.white,
+                        border: 'none',
+                        borderRadius: borderRadius.lg,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.semibold,
+                        cursor: 'pointer',
+                        transition: transitions.fast,
+                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-1px)';
+                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                        e.target.style.background = '#b91c1c';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0)';
+                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                        e.target.style.background = colors.error;
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <div style={{
@@ -1614,8 +1460,7 @@ function StudentDashboard() {
                                 }
                               }}
                               style={{
-                                ...buttonStyles.success,
-                                padding: `${spacing.xs} ${spacing.md}`,
+                                ...pillButtonStyles.success,
                                 fontSize: typography.fontSize.sm,
                               }}
                             >
