@@ -140,7 +140,7 @@ function TripsManager({ editOnly = false }) {
       } catch (e) {}
       
       const createdTrip = await createTrip({ ...form, price: Number(form.price || 0), capacity: Number(form.capacity || 0) });
-      setSuccess('Trip created');
+      showToast.success('Trip created successfully');
       
       // Save user restrictions if any
       const tripEvent = createdTrip?.event || createdTrip;

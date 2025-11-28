@@ -338,6 +338,19 @@ exports.reviewVendorApplication = async (req, res) => {
     app.reviewer = req.user._id;
     app.reviewedAt = new Date();
     if (notes) app.notes = notes;
+    
+    // If approving, calculate participation fee and set payment deadline
+    if (action === 'approve') {
+      const { calculateParticipationFee } = require('../utils/paymentCalculator');
+      app.participationFee = calculateParticipationFee(app, app.event);
+      // Payment deadline is 3 days after approval
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 3);
+      app.paymentDeadline = deadline;
+      app.paid = false; // Reset payment status
+      app.paidAt = undefined;
+    }
+    
     await app.save();
 
     const notifType = action === 'approve' ? 'VendorApplicationApproved' : 'VendorApplicationRejected';

@@ -161,7 +161,7 @@ function GymSessionsManager({ editOnly = false }) {
         instructor: form.instructor,
       };
       const createdSession = await createGymSession(payload);
-      setSuccess('Gym session created');
+      showToast.success('Gym session created successfully');
       
       // Save user restrictions if any
       const sessionEvent = createdSession?.event || createdSession;

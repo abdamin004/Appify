@@ -160,6 +160,12 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
   const handleRegisterClick = async (e) => {
     e.stopPropagation();
     
+    const eventId = event?._id || event?.id;
+    if (!eventId) {
+      showToast.error('Unable to determine event id for registration.');
+      return;
+    }
+
     if (!isLoggedIn) {
       showToast.warning('Please log in to register for events');
       if (onClick) onClick();
@@ -173,9 +179,9 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
 
     setRegistering(true);
     try {
-      await registerForEvent(event._id);
+      await registerForEvent(eventId);
       showToast.success('Successfully registered for the event!');
-      if (onRegister) onRegister(event._id);
+      if (onRegister) onRegister(eventId);
     } catch (err) {
       showToast.error(err.message || 'Failed to register for event');
     } finally {

@@ -12,7 +12,12 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
-const { sendGymSessionCancellationEmail, sendGymSessionUpdateEmail, sendVendorVisitorPassesEmail } = require('../utils/sendEmail');
+const {
+    sendGymSessionCancellationEmail,
+    sendGymSessionUpdateEmail,
+    sendVendorVisitorPassesEmail,
+    sendIndividualVisitorPassEmail
+} = require('../utils/sendEmail');
 const Notification = require('../models/Notification');
 const VisitorPass = require('../models/VisitorPass');
 const QRCode = require('qrcode');
@@ -160,6 +165,22 @@ module.exports = {
                 prerequisites
             } = req.body;
         
+            // Check for duplicate events (same title, location, and startDate)
+            if (title && location && startDate) {
+                const existingEvent = await Event.findOne({
+                    title: title.trim(),
+                    location: location.trim(),
+                    startDate: new Date(startDate),
+                    status: { $ne: 'cancelled' } // Don't count cancelled events as duplicates
+                });
+                
+                if (existingEvent) {
+                    return res.status(409).json({ 
+                        error: 'An event with the same title, location, and start date already exists' 
+                    });
+                }
+            }
+        
             const eventData = {
                 title,
                 shortDescription,
@@ -172,7 +193,7 @@ module.exports = {
                 type,
                 registrationDeadline,
                 capacity,
-                status,
+                status: typeof status === 'string' ? status.toLowerCase() : undefined,
                 createdBy: req.user._id
             };
 
@@ -613,6 +634,8 @@ module.exports = {
                 sessionType, instructor, equipment, difficulty, durationMinutes, prerequisites
             } = req.body;
 
+            const normalizedStatus = typeof status === 'string' ? status.toLowerCase() : undefined;
+
             const updatedData = {
                 ...(title && { title }),
                 ...(shortDescription && { shortDescription }),
@@ -623,7 +646,7 @@ module.exports = {
                 ...(endDate && { endDate }),
                 ...(location && { location }),
                 ...(capacity && { capacity }),
-                ...(status && { status }),
+                ...(normalizedStatus && { status: normalizedStatus }),
                 ...(registrationDeadline && { registrationDeadline })
             };
 
@@ -1344,6 +1367,7 @@ module.exports = {
             }
 
             let emailError = null;
+            let visitorEmailsSent = 0;
             try {
                 const passesForEmail = await VisitorPass.find({
                     $or: [
@@ -1359,15 +1383,31 @@ module.exports = {
                     .sort({ createdAt: 1 })
                     .lean();
 
-                if (passesForEmail.length && application.vendorUser?.email) {
-                    await sendVendorVisitorPassesEmail(
-                        application.vendorUser,
-                        event,
-                        application.organization,
-                        passesForEmail
-                    );
-                } else if (!application.vendorUser?.email) {
-                    console.warn('Vendor email not found for application:', applicationId);
+                if (passesForEmail.length) {
+                    if (application.vendorUser?.email) {
+                        await sendVendorVisitorPassesEmail(
+                            application.vendorUser,
+                            event,
+                            application.organization,
+                            passesForEmail
+                        );
+                    } else {
+                        console.warn('Vendor email not found for application:', applicationId);
+                    }
+
+                    const passesWithEmails = passesForEmail.filter(p => Boolean(p.visitorEmail));
+                    if (passesWithEmails.length) {
+                        const emailResults = await Promise.allSettled(
+                            passesWithEmails.map(pass =>
+                                sendIndividualVisitorPassEmail(pass, event, application.organization)
+                            )
+                        );
+                        visitorEmailsSent = emailResults.filter(r => r.status === 'fulfilled').length;
+                        const failedEmails = emailResults.filter(r => r.status === 'rejected');
+                        if (failedEmails.length) {
+                            console.error('Failed to email some visitor passes individually:', failedEmails);
+                        }
+                    }
                 }
             } catch (err) {
                 emailError = err;
@@ -1380,7 +1420,8 @@ module.exports = {
                 createdCount: created.length,
                 skipped,
                 passes: created,
-                emailDelivered: !emailError
+                emailDelivered: !emailError,
+                visitorEmailsSent
             });
         } catch (error) {
             console.error('generateVendorAttendeePasses error:', error);

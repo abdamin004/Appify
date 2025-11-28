@@ -3,10 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../Navbar";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
-import QRCodeGenerator from "../QRCode/QRCodeGenerator";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
-import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE } from "../../services/eventService";
+import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
@@ -24,12 +23,12 @@ function EventOfficeDashboard() {
   const [approvedVendorRequests, setApprovedVendorRequests] = useState([]);
   const [approvedVendorsLoading, setApprovedVendorsLoading] = useState(false);
   const [approvedVendorsError, setApprovedVendorsError] = useState("");
+  const [generatePassesLoadingId, setGeneratePassesLoadingId] = useState(null);
   const [gymSessions, setGymSessions] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
-  const [qrCodeEvent, setQrCodeEvent] = useState(null);
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
     // Load approved workshops from localStorage
     try {
@@ -572,13 +571,66 @@ function EventOfficeDashboard() {
 
   const handleVendorRequestAction = async (requestId, action) => {
     try {
-      const notes = window.prompt('Optional notes (press Enter to skip)') || undefined;
+      const isApprove = action === "approve";
+      const confirmed = await confirmDialog(
+        isApprove
+          ? "Are you sure you want to approve this vendor application?"
+          : "Are you sure you want to reject this vendor application?",
+        isApprove ? "Approve Vendor Request" : "Reject Vendor Request"
+      );
+      if (!confirmed) return;
+
+      let notes = undefined;
+      if (!isApprove) {
+        notes = window.prompt("Optional notes or rejection reason (press Enter to skip)") || undefined;
+      }
+
       await adminService.reviewVendorApplication(requestId, action, notes);
-      showToast.success(`Vendor request ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      showToast.success(`Vendor request ${isApprove ? "approved" : "rejected"} successfully!`);
       fetchVendorRequests();
     } catch (err) {
       console.error("Error updating vendor request:", err);
       showToast.error(err?.message || "Error updating vendor request");
+    }
+  };
+
+  const handleGenerateVisitorPasses = async (request) => {
+    if (!request?._id) {
+      showToast.error("Invalid vendor application selected.");
+      return;
+    }
+
+    if (!Array.isArray(request.attendees) || request.attendees.length === 0) {
+      showToast.warning("This vendor application has no listed visitors yet.");
+      return;
+    }
+
+    const confirmed = await confirmDialog(
+      `Generate QR codes for ${request.attendees.length} visitor(s) of ${request.organizationName || "this vendor"}? They will be emailed directly to the vendor contact.`,
+      "Generate Visitor QR Codes"
+    );
+    if (!confirmed) return;
+
+    try {
+      setGeneratePassesLoadingId(request._id);
+      const res = await generateVendorAttendeePasses(request._id);
+      const createdCount = typeof res?.createdCount === "number"
+        ? res.createdCount
+        : Array.isArray(res?.passes)
+          ? res.passes.length
+          : 0;
+      if (createdCount > 0) {
+        showToast.success(`Generated and emailed ${createdCount} visitor QR code${createdCount === 1 ? "" : "s"}.`);
+      } else {
+        showToast.success("Visitor QR codes are up to date.");
+      }
+      fetchVendorRequests();
+    } catch (err) {
+      console.error("Error generating visitor passes:", err);
+      const message = err?.message || err?.error || "Failed to generate visitor QR codes.";
+      showToast.error(message);
+    } finally {
+      setGeneratePassesLoadingId(null);
     }
   };
 
@@ -736,16 +788,23 @@ function EventOfficeDashboard() {
                     onClick={() => handleCreateEvent("booth")}
                     style={{
                       width: "100%",
-                      padding: "12px 20px",
+                      padding: `${spacing.md} ${spacing.xl}`,
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       cursor: "pointer",
-                      fontSize: "1rem",
-                      color: "#003366",
+                      fontSize: typography.fontSize.base,
+                      color: colors.primary,
+                      transition: transitions.fast,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = colors.gray100;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "transparent";
                     }}
                   >
-                    🏬 Create/edit Booth
+                    🏬 Create Booth
                   </button>
                   <button
                     onClick={() => handleCreateEvent("trip")}
@@ -864,12 +923,13 @@ function EventOfficeDashboard() {
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            {/* First Row of Tabs */}
+            {/* First Row of Tabs - 6 tabs */}
             <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("browse")}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "browse"
@@ -889,7 +949,8 @@ function EventOfficeDashboard() {
             <button
               onClick={() => setActiveTab("vendor-requests")}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "vendor-requests"
@@ -997,7 +1058,8 @@ function EventOfficeDashboard() {
             <button
               onClick={() => setActiveTab("gym-sessions")}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "gym-sessions"
@@ -1014,10 +1076,15 @@ function EventOfficeDashboard() {
             >
               💪 Gym Sessions
             </button>
+            </div>
+
+            {/* Second Row of Tabs - 6 tabs */}
+            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("workshop-approvals")}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "workshop-approvals"
@@ -1099,14 +1166,11 @@ function EventOfficeDashboard() {
             >
               ⭐ Loyalty Partners
             </button>
-            </div>
-
-            {/* Second Row of Tabs - Archived, Notifications, Reminders */}
-            <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap" }}>
             <button
               onClick={() => setActiveTab("archived")}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "archived"
@@ -1129,7 +1193,8 @@ function EventOfficeDashboard() {
                 fetchNotifications();
               }}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "notifications"
@@ -1175,7 +1240,8 @@ function EventOfficeDashboard() {
                 fetchReminders();
               }}
               style={{
-                flex: 1,
+                flex: "1 1 calc(16.666% - 10px)",
+                minWidth: "150px",
                 padding: `${spacing.md} ${spacing['2xl']}`,
                 background:
                   activeTab === "reminders"
@@ -1376,77 +1442,118 @@ function EventOfficeDashboard() {
                   </p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                    {approvedVendorRequests.map((request) => (
-                      <div
-                        key={request._id}
-                        style={{
-                          padding: "20px",
-                          background: "rgba(16, 185, 129, 0.1)",
-                          borderRadius: "12px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          border: "1px solid rgba(16, 185, 129, 0.3)",
-                        }}
-                      >
-                        <div>
-                          <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
-                            {request.organizationName || "Vendor"}
-                          </h3>
-                          <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
-                            ✅ Approved & ready for polls
-                          </p>
-                          <p style={{ color: "#065f46", margin: "4px 0" }}>
-                            Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
-                          </p>
-                          {request.eventStart && (
-                            <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Date: {new Date(request.eventStart).toLocaleString()}
+                    {approvedVendorRequests.map((request) => {
+                      const isGenerating = generatePassesLoadingId === request._id;
+                      const visitorCount = Array.isArray(request.attendees) ? request.attendees.length : 0;
+                      const eventType = (request.eventType || '').toLowerCase();
+                      const canGenerateVisitorQR = eventType === 'bazaar';
+                      return (
+                        <div
+                          key={request._id}
+                          style={{
+                            padding: "20px",
+                            background: "rgba(16, 185, 129, 0.1)",
+                            borderRadius: "12px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: spacing.lg,
+                            alignItems: "stretch",
+                            border: "1px solid rgba(16, 185, 129, 0.3)",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 260 }}>
+                            <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
+                              {request.organizationName || "Vendor"}
+                            </h3>
+                            <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
+                              ✅ Approved & ready for polls
                             </p>
-                          )}
-                          {request.eventLocation && (
                             <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Location: {request.eventLocation}
+                              Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
                             </p>
-                          )}
-                          <p style={{ color: "#065f46", margin: "4px 0" }}>
-                            Booth Size: {request.boothSize || "—"}
-                          </p>
-                          {request.vendorEmail && (
+                            {request.eventStart && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Date: {new Date(request.eventStart).toLocaleString()}
+                              </p>
+                            )}
+                            {request.eventLocation && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Location: {request.eventLocation}
+                              </p>
+                            )}
                             <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Vendor Email: {request.vendorEmail}
+                              Booth Size: {request.boothSize || "—"}
                             </p>
-                          )}
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
-                            Use in Booth Polls tab ➜
-                          </p>
-                          <button
-                            onClick={() => {
-                              setActiveTab("polls");
-                              setTimeout(() => {
-                                const el = document.getElementById("booth-polls-section");
-                                if (el) {
-                                  el.scrollIntoView({ behavior: "smooth" });
-                                }
-                              }, 200);
-                            }}
+                            <p style={{ color: "#065f46", margin: "4px 0" }}>
+                              Listed Visitors: {visitorCount || "No visitors added yet"}
+                            </p>
+                            {request.vendorEmail && (
+                              <p style={{ color: "#065f46", margin: "4px 0" }}>
+                                Vendor Email: {request.vendorEmail}
+                              </p>
+                            )}
+                          </div>
+                          <div
                             style={{
-                              padding: "10px 20px",
-                              background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontWeight: "600",
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "space-between",
+                              gap: spacing.md,
+                              minWidth: 220,
+                              textAlign: "right",
                             }}
                           >
-                            Go to Polls
-                          </button>
+                            {canGenerateVisitorQR && (
+                              <button
+                                onClick={() => handleGenerateVisitorPasses(request)}
+                                disabled={isGenerating}
+                                style={{
+                                  padding: "10px 20px",
+                                  background: isGenerating ? "#9ca3af" : "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  cursor: isGenerating ? "not-allowed" : "pointer",
+                                  fontWeight: "600",
+                                  boxShadow: isGenerating ? "none" : "0 8px 20px rgba(37, 99, 235, 0.25)",
+                                  transition: "background 0.2s ease",
+                                }}
+                              >
+                                {isGenerating ? "Generating…" : "Generate Visitor QR Codes"}
+                              </button>
+                            )}
+                            <div>
+                              <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
+                                Use in Booth Polls tab ➜
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setActiveTab("polls");
+                                  setTimeout(() => {
+                                    const el = document.getElementById("booth-polls-section");
+                                    if (el) {
+                                      el.scrollIntoView({ behavior: "smooth" });
+                                    }
+                                  }, 200);
+                                }}
+                                style={{
+                                  padding: "10px 20px",
+                                  background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                Go to Polls
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 </div>
@@ -2316,12 +2423,6 @@ function EventOfficeDashboard() {
       )}
 
       {/* QR Code Generator Modal */}
-      {qrCodeEvent && (
-        <QRCodeGenerator 
-          event={qrCodeEvent} 
-          onClose={() => setQrCodeEvent(null)} 
-        />
-      )}
     </div>
   );
 }

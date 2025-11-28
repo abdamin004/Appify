@@ -130,6 +130,13 @@ export function deleteEvent(id) {
   return http('DELETE', `${API_BASE}/events/delete/${id}`);
 }
 
+export function generateVendorAttendeePasses(applicationId) {
+  if (!applicationId) {
+    return Promise.reject(new Error('Missing vendor application id'));
+  }
+  return http('POST', `${API_BASE}/events/vendor-applications/${applicationId}/attendee-passes`);
+}
+
 // Event details + comments/ratings
 export async function getEventById(id) {
   const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';

@@ -23,6 +23,7 @@ import {
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import WalletBadge from "../Wallet/WalletBadge";
 
 function TADashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
@@ -620,40 +621,48 @@ function TADashboard() {
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing.xl,
+              flexDirection: "column",
+              gap: spacing.lg,
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div>
-              <h1
-                style={{
-                  fontSize: typography.fontSize['3xl'],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.sm,
-                }}
-              >
-                Welcome back, {user.firstName}! 👋
-              </h1>
-              <p
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  margin: 0,
-                }}
-              >
-                Discover and register for amazing events
-              </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: spacing.lg,
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontSize: typography.fontSize['3xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.primary,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  Welcome back, {user.firstName}! 👋
+                </h1>
+                <p
+                  style={{
+                    fontSize: typography.fontSize.lg,
+                    color: colors.gray500,
+                    margin: 0,
+                  }}
+                >
+                  Discover and register for amazing events
+                </p>
+                <div style={{ height: spacing.md }} />
+              </div>
             </div>
 
             <div
               style={{
                 display: "flex",
                 gap: spacing.lg,
-                alignItems: "center",
                 flexWrap: "wrap",
               }}
             >
@@ -665,6 +674,8 @@ function TADashboard() {
                   textAlign: "center",
                   border: `1px solid ${colors.primary}`,
                   boxShadow: shadows.md,
+                  minWidth: 160,
+                  flex: "1 1 160px",
                 }}
               >
                 <div
@@ -697,6 +708,8 @@ function TADashboard() {
                   border: `1px solid ${colors.primary}`,
                   boxShadow: shadows.md,
                   position: "relative",
+                  minWidth: 160,
+                  flex: "1 1 160px",
                 }}
               >
                 <div
@@ -719,6 +732,21 @@ function TADashboard() {
                   Notifications
                 </div>
               </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                width: "100%",
+              }}
+            >
+              <WalletBadge
+                balance={walletBalance}
+                currency="EGP"
+                onTopUp={() => setTopUpOpen(true)}
+                style={{ minWidth: 260 }}
+              />
             </div>
           </div>
 

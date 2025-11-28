@@ -14,6 +14,7 @@ import { getProfessorNotifications, markNotificationRead, markAllNotificationsRe
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import WalletBadge from "../Wallet/WalletBadge";
 
 function ProfessorDashboard() {
   const navigate = useNavigate();
@@ -546,68 +547,83 @@ function ProfessorDashboard() {
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing.xl,
+              flexDirection: "column",
+              gap: spacing.lg,
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div>
-              <h1
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: spacing.lg,
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontSize: typography.fontSize['3xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.primary,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  Welcome, Prof. {user.lastName || user.firstName}! 👋
+                </h1>
+                <p
+                  style={{
+                    fontSize: typography.fontSize.lg,
+                    color: colors.gray500,
+                    margin: 0,
+                  }}
+                >
+                  Manage your workshops and view university events
+                </p>
+                <div style={{ height: spacing.md }} />
+              </div>
+              <div
                 style={{
-                  fontSize: typography.fontSize['3xl'],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.sm,
+                  display: "flex",
+                  gap: spacing.md,
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
                 }}
               >
-                Welcome, Prof. {user.lastName || user.firstName}! 👋
-              </h1>
-              <p
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  margin: 0,
-                }}
-              >
-                Manage your workshops and view university events
-              </p>
+                <a
+                  href="/professor/workshops"
+                  onClick={(e) => {
+                    if (e && e.preventDefault) {
+                      try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) {}
+                    }
+                  }}
+                  style={{
+                    ...buttonStyles.primary,
+                    padding: `${spacing.md} ${spacing['2xl']}`,
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    minWidth: 220,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.boxShadow = shadows.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.boxShadow = shadows.accent;
+                  }}
+                >
+                  + Create Workshop
+                </a>
+              </div>
             </div>
 
             <div
               style={{
                 display: "flex",
                 gap: spacing.lg,
-                alignItems: "center",
                 flexWrap: "wrap",
               }}
             >
-              <a
-                href="/professor/workshops"
-                onClick={(e) => {
-                  // prefer client routing when available
-                  if (e && e.preventDefault) {
-                    try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) {}
-                  }
-                  // otherwise allow default anchor navigation
-                }}
-                style={{
-                  ...buttonStyles.primary,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.boxShadow = shadows.accentHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.boxShadow = shadows.accent;
-                }}
-              >
-                + Create Workshop
-              </a>
-
               <div
                 style={{
                   padding: `${spacing.md} ${spacing.xl}`,
@@ -616,6 +632,8 @@ function ProfessorDashboard() {
                   textAlign: "center",
                   border: `1px solid ${colors.primary}`,
                   boxShadow: shadows.md,
+                  minWidth: 160,
+                  flex: "1 1 160px",
                 }}
               >
                 <div
@@ -631,6 +649,7 @@ function ProfessorDashboard() {
                   style={{
                     fontSize: typography.fontSize.sm,
                     color: colors.accent,
+                    marginTop: spacing.xs,
                     fontWeight: typography.fontWeight.bold,
                   }}
                 >
@@ -647,21 +666,46 @@ function ProfessorDashboard() {
                   border: `1px solid ${colors.primary}`,
                   boxShadow: shadows.md,
                   position: "relative",
+                  minWidth: 160,
+                  flex: "1 1 160px",
                 }}
               >
-                <div style={{ 
-                  fontSize: typography.fontSize['2xl'], 
-                  fontWeight: typography.fontWeight.bold, 
-                  color: colors.white 
-                }}>
+                <div
+                  style={{
+                    fontSize: typography.fontSize['2xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.white,
+                  }}
+                >
                   {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
                 </div>
-                <div style={{ 
-                  fontSize: typography.fontSize.sm, 
-                  color: colors.accent,
-                  fontWeight: typography.fontWeight.bold,
-                }}>Notifications</div>
+                <div
+                  style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.accent,
+                    marginTop: spacing.xs,
+                    fontWeight: typography.fontWeight.bold,
+                  }}
+                >
+                  Notifications
+                </div>
               </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                width: "100%",
+              }}
+            >
+              <WalletBadge
+                balance={walletBalance}
+                currency="EGP"
+                onTopUp={() => setTopUpOpen(true)}
+                label="Wallet Balance"
+                style={{ minWidth: 260 }}
+              />
             </div>
           </div>
 

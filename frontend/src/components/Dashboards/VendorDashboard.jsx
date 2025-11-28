@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import VisitorQRCodeManager from "../Vendor/VisitorQRCodeManager";
@@ -10,8 +11,12 @@ import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
 import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+import { payApplicationWithWallet, getWalletBalance, createCheckoutSession, confirmStripeReceipt } from "../../services/paymentService";
+import TopUpDialog from "../Payments/TopUpDialog";
+import WalletBadge from "../Wallet/WalletBadge";
 
 function VendorDashboard() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("browse");
   const [activeApplicationTab, setActiveApplicationTab] = useState("all");
   const [activeUpcomingTab, setActiveUpcomingTab] = useState("bazaars");
@@ -21,11 +26,27 @@ function VendorDashboard() {
   const [loadingApplications, setLoadingApplications] = useState(false);
   const [showLoyaltyForm, setShowLoyaltyForm] = useState(false);
   const [loyaltyRefreshKey, setLoyaltyRefreshKey] = useState(0);
+  const [payingApplicationId, setPayingApplicationId] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(undefined);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [bannerMsg, setBannerMsg] = useState("");
+  const paymentProcessedRef = useRef(new Set());
   const [user, setUser] = useState({ 
     companyName: "", 
     firstName: "Vendor",
     email: "" 
   });
+
+  const totalApplications = applications.length;
+  const pendingPaymentCount = applications.filter(
+    (app) => (app.status || '').toLowerCase() === 'approved' && !app.paid
+  ).length;
+  const upcomingEventsCount = (upcomingBazaars?.length || 0) + (upcomingBooths?.length || 0);
+  const vendorStatCards = [
+    { label: "Total Applications", value: totalApplications },
+    { label: "Pending Payments", value: pendingPaymentCount },
+    { label: "Upcoming Events", value: upcomingEventsCount },
+  ];
 
   useEffect(() => {
     const loadUser = () => {
@@ -40,7 +61,162 @@ function VendorDashboard() {
       }
     };
     loadUser();
+    
+    // Load wallet balance
+    const loadWalletBalance = async () => {
+      try {
+        const balanceData = await getWalletBalance();
+        setWalletBalance(balanceData.balance || 0);
+      } catch (err) {
+        console.error("Error loading wallet balance:", err);
+        setWalletBalance(undefined);
+      }
+    };
+    loadWalletBalance();
+    
+    // Listen to wallet updates
+    const handleWalletUpdate = () => {
+      loadWalletBalance();
+    };
+    window.addEventListener('wallet:updated', handleWalletUpdate);
+    return () => {
+      window.removeEventListener('wallet:updated', handleWalletUpdate);
+    };
   }, []);
+
+  // Handle Stripe redirect after card payment - check on mount and URL changes
+  useEffect(() => {
+    const processPayment = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        const sessionId = params.get('session_id');
+        const status = params.get('status');
+        const applicationId = params.get('applicationId');
+        const mock = params.get('mock');
+        
+        console.log('Payment redirect handler - URL params:', { sessionId, status, applicationId, mock });
+        
+        // Only process if we have payment-related parameters
+        if (!sessionId && !(status === 'success' && applicationId)) {
+          console.log('No payment parameters found, skipping');
+          return;
+        }
+        
+        // Check if already processed for this specific payment
+        const paymentKey = `${sessionId || 'mock'}-${applicationId}`;
+        const processedKey = `payment_processed_${paymentKey}`;
+        if (sessionStorage.getItem(processedKey)) {
+          console.log('Payment already processed, skipping');
+          return;
+        }
+        
+        // Mark as processed
+        sessionStorage.setItem(processedKey, 'true');
+        
+        console.log('Processing payment...');
+        
+        if (sessionId) {
+          // Card payment via Stripe
+          try {
+            await confirmStripeReceipt(sessionId);
+          } catch (err) {
+            console.error('Error confirming receipt:', err);
+          }
+          // Refresh applications to show paid status
+          try {
+            await fetchApplications(activeApplicationTab);
+          } catch (err) {
+            console.error('Error refreshing applications:', err);
+          }
+          // Show success message
+          const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
+          setBannerMsg(`Payment successful.${email}`);
+          setTimeout(() => setBannerMsg(''), 6000);
+          // Clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('session_id');
+          url.searchParams.delete('applicationId');
+          url.searchParams.delete('mock');
+          window.history.replaceState({}, document.title, url.toString());
+        } else if (status === 'success' && applicationId) {
+          console.log('Processing mock payment for application:', applicationId);
+          // Ensure we're on the applications tab to see the update
+          if (activeTab !== 'my-applications') {
+            setActiveTab('my-applications');
+          }
+          // Mock payment or manual success - mark as paid
+          if (mock === '1') {
+            // Mock payment - call backend to mark as paid
+            try {
+              const token = localStorage.getItem("token");
+              const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+              console.log('Calling manual receipt endpoint with applicationId:', applicationId);
+              const response = await fetch(`${API_BASE}/payments/receipt/manual`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ applicationId }),
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Manual receipt error response:', errorData);
+                throw new Error(errorData.message || `HTTP ${response.status}`);
+              }
+              
+              const result = await response.json();
+              console.log('Mock payment processed successfully:', result);
+              showToast.success('Payment processed successfully!');
+            } catch (err) {
+              console.error('Error marking mock payment:', err);
+              showToast.error(err.message || 'Failed to process mock payment');
+              // Remove processed flag to allow retry
+              sessionStorage.removeItem(processedKey);
+              return; // Don't continue if payment failed
+            }
+          }
+          // Show success message immediately
+          const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
+          setBannerMsg(mock === '1' 
+            ? `Payment successful (mock mode - Stripe not configured).${email}` 
+            : `Payment successful.${email}`);
+          setTimeout(() => setBannerMsg(''), 6000);
+          // Refresh applications to show paid status - wait a bit for backend to process
+          setTimeout(async () => {
+            try {
+              console.log('Refreshing applications after payment, activeTab:', activeTab, 'activeApplicationTab:', activeApplicationTab);
+              await fetchApplications(activeApplicationTab || 'all');
+              console.log('Applications refreshed');
+            } catch (err) {
+              console.error('Error refreshing applications:', err);
+            }
+          }, 1500); // Increased delay to ensure backend has processed
+          // Clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('status');
+          url.searchParams.delete('applicationId');
+          url.searchParams.delete('mock');
+          url.searchParams.delete('eventId');
+          window.history.replaceState({}, document.title, url.toString());
+        }
+      } catch (err) {
+        console.error('Error handling payment redirect:', err);
+        showToast.error('Error processing payment. Please refresh the page.');
+        // Remove processed flag on error to allow retry
+        const params = new URLSearchParams(location.search || '');
+        const sessionId = params.get('session_id');
+        const applicationId = params.get('applicationId');
+        const paymentKey = `${sessionId || 'mock'}-${applicationId}`;
+        sessionStorage.removeItem(`payment_processed_${paymentKey}`);
+      }
+    };
+    
+    // Process immediately when location.search changes
+    processPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]); // Run when URL search params change
 
   useEffect(() => {
     if (activeTab === "upcoming") {
@@ -217,6 +393,123 @@ function VendorDashboard() {
     }
   };
 
+  const handlePayApplication = async (applicationId, paymentMethod = 'wallet') => {
+    const app = applications.find(a => a._id === applicationId);
+    if (!app) {
+      showToast.error('Application not found');
+      return;
+    }
+
+    const fee = app.participationFee || 0;
+    
+    if (paymentMethod === 'card') {
+      // Card payment - direct API call (no Stripe redirect)
+      try {
+        setPayingApplicationId(applicationId);
+        
+        // Confirm payment
+        const confirmed = await confirmDialog(
+          `Pay $${fee.toFixed(2)} for participation fee by card?`,
+          'Confirm Card Payment'
+        );
+        if (!confirmed) {
+          setPayingApplicationId(null);
+          return;
+        }
+
+        // Call backend to mark as paid
+        const token = localStorage.getItem("token");
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+        const response = await fetch(`${API_BASE}/payments/receipt/manual`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ applicationId }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Card payment processed successfully:', result);
+        
+        // Show success messages
+        showToast.success('Payment processed successfully!');
+        const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
+        setBannerMsg(`Payment successful.${email}`);
+        setTimeout(() => setBannerMsg(''), 6000);
+        
+        // Refresh applications to show paid status
+        await fetchApplications(activeApplicationTab);
+        
+      } catch (err) {
+        console.error('Error processing card payment:', err);
+        showToast.error(err.message || 'Payment failed. Please try again.');
+      } finally {
+        setPayingApplicationId(null);
+      }
+      return;
+    }
+
+    // Wallet payment
+    try {
+      // Check wallet balance first
+      const balanceData = await getWalletBalance();
+      const balance = balanceData.balance || 0;
+      setWalletBalance(balance);
+      
+      if (balance < fee) {
+        // Show option to use card payment instead
+        const useCard = await confirmDialog(
+          `Insufficient wallet balance. You need $${fee.toFixed(2)} but have $${balance.toFixed(2)}.\n\nWould you like to pay by card instead?`,
+          'Insufficient Balance'
+        );
+        if (useCard) {
+          await handlePayApplication(applicationId, 'card');
+        }
+        return;
+      }
+
+      const confirmed = await confirmDialog(
+        `Pay $${fee.toFixed(2)} for participation fee?`,
+        'Confirm Payment'
+      );
+      if (!confirmed) return;
+
+      setPayingApplicationId(applicationId);
+      await payApplicationWithWallet(applicationId);
+      showToast.success('Payment completed successfully!');
+      // Show success banner
+      const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
+      setBannerMsg(`Payment successful.${email}`);
+      setTimeout(() => setBannerMsg(''), 6000);
+      // Refresh applications to show paid status
+      await fetchApplications(activeApplicationTab);
+      // Refresh wallet balance
+      const newBalance = await getWalletBalance();
+      setWalletBalance(newBalance.balance || 0);
+    } catch (err) {
+      // If wallet payment fails, offer card payment as fallback
+      if (err.message && err.message.includes('user account')) {
+        const useCard = await confirmDialog(
+          `Wallet payment requires a user account. Would you like to pay by card instead?`,
+          'Payment Method'
+        );
+        if (useCard) {
+          await handlePayApplication(applicationId, 'card');
+        }
+      } else {
+        showToast.error(err.message || 'Payment failed. Please try again.');
+      }
+    } finally {
+      setPayingApplicationId(null);
+    }
+  };
+
   const displayName = user.companyName || user.firstName || "Vendor";
 
   return (
@@ -229,6 +522,30 @@ function VendorDashboard() {
       }}
     >
       <Navbar />
+
+      {/* Success Banner */}
+      {bannerMsg && (
+        <div
+          style={{
+            position: "fixed",
+            top: "80px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 10000,
+            background: colors.success,
+            color: colors.white,
+            padding: `${spacing.md} ${spacing.xl}`,
+            borderRadius: borderRadius.xl,
+            boxShadow: shadows.lg,
+            fontSize: typography.fontSize.base,
+            fontWeight: typography.fontWeight.semibold,
+            maxWidth: "90%",
+            textAlign: "center",
+          }}
+        >
+          {bannerMsg}
+        </div>
+      )}
 
       <div
         style={{
@@ -248,58 +565,126 @@ function VendorDashboard() {
               boxShadow: shadows.lg,
               marginBottom: spacing['2xl'],
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing.xl,
+              flexDirection: "column",
+              gap: spacing.lg,
               border: `1px solid ${colors.gray200}`,
             }}
           >
-            <div>
-              <h1
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: spacing.lg,
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontSize: typography.fontSize['3xl'],
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.primary,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  Welcome back, {displayName}! 👋
+                </h1>
+                <p
+                  style={{
+                    fontSize: typography.fontSize.lg,
+                    color: colors.gray500,
+                    margin: 0,
+                  }}
+                >
+                  View and manage bazaars and booths
+                </p>
+              </div>
+              <div
                 style={{
-                  fontSize: typography.fontSize['3xl'],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.sm,
+                  display: "flex",
+                  gap: spacing.md,
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
                 }}
               >
-                Welcome back, {displayName}! 👋
-              </h1>
-              <p
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  margin: 0,
-                }}
-              >
-                View and manage bazaars and booths
-              </p>
+                <button
+                  onClick={handleRequestBooth}
+                  style={{
+                    ...buttonStyles.primary,
+                    padding: `${spacing.md} ${spacing['2xl']}`,
+                    minWidth: 220,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.boxShadow = shadows.accentHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.boxShadow = shadows.accent;
+                  }}
+                >
+                  + Request Booth/Bazaar
+                </button>
+              </div>
             </div>
 
             <div
               style={{
                 display: "flex",
                 gap: spacing.lg,
-                alignItems: "center",
                 flexWrap: "wrap",
               }}
             >
-              <button
-                onClick={handleRequestBooth}
-                style={{
-                  ...buttonStyles.primary,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.boxShadow = shadows.accentHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.boxShadow = shadows.accent;
-                }}
-              >
-                + Request Booth/Bazaar
-              </button>
+              {vendorStatCards.map((stat) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    padding: `${spacing.md} ${spacing.xl}`,
+                    background: `linear-gradient(135deg, rgba(51, 102, 153, 0.75) 0%, rgba(26, 51, 77, 0.85) 100%)`,
+                    borderRadius: borderRadius.xl,
+                    textAlign: "center",
+                    border: `1px solid ${colors.primary}`,
+                    boxShadow: shadows.md,
+                    minWidth: 160,
+                    flex: "1 1 180px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: typography.fontSize['2xl'],
+                      fontWeight: typography.fontWeight.bold,
+                      color: colors.white,
+                    }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: typography.fontSize.sm,
+                      color: colors.accent,
+                      marginTop: spacing.xs,
+                      fontWeight: typography.fontWeight.bold,
+                    }}
+                  >
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                width: "100%",
+              }}
+            >
+              <WalletBadge
+                balance={walletBalance}
+                currency="USD"
+                onTopUp={() => setTopUpOpen(true)}
+                label="Wallet Balance"
+                style={{ minWidth: 260 }}
+              />
             </div>
           </div>
 
@@ -747,6 +1132,99 @@ function VendorDashboard() {
                                   📅 {new Date(app.event.startDate).toLocaleDateString()}
                                 </p>
                               )}
+                              {/* Payment Information for Approved Applications */}
+                              {app.status === "approved" && !app.paid && (
+                                <div style={{
+                                  background: colors.warningLight,
+                                  border: `1px solid ${colors.warning}`,
+                                  borderRadius: borderRadius.md,
+                                  padding: spacing.md,
+                                  marginTop: spacing.md,
+                                  marginBottom: spacing.md,
+                                }}>
+                                  <p style={{ 
+                                    color: colors.warning, 
+                                    fontSize: typography.fontSize.sm,
+                                    fontWeight: typography.fontWeight.bold,
+                                    marginBottom: spacing.xs,
+                                  }}>
+                                    💳 Payment Required
+                                  </p>
+                                  <p style={{ color: colors.gray700, fontSize: typography.fontSize.sm, marginBottom: spacing.xs }}>
+                                    Participation Fee: <strong>${(app.participationFee || 0).toFixed(2)}</strong>
+                                  </p>
+                                  {app.paymentDeadline && (
+                                    <p style={{ color: colors.gray700, fontSize: typography.fontSize.sm, marginBottom: spacing.sm }}>
+                                      Payment Deadline: <strong>{new Date(app.paymentDeadline).toLocaleDateString()}</strong>
+                                      {new Date(app.paymentDeadline) < new Date() && (
+                                        <span style={{ color: colors.error, marginLeft: spacing.xs }}>(Overdue)</span>
+                                      )}
+                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', gap: spacing.sm, flexDirection: 'column' }}>
+                                    <button
+                                      onClick={() => handlePayApplication(app._id, 'card')}
+                                      disabled={payingApplicationId === app._id}
+                                      style={{
+                                        width: "100%",
+                                        background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+                                        color: colors.primary,
+                                        border: 'none',
+                                        padding: spacing.sm,
+                                        borderRadius: borderRadius.md,
+                                        fontSize: typography.fontSize.sm,
+                                        fontWeight: typography.fontWeight.bold,
+                                        opacity: payingApplicationId === app._id ? 0.7 : 1,
+                                        cursor: payingApplicationId === app._id ? 'not-allowed' : 'pointer',
+                                        transition: transitions.fast,
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        if (payingApplicationId !== app._id) {
+                                          e.target.style.transform = 'translateY(-1px)';
+                                          e.target.style.boxShadow = shadows.md;
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = 'none';
+                                      }}
+                                    >
+                                      💳 Pay by Card
+                                    </button>
+                                    <button
+                                      onClick={() => handlePayApplication(app._id, 'wallet')}
+                                      disabled={payingApplicationId === app._id}
+                                      style={{
+                                        width: "100%",
+                                        ...buttonStyles.primary,
+                                        padding: spacing.sm,
+                                        fontSize: typography.fontSize.sm,
+                                        opacity: payingApplicationId === app._id ? 0.7 : 1,
+                                        cursor: payingApplicationId === app._id ? 'not-allowed' : 'pointer',
+                                      }}
+                                    >
+                                      {payingApplicationId === app._id ? 'Processing...' : '💵 Pay from Wallet'}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              {app.status === "approved" && app.paid && app.paidAt && (
+                                <div style={{
+                                  background: colors.successLight,
+                                  border: `1px solid ${colors.success}`,
+                                  borderRadius: borderRadius.md,
+                                  padding: spacing.md,
+                                  marginTop: spacing.md,
+                                  marginBottom: spacing.md,
+                                }}>
+                                  <p style={{ color: colors.success, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold }}>
+                                    ✓ Payment Completed
+                                  </p>
+                                  <p style={{ color: colors.gray700, fontSize: typography.fontSize.xs, marginTop: spacing.xs }}>
+                                    Paid on {new Date(app.paidAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             {app.status === "pending" && !app.paid && (
                               <button
@@ -900,6 +1378,16 @@ function VendorDashboard() {
           )}
         </div>
       </div>
+      {topUpOpen && (
+        <TopUpDialog
+          open={topUpOpen}
+          onClose={() => setTopUpOpen(false)}
+          onSuccess={(res) => {
+            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
+            if (typeof next === 'number') setWalletBalance(next);
+          }}
+        />
+      )}
     </div>
   );
 }

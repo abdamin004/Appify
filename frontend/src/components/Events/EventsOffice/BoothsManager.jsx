@@ -80,6 +80,7 @@ function BoothsManager() {
       }
       
       await refresh();
+      navigate('/EventOfficeDashboard');
     } catch (err) {
       const errorMsg = err.message || 'Failed to create booth';
       setError(errorMsg);

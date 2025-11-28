@@ -126,7 +126,7 @@ function ConferencesManager({ editOnly = false }) {
     try {
       const payload = { ...form, location: 'N/A' };
       const createdConference = await createConference(payload);
-      setSuccess('Conference created');
+      showToast.success('Conference created successfully');
       
       // Save user restrictions if any
       const conferenceEvent = createdConference?.event || createdConference;

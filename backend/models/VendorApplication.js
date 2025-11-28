@@ -28,7 +28,11 @@ const vendorApplicationSchema = new mongoose.Schema({
   reviewer:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // admin/staff who reviewed
   reviewedAt: Date,
 
-  paid: { type: Boolean, default: false}
+  // Payment
+  paid: { type: Boolean, default: false },
+  participationFee: { type: Number, default: 0 }, // Calculated fee based on event type
+  paymentDeadline: { type: Date }, // 3 days after approval
+  paidAt: { type: Date } // When payment was completed
 
 }, { timestamps: true });
 

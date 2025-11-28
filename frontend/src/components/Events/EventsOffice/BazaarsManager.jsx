@@ -105,7 +105,7 @@ function BazaarsManager({ editOnly = false }) {
     setLoading(true);
     try {
       const createdBazaar = await createBazaar(form);
-      setSuccess('Bazaar created');
+      showToast.success('Bazaar created successfully');
       
       // Save user restrictions if any
       const bazaarEvent = createdBazaar?.event || createdBazaar;
@@ -286,9 +286,10 @@ function BazaarsManager({ editOnly = false }) {
           </>
         )}
 
-        {editing && (() => {
-          const bz = bazaars.find(b => b._id === editing);
-          if (!bz) return null;
+        {(editing || (editOnly && editId)) && (() => {
+          const bz = editOnly && editId ? null : bazaars.find(b => b._id === editing);
+          const currentEditId = editOnly ? editId : editing;
+          if (!currentEditId) return null;
           return (
             <div style={{
               background: colors.white,
@@ -426,7 +427,7 @@ function BazaarsManager({ editOnly = false }) {
                 }}>
                   <button 
                     type="button" 
-                    onClick={() => onSave(editing)} 
+                    onClick={() => onSave(currentEditId)} 
                     disabled={loading}
                     style={{ 
                       ...buttonStyles.primary,
