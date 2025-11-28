@@ -59,7 +59,7 @@ async function http(method, url, body) {
     try {
       const data = await res.json();
       msg = data.message || data.error || msg;
-    } catch (_) {}
+    } catch (_) { }
     throw new Error(msg);
   }
   return res.json();
@@ -178,7 +178,7 @@ export async function getEventById(id) {
   const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
   const headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  
+
   const res = await fetch(`${API_BASE}/events/${id}`, { headers });
   if (!res.ok) {
     const text = await res.text();
@@ -215,7 +215,7 @@ export async function getEventRatings(id) {
     const count = res.length;
     const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
     const average = count > 0 ? total / count : 0;
-    const histogram = [1,2,3,4,5].reduce((acc, v) => {
+    const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
       acc[v] = res.filter(r => (r.rating || r.value) === v).length;
       return acc;
     }, {});
@@ -225,7 +225,7 @@ export async function getEventRatings(id) {
   const average = res.averageRating ?? res.average ?? 0;
   const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
   const ratings = res.ratings || [];
-  const histogram = [1,2,3,4,5].reduce((acc, v) => {
+  const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
     acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
     return acc;
   }, {});
@@ -251,7 +251,7 @@ export async function listPendingWorkshops() {
   try {
     // Try multiple approaches to get workshops
     let allWorkshops = [];
-    
+
     // Approach 1: Try sortEvents endpoint (doesn't filter by status)
     try {
       const sortRes = await fetch(`${API_BASE}/events/sort`);
@@ -263,7 +263,7 @@ export async function listPendingWorkshops() {
     } catch (e) {
       console.log('sortEvents approach failed:', e);
     }
-    
+
     // Approach 2: Try filter endpoint
     try {
       const q = new URLSearchParams({ type: 'Workshop' });
@@ -275,7 +275,7 @@ export async function listPendingWorkshops() {
     } catch (e) {
       console.log('filterEvents approach failed:', e);
     }
-    
+
     // Approach 3: Try getAllEvents
     try {
       const allRes = await fetch(`${API_BASE}/events`);
@@ -287,14 +287,14 @@ export async function listPendingWorkshops() {
     } catch (e) {
       console.log('getAllEvents approach failed:', e);
     }
-    
+
     // Remove duplicates by _id
     const uniqueWorkshops = Array.from(
       new Map(allWorkshops.map(w => [w._id, w])).values()
     );
-    
+
     // Filter for draft status workshops
-    return uniqueWorkshops.filter(w => w.status === 'draft');
+    return uniqueWorkshops.filter(w => w.status === 'pending');
   } catch (err) {
     console.error('Error fetching pending workshops:', err);
     return [];
@@ -329,22 +329,22 @@ export async function notifyAllUsersAboutNewEvent(event) {
   try {
     // Dynamic import to avoid circular dependencies
     const notificationService = await import('./notificationService');
-    const { 
-      createStudentNotification, 
+    const {
+      createStudentNotification,
       createEventOfficeNotification,
       markEventsAsSeen,
       createProfessorNotification
     } = notificationService;
-    
+
     if (!event || event.status !== 'published') return;
-    
+
     const eventId = String(event._id || event.id);
     const eventType = event.type || 'Event';
     const eventTitle = event.title || 'New Event';
-    
+
     // Mark event as seen immediately (so polling doesn't create duplicate notifications)
     markEventsAsSeen([eventId]);
-    
+
     // Create notification for all user types
     const notification = {
       type: 'NewEvent',
@@ -353,13 +353,13 @@ export async function notifyAllUsersAboutNewEvent(event) {
       eventTitle: eventTitle,
       eventType: eventType,
     };
-    
+
     // Create student notification (shared by students, staff, TA)
     createStudentNotification(notification);
-    
+
     // Create event office notification
     createEventOfficeNotification(notification);
-    
+
     // Create notifications for all professors (get all professor IDs from localStorage)
     // We'll create a notification for each professor we can find
     try {
@@ -374,7 +374,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
     } catch (profErr) {
       console.log('Could not create professor notifications:', profErr);
     }
-    
+
     // Show browser notification if permission granted
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
@@ -387,7 +387,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
         console.log('Browser notification failed:', notifErr);
       }
     }
-    
+
     // Dispatch custom event to refresh notifications in all dashboards
     window.dispatchEvent(new CustomEvent('newEventCreated', { detail: { event } }));
   } catch (err) {

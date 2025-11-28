@@ -12,7 +12,7 @@ function WorkshopsManager({ editOnly = false }) {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const editId = editOnly ? params.id : searchParams.get('edit');
-  
+
   // Get logged-in professor info for auto-fill
   const getProfessorInfo = () => {
     try {
@@ -29,7 +29,7 @@ function WorkshopsManager({ editOnly = false }) {
   };
 
   const professorInfo = getProfessorInfo();
-  
+
   const [form, setForm] = useState({
     title: '',
     shortDescription: '',
@@ -91,10 +91,10 @@ function WorkshopsManager({ editOnly = false }) {
           extraRequiredResourses: !!workshop.extraRequiredResourses,
           agenda: workshop.description || '',
           capacity: workshop.capacity || '',
-          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0) 
-            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' })) 
+          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0)
+            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' }))
             : [{ name: '', department: '' }],
-          status: workshop.status || 'draft',
+          status: workshop.status || 'pending',
         });
         // Set editing mode
         setEditing(id);
@@ -111,8 +111,8 @@ function WorkshopsManager({ editOnly = false }) {
           extraRequiredResourses: !!workshop.extraRequiredResourses,
           capacity: workshop.capacity ?? 0,
           agenda: workshop.description || '',
-          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0) 
-            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' })) 
+          professors: (Array.isArray(workshop.professors) && workshop.professors.length > 0)
+            ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' }))
             : [{ name: '', department: '' }],
         });
         showToast.success('Workshop loaded for editing');
@@ -137,7 +137,7 @@ function WorkshopsManager({ editOnly = false }) {
     }
   };
 
-  
+
 
   const onCreate = async (e) => {
     e.preventDefault();
@@ -150,7 +150,7 @@ function WorkshopsManager({ editOnly = false }) {
           const obj = JSON.parse(raw);
           createdBy = (obj && (obj._id || obj.id)) || undefined;
         }
-      } catch (_) {}
+      } catch (_) { }
       if (!createdBy) {
         throw new Error('Please login first. Creator not found.');
       }
@@ -161,7 +161,7 @@ function WorkshopsManager({ editOnly = false }) {
         startDate: form.startDate,
         endDate: form.endDate,
         registrationDeadline: form.registrationDeadline,
-        status: 'draft',
+        status: 'pending',
         facultyName: form.facultyName,
         requiredBudget: Number(form.requiredBudget || 0),
         fundingSource: form.fundingSource,
@@ -174,7 +174,7 @@ function WorkshopsManager({ editOnly = false }) {
         createdBy,
       };
       const createdWorkshop = await createWorkshop(payload);
-      
+
       // Create notification for Events Office
       createEventOfficeNotification({
         type: 'WorkshopSubmitted',
@@ -183,7 +183,7 @@ function WorkshopsManager({ editOnly = false }) {
         workshopTitle: payload.title,
         professorId: createdBy,
       });
-      
+
       showToast.success('Workshop created successfully');
       setForm({
         title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
@@ -193,22 +193,24 @@ function WorkshopsManager({ editOnly = false }) {
       await refresh();
       // Redirect to professor dashboard
       navigate('/ProfessorDashboard');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to create workshop');
     }
     finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { setEditing(row._id); setEditData({
-    title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || 'GUC Cairo',
-    startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
-    registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '',
-    facultyName: row.facultyName || '', requiredBudget: row.requiredBudget || 0, fundingSource: row.fundingSource || 'Grant',
-    extraRequiredResourses: !!row.extraRequiredResourses,
-    capacity: row.capacity ?? 0,
-    agenda: row.description || '',
-    professors: (Array.isArray(row.professors) && row.professors.length > 0) ? row.professors.map(p => ({ name: p.name || '', department: p.department || '' })) : [{ name: '', department: '' }],
-  }); };
+  const startEdit = (row) => {
+    setEditing(row._id); setEditData({
+      title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || 'GUC Cairo',
+      startDate: row.startDate ? row.startDate.slice(0, 16) : '', endDate: row.endDate ? row.endDate.slice(0, 16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0, 16) : '',
+      facultyName: row.facultyName || '', requiredBudget: row.requiredBudget || 0, fundingSource: row.fundingSource || 'Grant',
+      extraRequiredResourses: !!row.extraRequiredResourses,
+      capacity: row.capacity ?? 0,
+      agenda: row.description || '',
+      professors: (Array.isArray(row.professors) && row.professors.length > 0) ? row.professors.map(p => ({ name: p.name || '', department: p.department || '' })) : [{ name: '', department: '' }],
+    });
+  };
   // Remove edit requests from description
   const removeEditRequests = (description) => {
     if (!description) return '';
@@ -224,7 +226,7 @@ function WorkshopsManager({ editOnly = false }) {
     try {
       // Remove edit requests from the description when saving
       const cleanedAgenda = removeEditRequests(editData.agenda || '');
-      
+
       const payload = {
         title: editData.title,
         shortDescription: editData.shortDescription,
@@ -244,18 +246,18 @@ function WorkshopsManager({ editOnly = false }) {
       };
       await updateEvent(id, payload);
       showToast.success('Workshop updated successfully! Edit requests have been removed.');
-      setEditing(null); 
+      setEditing(null);
       setEditData({});
       // Reset form
       setForm({
         title: '', shortDescription: '', location: 'GUC Cairo', startDate: '', endDate: '', registrationDeadline: '',
         facultyName: '', requiredBudget: '', fundingSource: 'Grant', extraRequiredResourses: false,
-        agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'draft'
+        agenda: '', capacity: '', professors: [{ name: '', department: '' }], status: 'pending'
       });
       await refresh();
       // Redirect to professor dashboard
       navigate('/ProfessorDashboard');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to update workshop');
     }
     finally { setLoading(false); }
@@ -303,9 +305,9 @@ function WorkshopsManager({ editOnly = false }) {
         }}>{editOnly ? 'Edit Workshop' : 'Professor — Workshops'}</h1>
 
         {loadingWorkshop && (
-          <div style={{ 
-            padding: spacing.xl, 
-            textAlign: 'center', 
+          <div style={{
+            padding: spacing.xl,
+            textAlign: 'center',
             color: colors.primary,
             fontSize: typography.fontSize.base,
           }}>
@@ -314,18 +316,18 @@ function WorkshopsManager({ editOnly = false }) {
         )}
 
         {editOnly && !editing && (loadingWorkshop ? (
-          <div style={{ 
-            padding: spacing.xl, 
-            textAlign: 'center', 
+          <div style={{
+            padding: spacing.xl,
+            textAlign: 'center',
             color: colors.primary,
             fontSize: typography.fontSize.base,
           }}>
             Loading workshop for editing...
           </div>
         ) : (
-          <div style={{ 
-            padding: spacing.xl, 
-            textAlign: 'center', 
+          <div style={{
+            padding: spacing.xl,
+            textAlign: 'center',
             color: colors.error,
             fontSize: typography.fontSize.base,
           }}>
@@ -335,23 +337,23 @@ function WorkshopsManager({ editOnly = false }) {
 
         {editing ? (
           <div>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing.xl,
               marginBottom: spacing.lg,
             }}>Edit Workshop</h2>
-            <div style={{ 
-              marginBottom: spacing.xl, 
-              padding: spacing.lg, 
-              background: 'rgba(245, 158, 11, 0.1)', 
-              borderRadius: borderRadius.lg, 
-              border: `1px solid rgba(245, 158, 11, 0.3)` 
+            <div style={{
+              marginBottom: spacing.xl,
+              padding: spacing.lg,
+              background: 'rgba(245, 158, 11, 0.1)',
+              borderRadius: borderRadius.lg,
+              border: `1px solid rgba(245, 158, 11, 0.3)`
             }}>
-              <p style={{ 
-                margin: 0, 
-                color: colors.primary, 
+              <p style={{
+                margin: 0,
+                color: colors.primary,
                 fontWeight: typography.fontWeight.semibold,
                 fontSize: typography.fontSize.base,
               }}>
@@ -360,55 +362,55 @@ function WorkshopsManager({ editOnly = false }) {
             </div>
             <div className="form managerForm">
               <label>
-                <input className="input" required value={editData.title} onChange={e=>setEditData({ ...editData, title: e.target.value })} />
+                <input className="input" required value={editData.title} onChange={e => setEditData({ ...editData, title: e.target.value })} />
                 <span>Workshop Title</span>
               </label>
               <label>
-                <input className="input" value={editData.shortDescription} onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} />
+                <input className="input" value={editData.shortDescription} onChange={e => setEditData({ ...editData, shortDescription: e.target.value })} />
                 <span>Short Description</span>
               </label>
               <div className="flex grid-4">
                 <label>
-                  <select className="input" value={editData.location} onChange={e=>setEditData({ ...editData, location: e.target.value })}>
+                  <select className="input" value={editData.location} onChange={e => setEditData({ ...editData, location: e.target.value })}>
                     <option>GUC Cairo</option>
                     <option>GUC Berlin</option>
                   </select>
                   <span>Location</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " required value={editData.startDate} onChange={e=>setEditData({ ...editData, startDate: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " required value={editData.startDate} onChange={e => setEditData({ ...editData, startDate: e.target.value })} />
                   <span>Start Date/Time</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " required value={editData.endDate} onChange={e=>setEditData({ ...editData, endDate: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " required value={editData.endDate} onChange={e => setEditData({ ...editData, endDate: e.target.value })} />
                   <span>End Date/Time</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " value={editData.registrationDeadline} onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " value={editData.registrationDeadline} onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })} />
                   <span>Registration Deadline</span>
                 </label>
               </div>
               <div className="flex grid-3">
                 <label>
-                  <input className="input" required value={editData.facultyName} onChange={e=>setEditData({ ...editData, facultyName: e.target.value })} />
+                  <input className="input" required value={editData.facultyName} onChange={e => setEditData({ ...editData, facultyName: e.target.value })} />
                   <span>Faculty Name</span>
                 </label>
                 <label>
-                  <input className="input" type="number" required value={editData.requiredBudget} onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} />
+                  <input className="input" type="number" required value={editData.requiredBudget} onChange={e => setEditData({ ...editData, requiredBudget: e.target.value })} />
                   <span>Required Budget</span>
                 </label>
                 <label>
-                  <input className="input" type="number" min="0" value={editData.capacity} onChange={e=>setEditData({ ...editData, capacity: e.target.value })} />
+                  <input className="input" type="number" min="0" value={editData.capacity} onChange={e => setEditData({ ...editData, capacity: e.target.value })} />
                   <span>CAPACITY</span>
                 </label>
               </div>
               <label>
-                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={editData.agenda} onChange={e=>setEditData({ ...editData, agenda: e.target.value })} />
+                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={editData.agenda} onChange={e => setEditData({ ...editData, agenda: e.target.value })} />
                 <span>Full Agenda</span>
               </label>
               <div className="flex">
                 <label>
-                  <select className="input" value={editData.fundingSource} onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}>
+                  <select className="input" value={editData.fundingSource} onChange={e => setEditData({ ...editData, fundingSource: e.target.value })}>
                     <option value="Grant">Grant</option>
                     <option value="Sponsor">Sponsor</option>
                     <option value="External">External</option>
@@ -417,50 +419,50 @@ function WorkshopsManager({ editOnly = false }) {
                   <span>Funding Source</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" checked={!!editData.extraRequiredResourses} onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })} />
+                  <input type="checkbox" checked={!!editData.extraRequiredResourses} onChange={e => setEditData({ ...editData, extraRequiredResourses: e.target.checked })} />
                   <span>Extra Resources Required</span>
                 </label>
               </div>
               <div>
-                <div style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold, 
+                <div style={{
+                  color: colors.primary,
+                  fontWeight: typography.fontWeight.bold,
                   margin: `${spacing.sm} 0`,
                   fontSize: typography.fontSize.base,
                 }}>Professor(s) Participating</div>
                 {(editData.professors || []).map((p, idx) => (
                   <div key={idx} className="flex" style={{ gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
                     <label style={{ flex: 1 }}>
-                      <input 
-                        className="input" 
+                      <input
+                        className="input"
                         style={{ ...inputStyles.base }}
-                        value={p.name} 
-                        onChange={e=>{
+                        value={p.name}
+                        onChange={e => {
                           const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setEditData({ ...editData, professors: arr });
-                        }} 
+                        }}
                       />
                       <span>Professor Name</span>
                     </label>
                     <label style={{ flex: 1 }}>
-                      <input 
-                        className="input" 
+                      <input
+                        className="input"
                         style={{ ...inputStyles.base }}
-                        value={p.department} 
-                        onChange={e=>{
+                        value={p.department}
+                        onChange={e => {
                           const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setEditData({ ...editData, professors: arr });
-                        }} 
+                        }}
                       />
                       <span>Department</span>
                     </label>
-                    <button 
-                      type="button" 
-                      className="submit" 
-                      style={{ 
+                    <button
+                      type="button"
+                      className="submit"
+                      style={{
                         ...buttonStyles.outline,
                         padding: `${spacing.sm} ${spacing.md}`,
                       }}
-                      onClick={()=>{
-                        const arr = [...(editData.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setEditData({ ...editData, professors: arr }); }
+                      onClick={() => {
+                        const arr = [...(editData.professors || [])]; if (arr.length > 1) { arr.splice(idx, 1); setEditData({ ...editData, professors: arr }); }
                       }}
                       disabled={(editData.professors || []).length <= 1}
                       onMouseEnter={(e) => {
@@ -478,14 +480,14 @@ function WorkshopsManager({ editOnly = false }) {
                     </button>
                   </div>
                 ))}
-                <button 
-                  type="button" 
-                  className="submit" 
-                  style={{ 
+                <button
+                  type="button"
+                  className="submit"
+                  style={{
                     ...buttonStyles.primary,
                     marginBottom: spacing.md,
                   }}
-                  onClick={()=> setEditData({ ...editData, professors: [...(editData.professors || []), { name: '', department: '' }] })}
+                  onClick={() => setEditData({ ...editData, professors: [...(editData.professors || []), { name: '', department: '' }] })}
                   onMouseEnter={(e) => {
                     e.target.style.boxShadow = shadows.accentHover;
                   }}
@@ -497,11 +499,11 @@ function WorkshopsManager({ editOnly = false }) {
                 </button>
               </div>
               <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.lg }}>
-                <button 
-                  className="submit" 
-                  onClick={() => onSave(editing)} 
-                  disabled={loading} 
-                  style={{ 
+                <button
+                  className="submit"
+                  onClick={() => onSave(editing)}
+                  disabled={loading}
+                  style={{
                     ...buttonStyles.primary,
                     flex: 1,
                     opacity: loading ? 0.7 : 1,
@@ -520,10 +522,10 @@ function WorkshopsManager({ editOnly = false }) {
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>
-                <button 
-                  className="submit" 
-                  onClick={() => { setEditing(null); setEditData({}); setSearchParams({}); }} 
-                  style={{ 
+                <button
+                  className="submit"
+                  onClick={() => { setEditing(null); setEditData({}); setSearchParams({}); }}
+                  style={{
                     ...buttonStyles.outline,
                     flex: 1,
                   }}
@@ -541,64 +543,64 @@ function WorkshopsManager({ editOnly = false }) {
           </div>
         ) : (
           <div>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing.xl,
               marginBottom: spacing.lg,
             }}>Create Workshop</h2>
             <form className="form managerForm" onSubmit={onCreate}>
               <label>
-                <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
+                <input className="input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
                 <span>Workshop Title</span>
               </label>
               <label>
-                <input className="input" value={form.shortDescription} onChange={e=>setForm({ ...form, shortDescription: e.target.value })} />
+                <input className="input" value={form.shortDescription} onChange={e => setForm({ ...form, shortDescription: e.target.value })} />
                 <span>Short Description</span>
               </label>
               <div className="flex grid-4">
                 <label>
-                  <select className="input" value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })}>
+                  <select className="input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}>
                     <option>GUC Cairo</option>
                     <option>GUC Berlin</option>
                   </select>
                   <span>Location</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e=>setForm({ ...form, startDate: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
                   <span>Start Date/Time</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e=>setForm({ ...form, endDate: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
                   <span>End Date/Time</span>
                 </label>
                 <label>
-                  <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
+                  <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e => setForm({ ...form, registrationDeadline: e.target.value })} />
                   <span>Registration Deadline</span>
                 </label>
               </div>
               <div className="flex grid-3">
                 <label>
-                  <input className="input" required value={form.facultyName} onChange={e=>setForm({ ...form, facultyName: e.target.value })} />
+                  <input className="input" required value={form.facultyName} onChange={e => setForm({ ...form, facultyName: e.target.value })} />
                   <span>Faculty Name</span>
                 </label>
                 <label>
-                  <input className="input" type="number" required value={form.requiredBudget} onChange={e=>setForm({ ...form, requiredBudget: e.target.value })} />
+                  <input className="input" type="number" required value={form.requiredBudget} onChange={e => setForm({ ...form, requiredBudget: e.target.value })} />
                   <span>Required Budget</span>
                 </label>
                 <label>
-                  <input className="input" type="number" min="0" value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
+                  <input className="input" type="number" min="0" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
                   <span>CAPACITY</span>
                 </label>
               </div>
               <label>
-                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={form.agenda} onChange={e=>setForm({ ...form, agenda: e.target.value })} />
+                <textarea className="input" style={{ minHeight: 90, resize: 'vertical' }} value={form.agenda} onChange={e => setForm({ ...form, agenda: e.target.value })} />
                 <span>Full Agenda</span>
               </label>
               <div className="flex">
                 <label>
-                  <select className="input" value={form.fundingSource} onChange={e=>setForm({ ...form, fundingSource: e.target.value })}>
+                  <select className="input" value={form.fundingSource} onChange={e => setForm({ ...form, fundingSource: e.target.value })}>
                     <option value="Grant">Grant</option>
                     <option value="Sponsor">Sponsor</option>
                     <option value="External">External</option>
@@ -607,24 +609,24 @@ function WorkshopsManager({ editOnly = false }) {
                   <span>Funding Source</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="checkbox" checked={form.extraRequiredResourses} onChange={e=>setForm({ ...form, extraRequiredResourses: e.target.checked })} />
+                  <input type="checkbox" checked={form.extraRequiredResourses} onChange={e => setForm({ ...form, extraRequiredResourses: e.target.checked })} />
                   <span>Extra Resources Required</span>
                 </label>
               </div>
               <div>
-                <div style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold, 
+                <div style={{
+                  color: colors.primary,
+                  fontWeight: typography.fontWeight.bold,
                   margin: `${spacing.sm} 0`,
                   fontSize: typography.fontSize.base,
                 }}>Professor(s) Participating</div>
                 {professorInfo && form.professors?.[0]?.name && (
-                  <div style={{ 
-                    padding: `${spacing.md} ${spacing.lg}`, 
-                    background: 'linear-gradient(135deg, rgba(184, 148, 31, 0.12) 0%, rgba(184, 148, 31, 0.08) 100%)', 
-                    borderRadius: borderRadius.lg, 
-                    marginBottom: spacing.sm, 
-                    fontSize: typography.fontSize.sm, 
+                  <div style={{
+                    padding: `${spacing.md} ${spacing.lg}`,
+                    background: 'linear-gradient(135deg, rgba(184, 148, 31, 0.12) 0%, rgba(184, 148, 31, 0.08) 100%)',
+                    borderRadius: borderRadius.lg,
+                    marginBottom: spacing.sm,
+                    fontSize: typography.fontSize.sm,
                     color: colors.primary,
                     border: '2px solid rgba(184, 148, 31, 0.3)',
                     boxShadow: '0 2px 8px rgba(184, 148, 31, 0.15)',
@@ -638,36 +640,36 @@ function WorkshopsManager({ editOnly = false }) {
                 {(form.professors || []).map((p, idx) => (
                   <div key={idx} className="flex" style={{ gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
                     <label style={{ flex: 1 }}>
-                      <input 
-                        className="input" 
+                      <input
+                        className="input"
                         style={{ ...inputStyles.base }}
-                        value={p.name} 
-                        onChange={e=>{
+                        value={p.name}
+                        onChange={e => {
                           const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setForm({ ...form, professors: arr });
-                        }} 
+                        }}
                       />
                       <span>Professor Name</span>
                     </label>
                     <label style={{ flex: 1 }}>
-                      <input 
-                        className="input" 
+                      <input
+                        className="input"
                         style={{ ...inputStyles.base }}
-                        value={p.department} 
-                        onChange={e=>{
+                        value={p.department}
+                        onChange={e => {
                           const arr = [...(form.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setForm({ ...form, professors: arr });
-                        }} 
+                        }}
                       />
                       <span>Department</span>
                     </label>
-                    <button 
-                      type="button" 
-                      className="submit" 
-                      style={{ 
+                    <button
+                      type="button"
+                      className="submit"
+                      style={{
                         ...buttonStyles.outline,
                         padding: `${spacing.sm} ${spacing.md}`,
                       }}
-                      onClick={()=>{
-                        const arr = [...(form.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setForm({ ...form, professors: arr }); }
+                      onClick={() => {
+                        const arr = [...(form.professors || [])]; if (arr.length > 1) { arr.splice(idx, 1); setForm({ ...form, professors: arr }); }
                       }}
                       disabled={(form.professors || []).length <= 1}
                       onMouseEnter={(e) => {
@@ -685,14 +687,14 @@ function WorkshopsManager({ editOnly = false }) {
                     </button>
                   </div>
                 ))}
-                <button 
-                  type="button" 
-                  className="submit" 
-                  style={{ 
+                <button
+                  type="button"
+                  className="submit"
+                  style={{
                     ...buttonStyles.primary,
                     marginBottom: spacing.md,
                   }}
-                  onClick={()=> setForm({ ...form, professors: [...(form.professors || []), { name: '', department: '' }] })}
+                  onClick={() => setForm({ ...form, professors: [...(form.professors || []), { name: '', department: '' }] })}
                   onMouseEnter={(e) => {
                     e.target.style.boxShadow = shadows.accentHover;
                   }}
@@ -703,11 +705,11 @@ function WorkshopsManager({ editOnly = false }) {
                   Add Professor
                 </button>
               </div>
-              <button 
-                className="submit" 
-                type="submit" 
-                disabled={loading} 
-                style={{ 
+              <button
+                className="submit"
+                type="submit"
+                disabled={loading}
+                style={{
                   ...buttonStyles.primary,
                   opacity: loading ? 0.7 : 1,
                   cursor: loading ? 'not-allowed' : 'pointer',
@@ -731,331 +733,331 @@ function WorkshopsManager({ editOnly = false }) {
 
         {!editOnly && (
           <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing['3xl'],
               marginBottom: spacing.lg,
             }}>My Workshops</h2>
-        <div style={{ 
-          display: 'flex', 
-          gap: spacing.sm, 
-          alignItems: 'center', 
-          marginBottom: spacing.lg 
-        }}>
-          <input
-            className="input"
-            placeholder="Filter by professor name"
-            value={professorFilter}
-            onChange={e=>setProfessorFilter(e.target.value)}
-            style={{ 
-              ...inputStyles.base,
-              flex: 1 
-            }}
-          />
-        </div>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-          gap: spacing.lg 
-        }}>
-          {workshops.map((w) => (
-            <div key={w._id} style={{ 
-              border: `1px solid ${colors.gray200}`, 
-              borderRadius: borderRadius.xl, 
-              padding: spacing.lg, 
-              background: colors.white,
-              boxShadow: shadows.md,
-              transition: transitions.normal,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = shadows.lg;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = shadows.md;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            >
-              {editing === w._id ? (
-                <div>
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    value={editData.title} 
-                    onChange={e=>setEditData({ ...editData, title: e.target.value })} 
-                    placeholder="Title" 
-                  />
-                  <select 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    value={editData.location} 
-                    onChange={e=>setEditData({ ...editData, location: e.target.value })}
-                  >
-                    <option>GUC Cairo</option>
-                    <option>GUC Berlin</option>
-                  </select>
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    type="datetime-local" 
-                    placeholder=" " 
-                    value={editData.startDate} 
-                    onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
-                  />
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    type="datetime-local" 
-                    value={editData.endDate} 
-                    onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
-                  />
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    type="datetime-local" 
-                    placeholder=" " 
-                    value={editData.registrationDeadline} 
-                    onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
-                  />
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    value={editData.facultyName} 
-                    onChange={e=>setEditData({ ...editData, facultyName: e.target.value })} 
-                    placeholder="Faculty Name" 
-                  />
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    type="number" 
-                    value={editData.requiredBudget} 
-                    onChange={e=>setEditData({ ...editData, requiredBudget: e.target.value })} 
-                    placeholder="Required Budget" 
-                  />
-                  <input 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    type="number" 
-                    min="0" 
-                    value={editData.capacity} 
-                    onChange={e=>setEditData({ ...editData, capacity: e.target.value })} 
-                    placeholder="CAPACITY" 
-                  />
-                  <select 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm 
-                    }} 
-                    value={editData.fundingSource} 
-                    onChange={e=>setEditData({ ...editData, fundingSource: e.target.value })}
-                  >
-                    <option value="Grant">Grant</option>
-                    <option value="Sponsor">Sponsor</option>
-                    <option value="External">External</option>
-                    <option value="Internal">Internal</option>
-                  </select>
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: spacing.sm, 
-                    marginBottom: spacing.sm 
-                  }}>
-                    <input 
-                      type="checkbox" 
-                      checked={!!editData.extraRequiredResourses} 
-                      onChange={e=>setEditData({ ...editData, extraRequiredResourses: e.target.checked })} 
-                    />
-                    <span style={{ fontSize: typography.fontSize.sm }}>Extra Resources Required</span>
-                  </label>
-                  <textarea 
-                    className="input" 
-                    style={{ 
-                      ...inputStyles.base,
-                      marginBottom: spacing.sm, 
-                      minHeight: 80 
-                    }} 
-                    placeholder="Full Agenda" 
-                    value={editData.agenda} 
-                    onChange={e=>setEditData({ ...editData, agenda: e.target.value })} 
-                  />
-                  <div style={{ 
-                    color: colors.primary, 
-                    fontWeight: typography.fontWeight.bold, 
-                    margin: `${spacing.sm} 0`,
-                    fontSize: typography.fontSize.base,
-                  }}>Professor(s) Participating</div>
-                  {(editData.professors || []).map((p, idx) => (
-                    <div key={idx} className="flex" style={{ gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
-                      <label style={{ flex: 1 }}>
-                        <input 
-                          className="input" 
-                          style={{ ...inputStyles.base }}
-                          value={p.name} 
-                          onChange={e=>{
-                            const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setEditData({ ...editData, professors: arr });
-                          }} 
-                        />
-                        <span>Professor Name</span>
-                      </label>
-                      <label style={{ flex: 1 }}>
-                        <input 
-                          className="input" 
-                          style={{ ...inputStyles.base }}
-                          value={p.department} 
-                          onChange={e=>{
-                            const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setEditData({ ...editData, professors: arr });
-                          }} 
-                        />
-                        <span>Department</span>
-                      </label>
-                      <button 
-                        type="button" 
-                        className="submit" 
-                        style={{ 
-                          ...buttonStyles.outline,
-                          padding: `${spacing.sm} ${spacing.md}`,
+            <div style={{
+              display: 'flex',
+              gap: spacing.sm,
+              alignItems: 'center',
+              marginBottom: spacing.lg
+            }}>
+              <input
+                className="input"
+                placeholder="Filter by professor name"
+                value={professorFilter}
+                onChange={e => setProfessorFilter(e.target.value)}
+                style={{
+                  ...inputStyles.base,
+                  flex: 1
+                }}
+              />
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: spacing.lg
+            }}>
+              {workshops.map((w) => (
+                <div key={w._id} style={{
+                  border: `1px solid ${colors.gray200}`,
+                  borderRadius: borderRadius.xl,
+                  padding: spacing.lg,
+                  background: colors.white,
+                  boxShadow: shadows.md,
+                  transition: transitions.normal,
+                }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.lg;
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.md;
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  {editing === w._id ? (
+                    <div>
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
                         }}
-                        onClick={()=>{
-                          const arr = [...(editData.professors || [])]; if (arr.length > 1) { arr.splice(idx,1); setEditData({ ...editData, professors: arr }); }
+                        value={editData.title}
+                        onChange={e => setEditData({ ...editData, title: e.target.value })}
+                        placeholder="Title"
+                      />
+                      <select
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
                         }}
-                        disabled={(editData.professors || []).length <= 1}
+                        value={editData.location}
+                        onChange={e => setEditData({ ...editData, location: e.target.value })}
+                      >
+                        <option>GUC Cairo</option>
+                        <option>GUC Berlin</option>
+                      </select>
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        type="datetime-local"
+                        placeholder=" "
+                        value={editData.startDate}
+                        onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        type="datetime-local"
+                        value={editData.endDate}
+                        onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        type="datetime-local"
+                        placeholder=" "
+                        value={editData.registrationDeadline}
+                        onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        value={editData.facultyName}
+                        onChange={e => setEditData({ ...editData, facultyName: e.target.value })}
+                        placeholder="Faculty Name"
+                      />
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        type="number"
+                        value={editData.requiredBudget}
+                        onChange={e => setEditData({ ...editData, requiredBudget: e.target.value })}
+                        placeholder="Required Budget"
+                      />
+                      <input
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        type="number"
+                        min="0"
+                        value={editData.capacity}
+                        onChange={e => setEditData({ ...editData, capacity: e.target.value })}
+                        placeholder="CAPACITY"
+                      />
+                      <select
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm
+                        }}
+                        value={editData.fundingSource}
+                        onChange={e => setEditData({ ...editData, fundingSource: e.target.value })}
+                      >
+                        <option value="Grant">Grant</option>
+                        <option value="Sponsor">Sponsor</option>
+                        <option value="External">External</option>
+                        <option value="Internal">Internal</option>
+                      </select>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        marginBottom: spacing.sm
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!!editData.extraRequiredResourses}
+                          onChange={e => setEditData({ ...editData, extraRequiredResourses: e.target.checked })}
+                        />
+                        <span style={{ fontSize: typography.fontSize.sm }}>Extra Resources Required</span>
+                      </label>
+                      <textarea
+                        className="input"
+                        style={{
+                          ...inputStyles.base,
+                          marginBottom: spacing.sm,
+                          minHeight: 80
+                        }}
+                        placeholder="Full Agenda"
+                        value={editData.agenda}
+                        onChange={e => setEditData({ ...editData, agenda: e.target.value })}
+                      />
+                      <div style={{
+                        color: colors.primary,
+                        fontWeight: typography.fontWeight.bold,
+                        margin: `${spacing.sm} 0`,
+                        fontSize: typography.fontSize.base,
+                      }}>Professor(s) Participating</div>
+                      {(editData.professors || []).map((p, idx) => (
+                        <div key={idx} className="flex" style={{ gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
+                          <label style={{ flex: 1 }}>
+                            <input
+                              className="input"
+                              style={{ ...inputStyles.base }}
+                              value={p.name}
+                              onChange={e => {
+                                const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], name: e.target.value }; setEditData({ ...editData, professors: arr });
+                              }}
+                            />
+                            <span>Professor Name</span>
+                          </label>
+                          <label style={{ flex: 1 }}>
+                            <input
+                              className="input"
+                              style={{ ...inputStyles.base }}
+                              value={p.department}
+                              onChange={e => {
+                                const arr = [...(editData.professors || [])]; arr[idx] = { ...arr[idx], department: e.target.value }; setEditData({ ...editData, professors: arr });
+                              }}
+                            />
+                            <span>Department</span>
+                          </label>
+                          <button
+                            type="button"
+                            className="submit"
+                            style={{
+                              ...buttonStyles.outline,
+                              padding: `${spacing.sm} ${spacing.md}`,
+                            }}
+                            onClick={() => {
+                              const arr = [...(editData.professors || [])]; if (arr.length > 1) { arr.splice(idx, 1); setEditData({ ...editData, professors: arr }); }
+                            }}
+                            disabled={(editData.professors || []).length <= 1}
+                            onMouseEnter={(e) => {
+                              if ((editData.professors || []).length > 1) {
+                                e.target.style.background = colors.gray100;
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if ((editData.professors || []).length > 1) {
+                                e.target.style.background = 'transparent';
+                              }
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="submit"
+                        style={{
+                          ...buttonStyles.primary,
+                          marginBottom: spacing.md,
+                        }}
+                        onClick={() => setEditData({ ...editData, professors: [...(editData.professors || []), { name: '', department: '' }] })}
                         onMouseEnter={(e) => {
-                          if ((editData.professors || []).length > 1) {
-                            e.target.style.background = colors.gray100;
-                          }
+                          e.target.style.boxShadow = shadows.accentHover;
                         }}
                         onMouseLeave={(e) => {
-                          if ((editData.professors || []).length > 1) {
-                            e.target.style.background = 'transparent';
-                          }
+                          e.target.style.boxShadow = shadows.accent;
                         }}
                       >
-                        Remove
+                        Add Professor
+                      </button>
+                      <div style={{ display: 'flex', gap: spacing.sm }}>
+                        <button
+                          className="submit"
+                          onClick={() => onSave(w._id)}
+                          style={{
+                            ...buttonStyles.primary,
+                            flex: 1,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.boxShadow = shadows.accentHover;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.boxShadow = shadows.accent;
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="submit"
+                          onClick={() => setEditing(null)}
+                          style={{
+                            ...buttonStyles.outline,
+                            flex: 1,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = colors.gray100;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = 'transparent';
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        fontWeight: typography.fontWeight.extrabold,
+                        color: colors.primary,
+                        fontSize: typography.fontSize.lg,
+                        marginBottom: spacing.sm,
+                      }}>
+                        {w.title}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginBottom: spacing.xs,
+                      }}>
+                        📍 {w.location} • {w.facultyName}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginBottom: spacing.md,
+                      }}>
+                        From {new Date(w.startDate).toLocaleString()} to {w.endDate ? new Date(w.endDate).toLocaleString() : '—'}
+                      </div>
+                      <button
+                        className="submit"
+                        onClick={() => navigate(`/professor/workshops/edit/${w._id}`)}
+                        style={{
+                          ...buttonStyles.primary,
+                          width: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.boxShadow = shadows.accentHover;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.boxShadow = shadows.accent;
+                        }}
+                      >
+                        Edit
                       </button>
                     </div>
-                  ))}
-                  <button 
-                    type="button" 
-                    className="submit" 
-                    style={{ 
-                      ...buttonStyles.primary,
-                      marginBottom: spacing.md,
-                    }}
-                    onClick={()=> setEditData({ ...editData, professors: [...(editData.professors || []), { name: '', department: '' }] })}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
-                  >
-                    Add Professor
-                  </button>
-                  <div style={{ display: 'flex', gap: spacing.sm }}>
-                    <button 
-                      className="submit" 
-                      onClick={() => onSave(w._id)} 
-                      style={{ 
-                        ...buttonStyles.primary,
-                        flex: 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.boxShadow = shadows.accentHover;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.boxShadow = shadows.accent;
-                      }}
-                    >
-                      Save
-                    </button>
-                    <button 
-                      className="submit" 
-                      onClick={() => setEditing(null)} 
-                      style={{ 
-                        ...buttonStyles.outline,
-                        flex: 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = colors.gray100;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <div>
-                  <div style={{ 
-                    fontWeight: typography.fontWeight.extrabold, 
-                    color: colors.primary,
-                    fontSize: typography.fontSize.lg,
-                    marginBottom: spacing.sm,
-                  }}>
-                    {w.title}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.xs,
-                  }}>
-                    📍 {w.location} • {w.facultyName}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.md,
-                  }}>
-                    From {new Date(w.startDate).toLocaleString()} to {w.endDate ? new Date(w.endDate).toLocaleString() : '—'}
-                  </div>
-                  <button 
-                    className="submit" 
-                    onClick={() => navigate(`/professor/workshops/edit/${w._id}`)} 
-                    style={{ 
-                      ...buttonStyles.primary,
-                      width: '100%',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
               ))}
             </div>
           </>

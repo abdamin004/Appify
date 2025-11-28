@@ -23,20 +23,20 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
       return new Set();
     }
   });
-  
+
   // Only show back button when on the /events route, not when embedded in dashboards
   const showBackButton = location.pathname === '/events';
 
   // Get role-based event types if filterByTypes is not provided
   const getRoleBasedEventTypes = () => {
     if (filterByTypes !== null) return filterByTypes; // Use provided filter
-    
+
     try {
       const userData = localStorage.getItem("user");
       if (!userData) return null; // No user, show all
       const user = JSON.parse(userData);
       const role = (user.role || '').toLowerCase();
-      
+
       switch (role) {
         case "student":
         case "staff":
@@ -130,11 +130,11 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
       const token = localStorage.getItem('token');
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      
+
       const response = await fetch(`${endpoint}?${queryParams}`, { headers });
       const data = await response.json();
       let list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      
+
       // Add frontend-approved workshops (draft workshops that were approved)
       try {
         const approvedSet = getApprovedWorkshops();
@@ -144,7 +144,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
           const sortData = await sortRes.json();
           if (Array.isArray(sortData)) {
             const approvedWorkshops = sortData.filter(
-              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'draft'
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
             );
             // Mark them as published for display
             approvedWorkshops.forEach(w => { w.status = 'published'; });
@@ -157,7 +157,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
       } catch (e) {
         console.log('Error adding approved workshops:', e);
       }
-      
+
       // Filter events based on user restrictions (frontend-only)
       const filteredList = list.filter(event => {
         const eventId = event._id || event.id;
@@ -168,7 +168,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         }
         return hasAccess;
       });
-      
+
       setEvents(filteredList);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -206,7 +206,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     .filter((event) => {
       // Handle archived events based on props
       const isArchived = archivedEventsSet.has(event._id) || event.status === 'completed';
-      
+
       if (showArchivedOnly) {
         // Only show archived events
         if (!isArchived) return false;
@@ -215,7 +215,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         if (isArchived) return false;
       }
       // If neither showArchivedOnly nor hideArchived, EventOffice can see all events (original behavior)
-      
+
       // Filter for upcoming events only
       if (filters.upcomingOnly) {
         const eventStartDate = event.startDate ? new Date(event.startDate) : null;
@@ -223,7 +223,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
           return false;
         }
       }
-      
+
       if (effectiveFilterByTypes && !effectiveFilterByTypes.includes(event.type)) return false;
       if (filters.type && event.type !== filters.type) return false;
       if (filters.search) {
@@ -269,7 +269,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     } else {
       const confirmed = await confirmDialog('Archive this event? It will be hidden from the event list.', 'Archive Event');
       if (!confirmed) return;
-      
+
       // Frontend-only archiving - add to localStorage
       try {
         const stored = localStorage.getItem('archivedEvents');
@@ -294,7 +294,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     } else {
       const confirmed = await confirmDialog('Unarchive this event? It will be visible in the event list again.', 'Unarchive Event');
       if (!confirmed) return;
-      
+
       // Frontend-only unarchiving - remove from localStorage
       try {
         const stored = localStorage.getItem('archivedEvents');
@@ -359,7 +359,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         }}
       />
 
-      
+
 
       <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['4xl']} ${spacing['7xl']}`, position: "relative", zIndex: 1 }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
@@ -393,11 +393,11 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
           {/* Header */}
           <div style={{ textAlign: "center", marginBottom: spacing['5xl'], position: 'relative' }}>
             {headerAction && (
-              <div style={{ 
-                position: 'absolute', 
-                left: 0, 
-                top: '50%', 
-                transform: 'translateY(-50%)' 
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)'
               }}>
                 {headerAction}
               </div>
@@ -414,19 +414,19 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
             >
               {showArchivedOnly ? 'Archived Events' : 'Upcoming Events'}
             </h1>
-            <p style={{ 
-              fontSize: typography.fontSize.xl, 
-              color: colors.accent, 
+            <p style={{
+              fontSize: typography.fontSize.xl,
+              color: colors.accent,
               lineHeight: typography.lineHeight.relaxed,
-              opacity: 0.95 
+              opacity: 0.95
             }}>
-              {showArchivedOnly 
+              {showArchivedOnly
                 ? 'View and manage archived events'
-                : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar","Booth"].includes(t))
-                ? 'Discover bazaars and booths'
-                : effectiveFilterByTypes && effectiveFilterByTypes.some(t => ["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"].includes(t))
-                ? 'Discover workshops, trips, conferences, gym sessions, bazaars, and booths'
-                : 'Discover workshops, trips, conferences, bazaars, and more'}
+                : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar", "Booth"].includes(t))
+                  ? 'Discover bazaars and booths'
+                  : effectiveFilterByTypes && effectiveFilterByTypes.some(t => ["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"].includes(t))
+                    ? 'Discover workshops, trips, conferences, gym sessions, bazaars, and booths'
+                    : 'Discover workshops, trips, conferences, bazaars, and more'}
             </p>
           </div>
 
@@ -504,20 +504,20 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                 {
                   effectiveFilterByTypes
                     ? effectiveFilterByTypes.map((t) => (
-                        <option key={t} value={t}>
-                          {t === 'Bazaar' ? '🏪 Bazaar' : t === 'Booth' ? '🎪 Booth' : t === 'GymSession' ? '💪 Gym Session' : t}
-                        </option>
-                      ))
+                      <option key={t} value={t}>
+                        {t === 'Bazaar' ? '🏪 Bazaar' : t === 'Booth' ? '🎪 Booth' : t === 'GymSession' ? '💪 Gym Session' : t}
+                      </option>
+                    ))
                     : (
-                        <>
-                          <option value="Workshop">🛠️ Workshop</option>
-                          <option value="Trip">🚌 Trip</option>
-                          <option value="Bazaar">🏪 Bazaar</option>
-                          <option value="Booth">🎪 Booth</option>
-                          <option value="Conference">🎤 Conference</option>
-                          <option value="GymSession">💪 Gym Session</option>
-                        </>
-                      )
+                      <>
+                        <option value="Workshop">🛠️ Workshop</option>
+                        <option value="Trip">🚌 Trip</option>
+                        <option value="Bazaar">🏪 Bazaar</option>
+                        <option value="Booth">🎪 Booth</option>
+                        <option value="Conference">🎤 Conference</option>
+                        <option value="GymSession">💪 Gym Session</option>
+                      </>
+                    )
                 }
               </select>
 
@@ -565,10 +565,10 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs, minWidth: "160px" }}>
-                <label style={{ 
-                  fontSize: typography.fontSize.xs, 
-                  color: colors.gray600, 
-                  fontWeight: typography.fontWeight.medium 
+                <label style={{
+                  fontSize: typography.fontSize.xs,
+                  color: colors.gray600,
+                  fontWeight: typography.fontWeight.medium
                 }}>
                   Start Date
                 </label>
@@ -593,10 +593,10 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs, minWidth: "160px" }}>
-                <label style={{ 
-                  fontSize: typography.fontSize.xs, 
-                  color: colors.gray600, 
-                  fontWeight: typography.fontWeight.medium 
+                <label style={{
+                  fontSize: typography.fontSize.xs,
+                  color: colors.gray600,
+                  fontWeight: typography.fontWeight.medium
                 }}>
                   End Date
                 </label>
@@ -622,10 +622,10 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs, minWidth: "160px" }}>
-                <label style={{ 
-                  fontSize: typography.fontSize.xs, 
-                  color: colors.gray600, 
-                  fontWeight: typography.fontWeight.medium 
+                <label style={{
+                  fontSize: typography.fontSize.xs,
+                  color: colors.gray600,
+                  fontWeight: typography.fontWeight.medium
                 }}>
                   Sort by
                 </label>
@@ -653,9 +653,9 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               </div>
 
               {/* Upcoming Only Filter */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: spacing.sm,
                 minWidth: "160px",
                 padding: `${spacing.sm} 0`,
@@ -674,11 +674,11 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                     accentColor: colors.accent,
                   }}
                 />
-                <label 
+                <label
                   htmlFor="upcomingOnly"
-                  style={{ 
-                    fontSize: typography.fontSize.base, 
-                    color: colors.gray700, 
+                  style={{
+                    fontSize: typography.fontSize.base,
+                    color: colors.gray700,
                     fontWeight: typography.fontWeight.medium,
                     cursor: 'pointer',
                     userSelect: 'none',
@@ -773,8 +773,8 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               >
                 No events found
               </p>
-              <p style={{ 
-                fontSize: typography.fontSize.lg, 
+              <p style={{
+                fontSize: typography.fontSize.lg,
                 color: colors.gray500,
                 lineHeight: typography.lineHeight.normal,
               }}>

@@ -1,5 +1,5 @@
 const Event = require('../models/Event');
-const Vendor = require('../models/Vendor'); 
+const Vendor = require('../models/Vendor');
 const VendorApplication = require('../models/VendorApplication');
 const User = require('../models/User');
 const Workshop = require('../models/Workshop');
@@ -22,96 +22,96 @@ const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'Even
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
-  try {
-    if (!Array.isArray(events) || events.length === 0) return events;
-    const ids = events.map(e => e && e._id).filter(Boolean);
-    const apps = await VendorApplication.find({ event: { $in: ids }, status: 'approved' })
-      .populate('vendorUser', 'companyName email')
-      .select('event organization status vendorUser');
-    const byEvent = new Map();
-    for (const a of apps) {
-      const key = String(a.event);
-      if (!byEvent.has(key)) byEvent.set(key, []);
-      byEvent.get(key).push({
-        organization: a.organization,
-        vendorCompany: a.vendorUser && a.vendorUser.companyName,
-        vendorEmail: a.vendorUser && a.vendorUser.email,
-        status: a.status,
-      });
+    try {
+        if (!Array.isArray(events) || events.length === 0) return events;
+        const ids = events.map(e => e && e._id).filter(Boolean);
+        const apps = await VendorApplication.find({ event: { $in: ids }, status: 'approved' })
+            .populate('vendorUser', 'companyName email')
+            .select('event organization status vendorUser');
+        const byEvent = new Map();
+        for (const a of apps) {
+            const key = String(a.event);
+            if (!byEvent.has(key)) byEvent.set(key, []);
+            byEvent.get(key).push({
+                organization: a.organization,
+                vendorCompany: a.vendorUser && a.vendorUser.companyName,
+                vendorEmail: a.vendorUser && a.vendorUser.email,
+                status: a.status,
+            });
+        }
+        return events.map(e => {
+            if (!e) return e;
+            const isBazaarOrBooth = e.type === 'Bazaar' || e.type === 'Booth';
+            if (!isBazaarOrBooth) return e;
+            const key = String(e._id);
+            const participants = byEvent.get(key) || [];
+            // Ensure plain object so we can append fields safely
+            const obj = typeof e.toObject === 'function' ? e.toObject() : { ...e };
+            obj.participants = participants;
+            obj.participantsCount = participants.length;
+            return obj;
+        });
+    } catch (err) {
+        // In case of error, return original events
+        return events;
     }
-    return events.map(e => {
-      if (!e) return e;
-      const isBazaarOrBooth = e.type === 'Bazaar' || e.type === 'Booth';
-      if (!isBazaarOrBooth) return e;
-      const key = String(e._id);
-      const participants = byEvent.get(key) || [];
-      // Ensure plain object so we can append fields safely
-      const obj = typeof e.toObject === 'function' ? e.toObject() : { ...e };
-      obj.participants = participants;
-      obj.participantsCount = participants.length;
-      return obj;
-    });
-  } catch (err) {
-    // In case of error, return original events
-    return events;
-  }
 }
 
 function qualifiesForExternalVisitors(event) {
-  if (!event) return { allowed: false };
-  if (event.type === 'Bazaar') {
-    return { allowed: true, category: 'Bazaar' };
-  }
-  const haystack = [
-    event.category || '',
-    event.title || '',
-    Array.isArray(event.tags) ? event.tags.join(' ') : ''
-  ]
-    .join(' ')
-    .toLowerCase();
+    if (!event) return { allowed: false };
+    if (event.type === 'Bazaar') {
+        return { allowed: true, category: 'Bazaar' };
+    }
+    const haystack = [
+        event.category || '',
+        event.title || '',
+        Array.isArray(event.tags) ? event.tags.join(' ') : ''
+    ]
+        .join(' ')
+        .toLowerCase();
 
-  if (haystack.includes('career') && haystack.includes('fair')) {
-    return { allowed: true, category: 'CareerFair' };
-  }
+    if (haystack.includes('career') && haystack.includes('fair')) {
+        return { allowed: true, category: 'CareerFair' };
+    }
 
-  return { allowed: false };
+    return { allowed: false };
 }
 
 function parseAllowedRoles(input) {
-  if (input === undefined) return null;
-  if (input === null) return [];
+    if (input === undefined) return null;
+    if (input === null) return [];
 
-  let list;
-  if (Array.isArray(input)) {
-    list = input;
-  } else if (typeof input === 'string') {
-    const trimmed = input.trim();
-    if (!trimmed) return [];
-    list = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
-  } else {
-    return null;
-  }
-
-  if (list.length === 0) return [];
-
-  const normalized = [];
-  list.forEach((role) => {
-    if (!role) return;
-    const match = USER_ROLE_OPTIONS.find(
-      (opt) => opt.toLowerCase() === role.toString().toLowerCase()
-    );
-    if (match && !normalized.includes(match)) {
-      normalized.push(match);
+    let list;
+    if (Array.isArray(input)) {
+        list = input;
+    } else if (typeof input === 'string') {
+        const trimmed = input.trim();
+        if (!trimmed) return [];
+        list = trimmed.split(',').map((part) => part.trim()).filter(Boolean);
+    } else {
+        return null;
     }
-  });
 
-  if (normalized.length === 0) {
-    throw new Error(
-      `allowedRoles contains invalid values. Valid options: ${USER_ROLE_OPTIONS.join(', ')}`
-    );
-  }
+    if (list.length === 0) return [];
 
-  return normalized;
+    const normalized = [];
+    list.forEach((role) => {
+        if (!role) return;
+        const match = USER_ROLE_OPTIONS.find(
+            (opt) => opt.toLowerCase() === role.toString().toLowerCase()
+        );
+        if (match && !normalized.includes(match)) {
+            normalized.push(match);
+        }
+    });
+
+    if (normalized.length === 0) {
+        throw new Error(
+            `allowedRoles contains invalid values. Valid options: ${USER_ROLE_OPTIONS.join(', ')}`
+        );
+    }
+
+    return normalized;
 }
 
 module.exports = {
@@ -120,7 +120,9 @@ module.exports = {
         try {
             const { id } = req.params;
             if (!ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid event id' });
-            const event = await Event.findById(id).populate({ path: 'vendors', options: { strictPopulate: false } });
+            const event = await Event.findById(id)
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email' });
             if (!event) return res.status(404).json({ message: 'Event not found' });
             res.json(event);
         } catch (err) {
@@ -143,7 +145,7 @@ module.exports = {
                 vendors,
                 capacity,
                 status,
-                registrationDeadline, 
+                registrationDeadline,
                 professors,
                 facultyName,
                 requiredBudget,
@@ -159,7 +161,7 @@ module.exports = {
                 durationMinutes,
                 prerequisites
             } = req.body;
-        
+
             const eventData = {
                 title,
                 shortDescription,
@@ -185,7 +187,7 @@ module.exports = {
 
             switch (type) {
                 case 'Workshop':
-                    event = await Workshop.create({...eventData, professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses});
+                    event = await Workshop.create({ ...eventData, professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses });
                     const eventOffice = await User.find({ role: 'EventOffice' });
                     eventOffice.forEach(office => {
                         office.notifications.push({
@@ -197,19 +199,19 @@ module.exports = {
                     });
                     break;
                 case 'Trip':
-                    event = await Trip.create({...eventData, price});
+                    event = await Trip.create({ ...eventData, price });
                     break;
-                case 'Bazaar':  
-                    event = await Bazaar.create({...eventData, vendors});
+                case 'Bazaar':
+                    event = await Bazaar.create({ ...eventData, vendors });
                     break;
                 case 'Booth':
-                    event = await Booth.create({...eventData, vendors});
+                    event = await Booth.create({ ...eventData, vendors });
                     break;
                 case 'Conference':
-                    event = await Conference.create({...eventData, websiteLink, requiredBudget, fundingSource, extraRequiredResourses});
+                    event = await Conference.create({ ...eventData, websiteLink, requiredBudget, fundingSource, extraRequiredResourses });
                     break;
                 case 'GymSession':
-                    event = await GymSession.create({...eventData, sessionType, instructor, equipment, difficulty, durationMinutes, prerequisites});
+                    event = await GymSession.create({ ...eventData, sessionType, instructor, equipment, difficulty, durationMinutes, prerequisites });
                     break;
                 default:
                     event = await Event.create(eventData);
@@ -276,7 +278,7 @@ module.exports = {
         }
     },
 
-    async filterEvents(req, res) { 
+    async filterEvents(req, res) {
         try {
             const { category, location, type, startDate, professorName } = req.query;
             const base = { status: 'published' };
@@ -288,15 +290,15 @@ module.exports = {
             let events;
             if (startDate) {
                 events = await Event.find({ ...base, startDate: { $gte: new Date(startDate) } })
-                  .populate({ path: 'vendors', options: { strictPopulate: false } })
-                  .sort({ startDate: 1 })
-                  .exec();
+                    .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .sort({ startDate: 1 })
+                    .exec();
             } else {
                 // No startDate filter provided: include all published events (past and future)
                 events = await Event.find(base)
-                  .populate({ path: 'vendors', options: { strictPopulate: false } })
-                  .sort({ startDate: 1 })
-                  .exec();
+                    .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .sort({ startDate: 1 })
+                    .exec();
             }
 
             const enriched = await attachApprovedParticipants(events);
@@ -347,9 +349,13 @@ module.exports = {
     async getMyWorkshops(req, res) {
         try {
             const professorId = req.user._id;
+            console.log('Fetching workshops for professor:', professorId);
             const workshops = await Workshop.find({ createdBy: professorId });
+            console.log('Found workshops:', workshops.length, 'workshops');
+            console.log('Workshop statuses:', workshops.map(w => ({ title: w.title, status: w.status })));
             res.status(200).json(workshops);
         } catch (err) {
+            console.error('Error in getMyWorkshops:', err);
             res.status(500).json({ error: err.message });
         }
     },// Add this to your eventController.js
@@ -419,52 +425,52 @@ module.exports = {
             // Find the event
             const event = await Event.findById(eventId);
             if (!event) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    message: 'Event not found' 
+                    message: 'Event not found'
                 });
             }
 
             // Check if event has already started
             if (new Date(event.startDate) <= new Date()) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'Cannot register for an event that has already started' 
+                    message: 'Cannot register for an event that has already started'
                 });
             }
 
             // Check if registration deadline has passed
             if (event.registrationDeadline && new Date(event.registrationDeadline) < new Date()) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'Registration deadline has passed' 
+                    message: 'Registration deadline has passed'
                 });
             }
 
-        
+
 
             // Check if event is at capacity
             if (event.capacity && event.registeredUsers && event.registeredUsers.length >= event.capacity) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'Event is at full capacity' 
+                    message: 'Event is at full capacity'
                 });
             }
 
             // Check if user is already registered
             if (event.registeredUsers && event.registeredUsers.includes(userId)) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'You are already registered for this event' 
+                    message: 'You are already registered for this event'
                 });
             }
 
             // Find the user
             const user = await User.findById(userId);
             if (!user) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    message: 'User not found' 
+                    message: 'User not found'
                 });
             }
 
@@ -479,9 +485,9 @@ module.exports = {
 
             // Check if user already registered
             if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'You are already registered for this event' 
+                    message: 'You are already registered for this event'
                 });
             }
 
@@ -507,9 +513,10 @@ module.exports = {
             });
 
         } catch (err) {
-            res.status(500).json({ 
+            console.error('Registration error:', err);
+            res.status(500).json({
                 success: false,
-                message: err.message 
+                message: err.message
             });
         }
     },
@@ -522,34 +529,34 @@ module.exports = {
             // Find the event
             const event = await Event.findById(eventId);
             if (!event) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    message: 'Event not found' 
+                    message: 'Event not found'
                 });
             }
 
             // Check if event has already started
             if (new Date(event.startDate) <= new Date()) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'Cannot unregister from an event that has already started' 
+                    message: 'Cannot unregister from an event that has already started'
                 });
             }
 
             // Check if user is registered
             if (!event.registeredUsers || !event.registeredUsers.includes(userId)) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     success: false,
-                    message: 'You are not registered for this event' 
+                    message: 'You are not registered for this event'
                 });
             }
 
             // Find the user
             const user = await User.findById(userId);
             if (!user) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     success: false,
-                    message: 'User not found' 
+                    message: 'User not found'
                 });
             }
 
@@ -571,16 +578,17 @@ module.exports = {
             });
 
         } catch (err) {
-            res.status(500).json({ 
+            console.error('Unregistration error:', err);
+            res.status(500).json({
                 success: false,
-                message: err.message 
+                message: err.message
             });
         }
     },
 
     async updateEvent(req, res) {
         try {
-            const {id} = req.params;
+            const { id } = req.params;
             const event = await Event.findById(id).populate('registeredUsers', 'email firstName lastName');
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
@@ -588,7 +596,7 @@ module.exports = {
             if (event.startDate <= new Date()) {
                 return res.status(400).json({ error: 'Cannot update an event that has already started' });
             }
-            
+
             // Store original values for comparison (especially for gym sessions)
             const originalEvent = {
                 status: event.status,
@@ -599,9 +607,9 @@ module.exports = {
                 instructor: event.instructor,
                 capacity: event.capacity
             };
-            
+
             const {
-                title, shortDescription, description, category, tags, startDate, endDate, 
+                title, shortDescription, description, category, tags, startDate, endDate,
                 location, capacity, status, registrationDeadline,
                 professors, facultyName, requiredBudget, fundingSource, extraRequiredResourses,
                 price, websiteLink, vendors,
@@ -663,7 +671,7 @@ module.exports = {
 
             const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true })
                 .populate({ path: 'vendors', options: { strictPopulate: false } });
-            
+
             // Send email notifications for gym sessions
             if (event.type === 'GymSession' && event.registeredUsers && event.registeredUsers.length > 0) {
                 // Check if session was cancelled
@@ -679,12 +687,12 @@ module.exports = {
                             }
                         });
                     await Promise.allSettled(emailPromises);
-                } 
+                }
                 // Check if session was edited (not cancelled)
                 else if (status !== 'cancelled' && originalEvent.status !== 'cancelled') {
                     // Detect changes - only check fields that were actually provided in the request
                     const changes = [];
-                    
+
                     if (startDate !== undefined) {
                         const newStart = new Date(startDate).getTime();
                         const oldStart = new Date(originalEvent.startDate).getTime();
@@ -692,7 +700,7 @@ module.exports = {
                             changes.push(`Start date changed to ${new Date(startDate).toLocaleString()}`);
                         }
                     }
-                    
+
                     if (endDate !== undefined) {
                         const newEnd = new Date(endDate).getTime();
                         const oldEnd = originalEvent.endDate ? new Date(originalEvent.endDate).getTime() : null;
@@ -700,23 +708,23 @@ module.exports = {
                             changes.push(`End date changed to ${new Date(endDate).toLocaleString()}`);
                         }
                     }
-                    
+
                     if (location !== undefined && location !== originalEvent.location) {
                         changes.push(`Location changed to ${location}`);
                     }
-                    
+
                     if (sessionType !== undefined && sessionType !== originalEvent.sessionType) {
                         changes.push(`Session type changed to ${sessionType}`);
                     }
-                    
+
                     if (instructor !== undefined && instructor !== originalEvent.instructor) {
                         changes.push(`Instructor changed to ${instructor}`);
                     }
-                    
+
                     if (capacity !== undefined && capacity !== originalEvent.capacity) {
                         changes.push(`Capacity changed to ${capacity}`);
                     }
-                    
+
                     // Only send update email if there are actual changes
                     if (changes.length > 0) {
                         const emailPromises = event.registeredUsers
@@ -732,7 +740,7 @@ module.exports = {
                     }
                 }
             }
-            
+
             res.status(200).json({
                 success: true,
                 message: 'Event updated successfully',
@@ -904,7 +912,7 @@ module.exports = {
 
     async deleteEvent(req, res) {
         try {
-            const {id} = req.params;
+            const { id } = req.params;
             const event = await Event.findById(id);
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
@@ -912,7 +920,7 @@ module.exports = {
             if (event.startDate <= new Date()) {
                 return res.status(400).json({ error: 'Cannot delete an event that has already started' });
             }
-            
+
             switch (event.type) {
                 case 'Workshop':
                     await Workshop.findByIdAndDelete(id);
@@ -938,15 +946,15 @@ module.exports = {
         }
     },
     async publishEvent(req, res) {
-    try {
-        const { id } = req.params;
-        const event = await Event.findById(id);
-        if (!event) {
-            return res.status(404).json({ success: false, message: 'Event not found' });
-        }
+        try {
+            const { id } = req.params;
+            const event = await Event.findById(id);
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
 
-        event.status = 'published';
-        await event.save();
+            event.status = 'published';
+            await event.save();
 
         //  New Event Published notification
         try {
@@ -959,33 +967,30 @@ module.exports = {
         } catch (notifyErr) {
             // don't fail the request because of a notification error
         }
-        res.status(200).json({
-            success: true,
-            message: 'Event published successfully',
-            event
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
+
+        res.status(200).json({ success: true, message: 'Event published successfully', event });
+        } catch (err) {
+            res.status(500).json({ success: false, error: err.message });
+        }
     },
     async addComment(req, res) {
         try {
             const { eventId } = req.params;
             const { content } = req.body;
             const userId = req.user._id;
-            
+
             // First check if the event exists
             const eventObj = await Event.findById(eventId);
             if (!eventObj) {
                 return res.status(404).json({ success: false, message: 'Event not found' });
             }
-            
+
             // Check if the user is registered/attending this event before creating comment
             // Assuming event has a registeredUsers array of user IDs
             if (!eventObj.registeredUsers || !eventObj.registeredUsers.some(u => u.toString() === userId.toString())) {
                 return res.status(403).json({ success: false, message: 'You must be registered for this event to comment.' });
             }
-            
+
             // Only create comment if validation passes
             const comment = await Comment.create({ content, event: eventId, user: userId });
             res.status(201).json({ success: true, message: 'Comment added successfully', comment });
@@ -1004,7 +1009,7 @@ module.exports = {
     },
     async getEventComments(req, res) {
         try {
-            const eventId  = req.params.id;
+            const eventId = req.params.id;
 
             // Make sure event exists
             const event = await Event.findById(eventId);
@@ -1034,7 +1039,7 @@ module.exports = {
 
     async getEventRatings(req, res) {
         try {
-            const eventId  = req.params.id;
+            const eventId = req.params.id;
 
             // Make sure event exists
             const event = await Event.findById(eventId);
@@ -1069,7 +1074,7 @@ module.exports = {
         }
     },
 
-   
+
 
     // Wrapper function for route /:id/ratings (maps id to eventId)
     async addEventRating(req, res) {

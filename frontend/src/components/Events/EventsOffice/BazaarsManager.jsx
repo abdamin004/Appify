@@ -33,7 +33,7 @@ function BazaarsManager({ editOnly = false }) {
       const url = new URL(window.location.href);
       url.searchParams.delete('edit');
       window.history.replaceState({}, '', url.toString());
-    } catch (_) {}
+    } catch (_) { }
   };
 
   async function refresh() {
@@ -60,9 +60,9 @@ function BazaarsManager({ editOnly = false }) {
           title: bazaar.title || '',
           shortDescription: bazaar.shortDescription || '',
           location: bazaar.location || '',
-          startDate: bazaar.startDate ? bazaar.startDate.slice(0,16) : '',
-          endDate: bazaar.endDate ? bazaar.endDate.slice(0,16) : '',
-          registrationDeadline: bazaar.registrationDeadline ? bazaar.registrationDeadline.slice(0,16) : '',
+          startDate: bazaar.startDate ? bazaar.startDate.slice(0, 16) : '',
+          endDate: bazaar.endDate ? bazaar.endDate.slice(0, 16) : '',
+          registrationDeadline: bazaar.registrationDeadline ? bazaar.registrationDeadline.slice(0, 16) : '',
           status: bazaar.status || 'published'
         });
         setAllowedRoles(Array.isArray(bazaar.allowedRoles) ? bazaar.allowedRoles : []);
@@ -122,7 +122,7 @@ function BazaarsManager({ editOnly = false }) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(bazaarEvent);
       }
-      
+
       await refresh();
       // Redirect to Event Office dashboard
       navigate('/EventOfficeDashboard');
@@ -153,7 +153,7 @@ function BazaarsManager({ editOnly = false }) {
       };
       await updateEvent(id, payload);
       showToast.success('Bazaar updated successfully');
-      setEditing(null); 
+      setEditing(null);
       setEditData({});
       setAllowedRoles([]);
       clearEditParam();
@@ -173,15 +173,15 @@ function BazaarsManager({ editOnly = false }) {
       padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
     }}>
       <div style={{ position: 'relative' }}>
-        <div style={{ 
-          position: 'absolute', 
-          top: -40, 
-          right: -40, 
-          width: 260, 
-          height: 260, 
-          background: 'rgba(212,175,55,0.12)', 
-          borderRadius: '50%', 
-          filter: 'blur(60px)' 
+        <div style={{
+          position: 'absolute',
+          top: -40,
+          right: -40,
+          width: 260,
+          height: 260,
+          background: 'rgba(212,175,55,0.12)',
+          borderRadius: '50%',
+          filter: 'blur(60px)'
         }} />
       </div>
       <div style={{
@@ -227,10 +227,10 @@ function BazaarsManager({ editOnly = false }) {
 
         {!editOnly && (
           <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing.xl,
               marginBottom: spacing.lg,
             }}>Create Bazaar</h2>
@@ -316,9 +316,9 @@ function BazaarsManager({ editOnly = false }) {
                 paddingBottom: spacing.lg,
                 borderBottom: `2px solid ${colors.gray200}`,
               }}>
-                <h2 style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold, 
+                <h2 style={{
+                  color: colors.primary,
+                  fontWeight: typography.fontWeight.bold,
                   fontSize: typography.fontSize.xl,
                   margin: 0,
                 }}>✏️ Edit Bazaar</h2>
@@ -326,105 +326,105 @@ function BazaarsManager({ editOnly = false }) {
               <div style={{ display: 'grid', gap: spacing.lg }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Title *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.title} 
-                      onChange={e=>setEditData({ ...editData, title: e.target.value })} 
+                    <input
+                      className="input"
+                      required
+                      value={editData.title}
+                      onChange={e => setEditData({ ...editData, title: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Short Description</span>
-                    <input 
-                      className="input" 
-                      value={editData.shortDescription} 
-                      onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} 
+                    <input
+                      className="input"
+                      value={editData.shortDescription}
+                      onChange={e => setEditData({ ...editData, shortDescription: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Start Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.startDate} 
-                      onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      required
+                      value={editData.startDate}
+                      onChange={e => setEditData({ ...editData, startDate: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>End Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.endDate} 
-                      onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      required
+                      value={editData.endDate}
+                      onChange={e => setEditData({ ...editData, endDate: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Location *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.location} 
-                      onChange={e=>setEditData({ ...editData, location: e.target.value })} 
+                    <input
+                      className="input"
+                      required
+                      value={editData.location}
+                      onChange={e => setEditData({ ...editData, location: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Registration Deadline</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      value={editData.registrationDeadline} 
-                      onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      value={editData.registrationDeadline}
+                      onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
@@ -441,11 +441,11 @@ function BazaarsManager({ editOnly = false }) {
                   paddingTop: spacing.lg,
                   borderTop: `1px solid ${colors.gray200}`,
                 }}>
-                  <button 
-                    type="button" 
-                    onClick={() => onSave(editing)} 
+                  <button
+                    type="button"
+                    onClick={() => onSave(editing)}
                     disabled={loading}
-                    style={{ 
+                    style={{
                       ...buttonStyles.primary,
                       flex: 1,
                       padding: `${spacing.md} ${spacing.xl}`,
@@ -476,89 +476,89 @@ function BazaarsManager({ editOnly = false }) {
 
         {!editOnly && (
           <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing['3xl'],
               marginBottom: spacing.lg,
             }}>Existing Bazaars</h2>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-              gap: spacing.lg 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: spacing.lg
             }}>
               {bazaars.map((bz) => (
-            <div key={bz._id} style={{ 
-              border: `1px solid ${colors.gray200}`, 
-              borderRadius: borderRadius.xl, 
-              padding: spacing.lg, 
-              background: colors.white,
-              boxShadow: shadows.md,
-              transition: transitions.normal,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = shadows.lg;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = shadows.md;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            >
-              {editing !== bz._id && (
-                <div>
-                  <div style={{ 
-                    fontWeight: typography.fontWeight.extrabold, 
-                    color: colors.primary,
-                    fontSize: typography.fontSize.lg,
-                    marginBottom: spacing.sm,
-                  }}>
-                    {bz.title}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray700, 
-                    fontSize: typography.fontSize.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    {bz.shortDescription || '—'}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs, 
-                    marginTop: spacing.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    📍 {bz.location}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.md,
-                  }}>
-                    From {new Date(bz.startDate).toLocaleString()} to {bz.endDate ? new Date(bz.endDate).toLocaleString() : '—'}
-                  </div>
-                  <button 
-                    className="submit" 
-                    onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)} 
-                    style={{ 
-                      ...buttonStyles.primary,
-                      width: '100%',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
-                  >
-                    Edit
-                  </button>
+                <div key={bz._id} style={{
+                  border: `1px solid ${colors.gray200}`,
+                  borderRadius: borderRadius.xl,
+                  padding: spacing.lg,
+                  background: colors.white,
+                  boxShadow: shadows.md,
+                  transition: transitions.normal,
+                }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.lg;
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.md;
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  {editing !== bz._id && (
+                    <div>
+                      <div style={{
+                        fontWeight: typography.fontWeight.extrabold,
+                        color: colors.primary,
+                        fontSize: typography.fontSize.lg,
+                        marginBottom: spacing.sm,
+                      }}>
+                        {bz.title}
+                      </div>
+                      <div style={{
+                        color: colors.gray700,
+                        fontSize: typography.fontSize.sm,
+                        marginBottom: spacing.xs,
+                      }}>
+                        {bz.shortDescription || '—'}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginTop: spacing.sm,
+                        marginBottom: spacing.xs,
+                      }}>
+                        📍 {bz.location}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginBottom: spacing.md,
+                      }}>
+                        From {new Date(bz.startDate).toLocaleString()} to {bz.endDate ? new Date(bz.endDate).toLocaleString() : '—'}
+                      </div>
+                      <button
+                        className="submit"
+                        onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)}
+                        style={{
+                          ...buttonStyles.primary,
+                          width: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.boxShadow = shadows.accentHover;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.boxShadow = shadows.accent;
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
           </>
         )}
       </div>
