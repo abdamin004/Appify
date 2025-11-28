@@ -3,8 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createGymSession, listGymSessions, updateGymSession, cancelGymSession, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast, confirmDialog } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -47,7 +46,7 @@ function GymSessionsManager({ editOnly = false }) {
     instructor: '',
     capacity: '',
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
@@ -107,6 +106,7 @@ function GymSessionsManager({ editOnly = false }) {
           instructor: session.instructor || '',
           capacity: session.capacity || '',
         });
+        setAllowedRoles(Array.isArray(session.allowedRoles) ? session.allowedRoles : []);
         setEditing(id);
       } else {
         showToast.error('Gym session not found');
@@ -159,19 +159,15 @@ function GymSessionsManager({ editOnly = false }) {
         capacity: Number(form.capacity || 0),
         sessionType: form.sessionType,
         instructor: form.instructor,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
       };
       const createdSession = await createGymSession(payload);
       showToast.success('Gym session created successfully');
       
-      // Save user restrictions if any
       const sessionEvent = createdSession?.event || createdSession;
-      const eventId = sessionEvent?._id || sessionEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        setRestrictedUsers(eventId, restrictedUserIds);
-      }
       
       setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (sessionEvent && (sessionEvent.status === 'published' || payload.status === 'published')) {
@@ -201,6 +197,7 @@ function GymSessionsManager({ editOnly = false }) {
       instructor: row.instructor || '',
       capacity: (row.capacity ?? '').toString(),
     });
+    setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
   };
 
   const onSave = async (id) => {
@@ -215,10 +212,12 @@ function GymSessionsManager({ editOnly = false }) {
         instructor: editData.instructor,
         capacity: Number(editData.capacity || 0),
         durationMinutes: Number(editData.duration || 0),
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
       });
       showToast.success('Gym session updated successfully');
       setEditing(null); 
       setEditData({});
+      setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
@@ -351,10 +350,10 @@ function GymSessionsManager({ editOnly = false }) {
               <span>Instructor</span>
             </label>
           </div>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 
@@ -523,6 +522,11 @@ function GymSessionsManager({ editOnly = false }) {
                     />
                   </label>
                 </div>
+                <RoleSelector 
+                  selectedRoles={allowedRoles}
+                  onChange={setAllowedRoles}
+                  label="Restrict Event to Specific Roles"
+                />
                 <div style={{ 
                   display: 'flex', 
                   gap: spacing.md, 

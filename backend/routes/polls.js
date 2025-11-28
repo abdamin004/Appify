@@ -27,14 +27,7 @@ router.get(
   pollController.listPolls
 );
 
-// Get a specific poll
-router.get(
-  '/:pollId',
-  auth,
-  pollController.getPoll
-);
-
-// Vote on a poll (Student/Staff/TA/Professor)
+// Vote on a poll (Student/Staff/TA/Professor) - must come before /:pollId
 router.post(
   '/:pollId/vote',
   auth,
@@ -42,12 +35,27 @@ router.post(
   pollController.voteOnPoll
 );
 
-// Close/complete a poll (EventOffice only)
+// Close/complete a poll (EventOffice only) - must come before /:pollId
 router.patch(
   '/:pollId/close',
   auth,
   roleCheck('EventOffice', 'Admin'),
   pollController.closePoll
+);
+
+// Delete a poll (EventOffice only) - must come before /:pollId GET
+router.delete(
+  '/:pollId',
+  auth,
+  roleCheck('EventOffice', 'Admin'),
+  pollController.deletePoll
+);
+
+// Get a specific poll - must come last
+router.get(
+  '/:pollId',
+  auth,
+  pollController.getPoll
 );
 
 module.exports = router;

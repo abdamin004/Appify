@@ -3,8 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createBooth, listBooths, updateEvent, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -42,7 +41,7 @@ function BoothsManager() {
     registrationDeadline: '',
     status: 'published',
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -60,18 +59,17 @@ function BoothsManager() {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
-      const createdBooth = await createBooth(form);
+      const payload = {
+        ...form,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
+      const createdBooth = await createBooth(payload);
       showToast.success('Booth created successfully');
       
-      // Save user restrictions if any
       const boothEvent = createdBooth?.event || createdBooth;
-      const eventId = boothEvent?._id || boothEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        setRestrictedUsers(eventId, restrictedUserIds);
-      }
       
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (boothEvent && (boothEvent.status === 'published' || form.status === 'published')) {
@@ -206,10 +204,10 @@ function BoothsManager() {
               <span>Registration Deadline</span>
             </label>
           </div>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 

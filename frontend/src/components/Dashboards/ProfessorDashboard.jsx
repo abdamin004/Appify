@@ -131,13 +131,13 @@ function ProfessorDashboard() {
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
-      
+
       // Filter out restricted events that user can't access
       const accessibleEvents = publishedEvents.filter(e => {
         const eventId = e._id || e.id;
         return canUserAccessEvent(eventId);
       });
-      
+
       const seenIds = getSeenEventIds();
       const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
@@ -152,11 +152,11 @@ function ProfessorDashboard() {
         if (rawUser) {
           const u = JSON.parse(rawUser);
           const professorId = u && (u._id || u.id);
-          
+
           newEvents.forEach(event => {
             const eventId = String(event._id || event.id);
             const eventType = event.type || 'Event';
-            
+
             if (professorId) {
               createProfessorNotification(professorId, {
                 type: 'NewEvent',
@@ -210,33 +210,33 @@ function ProfessorDashboard() {
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      
+
       if (!res.ok) return;
-      
+
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
-      
+
       const rawUser = localStorage.getItem('user');
       if (!rawUser) return;
       const u = JSON.parse(rawUser);
       const userId = u && (u._id || u.id);
       if (!userId) return;
-      
+
       const sentReminders = getSentReminders(userId);
       const now = new Date();
-      
+
       events.forEach(event => {
         if (!event.startDate) return;
-        
+
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
         const eventTitle = event.title || 'Event';
         const eventType = event.type || 'Event';
-        
+
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
         const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
-        
+
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
           markReminderSent(userId, oneDayReminderId);
           createReminderNotification({
@@ -248,7 +248,7 @@ function ProfessorDashboard() {
             reminderType: '1day',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -261,11 +261,11 @@ function ProfessorDashboard() {
             }
           }
         }
-        
+
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
         const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
-        
+
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
           markReminderSent(userId, oneHourReminderId);
           createReminderNotification({
@@ -277,7 +277,7 @@ function ProfessorDashboard() {
             reminderType: '1hour',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -291,7 +291,7 @@ function ProfessorDashboard() {
           }
         }
       });
-      
+
       fetchReminders();
       fetchNotifications();
     } catch (err) {
@@ -312,7 +312,7 @@ function ProfessorDashboard() {
         const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
         setBannerMsg(`${m1}${amtTxt}.${email}`);
         setTimeout(() => setBannerMsg(''), 6000);
-      } catch (_) {}
+      } catch (_) { }
     };
     window.addEventListener('wallet:updated', onWallet);
     window.addEventListener('payment:success', onPaymentSuccess);
@@ -331,8 +331,8 @@ function ProfessorDashboard() {
         const status = params.get('status');
         const eventId = params.get('eventId');
         if (sessionId) {
-          try { await confirmStripeReceipt(sessionId); } catch (_) {}
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          try { await confirmStripeReceipt(sessionId); } catch (_) { }
+          try { await fetchRegisteredEvents(); } catch (_) { }
           const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
           setBannerMsg(`Payment successful.${email}`);
           setTimeout(() => setBannerMsg(''), 6000);
@@ -340,8 +340,8 @@ function ProfessorDashboard() {
           url.searchParams.delete('session_id');
           window.history.replaceState({}, document.title, url.toString());
         } else if (status === 'success') {
-          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) {}
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) { }
+          try { await fetchRegisteredEvents(); } catch (_) { }
           setBannerMsg('Payment successful.');
           setTimeout(() => setBannerMsg(''), 6000);
           const url = new URL(window.location.href);
@@ -349,7 +349,7 @@ function ProfessorDashboard() {
           url.searchParams.delete('eventId');
           window.history.replaceState({}, document.title, url.toString());
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, [user]);
 
@@ -386,8 +386,8 @@ function ProfessorDashboard() {
   };
 
   useEffect(() => {
-    if (activeTab === "my-workshops" && myWorkshops.length === 0) {
-      fetchMyWorkshops();
+    if (activeTab === "my-workshops") {
+      fetchMyWorkshops(); // Always refetch to ensure we get latest status
     } else if (activeTab === "registered" && registeredEvents.length === 0) {
       fetchRegisteredEvents();
     } else if (activeTab === 'favourites') {
@@ -428,11 +428,12 @@ function ProfessorDashboard() {
       const url = `${API_BASE}/events/workshops/mine?professorId=${encodeURIComponent(professorId)}`;
       const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) {
-        try { const err = await res.json(); console.error('fetchMyWorkshops failed:', err); } catch (_) {}
+        try { const err = await res.json(); console.error('fetchMyWorkshops failed:', err); } catch (_) { }
         setMyWorkshops([]);
         return;
       }
       const data = await res.json();
+      console.log('Fetched workshops:', data); // Debug log
       setMyWorkshops(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching my workshops:", err);
@@ -463,7 +464,7 @@ function ProfessorDashboard() {
       clearTimeout(timeoutId);
       
       if (!res.ok) {
-        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
         return;
       }
@@ -798,18 +799,18 @@ function ProfessorDashboard() {
           {/* Content */}
           {activeTab === "browse" && <EventsList enableFavorites={true} />}
           {activeTab === "registered" && (
-            <MyEventsList 
+            <MyEventsList
               events={registeredEvents.filter(event => {
                 const eventId = event._id || event.id;
                 if (!eventId) return true;
                 return canUserAccessEvent(eventId);
-              })} 
-              showRefundButton 
+              })}
+              showRefundButton
             />
           )}
           {activeTab === "my-workshops" && <WorkshopParticipantsView workshops={myWorkshops} />}
           {activeTab === 'favourites' && <MyEventsList events={favouriteEvents} />}
-          
+
           {activeTab === "gym-sessions" && (
             <div
               style={{
@@ -820,8 +821,8 @@ function ProfessorDashboard() {
                 border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold,
@@ -829,38 +830,38 @@ function ProfessorDashboard() {
                 Gym Sessions
               </h2>
               {gymSessionsLoading ? (
-                <div style={{ 
+                <div style={{
                   textAlign: "center",
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>Loading sessions...</p>
                 </div>
               ) : gymSessionsError ? (
-                <div style={{ 
-                  color: colors.error, 
-                  background: colors.errorLight, 
-                  padding: spacing.lg, 
+                <div style={{
+                  color: colors.error,
+                  background: colors.errorLight,
+                  padding: spacing.lg,
                   borderRadius: borderRadius.xl,
                   marginBottom: spacing.lg,
                 }}>{gymSessionsError}</div>
               ) : (!gymSessions || gymSessions.length === 0) ? (
-                <div style={{ 
+                <div style={{
                   textAlign: "center",
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No gym sessions scheduled</p>
                 </div>
               ) : (() => {
                 const typeMap = {
-                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba', 
+                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba',
                   crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
                 };
                 const byMonth = (gymSessions || []).reduce((acc, s) => {
@@ -914,35 +915,35 @@ function ProfessorDashboard() {
                       const typeKeys = Object.keys(byType).sort();
                       return (
                         <div key={month}>
-                          <div style={{ 
-                            background: colors.bgCard, 
-                            padding: `${spacing.lg} ${spacing.xl}`, 
-                            borderRadius: borderRadius.xl, 
+                          <div style={{
+                            background: colors.bgCard,
+                            padding: `${spacing.lg} ${spacing.xl}`,
+                            borderRadius: borderRadius.xl,
                             boxShadow: shadows.md,
                             border: `1px solid ${colors.gray200}`,
                           }}>
-                            <h3 style={{ 
-                              margin: 0, 
+                            <h3 style={{
+                              margin: 0,
                               color: colors.primary,
                               fontSize: typography.fontSize.xl,
                               fontWeight: typography.fontWeight.bold,
                             }}>{month}</h3>
-                            <div style={{ 
-                              display: 'grid', 
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-                              gap: spacing.lg, 
-                              marginTop: spacing.lg 
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                              gap: spacing.lg,
+                              marginTop: spacing.lg
                             }}>
                               {typeKeys.map((tk) => (
-                                <div key={tk} style={{ 
-                                  background: colors.white, 
-                                  border: `1px solid ${colors.gray200}`, 
-                                  borderRadius: borderRadius.xl, 
-                                  padding: spacing.lg 
+                                <div key={tk} style={{
+                                  background: colors.white,
+                                  border: `1px solid ${colors.gray200}`,
+                                  borderRadius: borderRadius.xl,
+                                  padding: spacing.lg
                                 }}>
-                                  <div style={{ 
-                                    fontWeight: typography.fontWeight.extrabold, 
-                                    color: colors.primary, 
+                                  <div style={{
+                                    fontWeight: typography.fontWeight.extrabold,
+                                    color: colors.primary,
                                     marginBottom: spacing.sm,
                                     fontSize: typography.fontSize.base,
                                   }}>{tk}</div>
@@ -962,24 +963,24 @@ function ProfessorDashboard() {
                                           return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                         };
                                         return (
-                                          <li key={id} style={{ 
-                                            padding: `${spacing.sm} 0`, 
-                                            borderTop: `1px solid ${colors.gray100}` 
+                                          <li key={id} style={{
+                                            padding: `${spacing.sm} 0`,
+                                            borderTop: `1px solid ${colors.gray100}`
                                           }}>
-                                            <div style={{ 
-                                              display:'flex', 
-                                              justifyContent:'space-between', 
-                                              alignItems:'center', 
-                                              gap: spacing.lg 
+                                            <div style={{
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                              alignItems: 'center',
+                                              gap: spacing.lg
                                             }}>
                                               <div>
-                                                <div style={{ 
+                                                <div style={{
                                                   fontSize: typography.fontSize.sm,
                                                   fontWeight: typography.fontWeight.medium,
                                                   color: colors.gray700,
                                                 }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{ 
-                                                  fontSize: typography.fontSize.xs, 
+                                                <div style={{
+                                                  fontSize: typography.fontSize.xs,
                                                   color: colors.gray500,
                                                   marginTop: spacing.xs,
                                                 }}>
@@ -1016,10 +1017,10 @@ function ProfessorDashboard() {
                                               </div>
                                             </div>
                                             {gymStatus[id] && gymStatus[id].msg && (
-                                              <div style={{ 
-                                                marginTop: spacing.sm, 
-                                                fontSize: typography.fontSize.xs, 
-                                                color: gymStatus[id].ok ? colors.success : colors.error 
+                                              <div style={{
+                                                marginTop: spacing.sm,
+                                                fontSize: typography.fontSize.xs,
+                                                color: gymStatus[id].ok ? colors.success : colors.error
                                               }}>
                                                 {gymStatus[id].msg}
                                               </div>
@@ -1040,7 +1041,7 @@ function ProfessorDashboard() {
               })()}
             </div>
           )}
-          
+
           {activeTab === "reminders" && (
             <div
               style={{
@@ -1052,8 +1053,8 @@ function ProfessorDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold
@@ -1109,9 +1110,9 @@ function ProfessorDashboard() {
                           <div style={{ flex: 1 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                              <h3 style={{ 
-                                color: colors.primary, 
-                                margin: 0, 
+                              <h3 style={{
+                                color: colors.primary,
+                                margin: 0,
                                 fontSize: typography.fontSize.lg,
                                 fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
@@ -1128,8 +1129,8 @@ function ProfessorDashboard() {
                                 }} />
                               )}
                             </div>
-                            <p style={{ 
-                              color: colors.gray500, 
+                            <p style={{
+                              color: colors.gray500,
                               margin: `${spacing.sm} 0`,
                               fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                               fontSize: typography.fontSize.base
@@ -1137,8 +1138,8 @@ function ProfessorDashboard() {
                               {reminder.message}
                             </p>
                             {reminder.eventStartDate && (
-                              <p style={{ 
-                                color: colors.gray400, 
+                              <p style={{
+                                color: colors.gray400,
                                 fontSize: typography.fontSize.sm,
                                 margin: `${spacing.xs} 0`,
                               }}>
@@ -1160,8 +1161,8 @@ function ProfessorDashboard() {
                                 View Event
                               </button>
                             )}
-                            <p style={{ 
-                              color: colors.gray400, 
+                            <p style={{
+                              color: colors.gray400,
                               fontSize: typography.fontSize.sm,
                               margin: `${spacing.sm} 0 0 0`,
                             }}>
@@ -1269,8 +1270,8 @@ function ProfessorDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold
@@ -1377,9 +1378,9 @@ function ProfessorDashboard() {
                             {notif.type === 'WorkshopRejected' && (
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>❌</span>
                             )}
-                            <h3 style={{ 
-                              color: colors.primary, 
-                              margin: 0, 
+                            <h3 style={{
+                              color: colors.primary,
+                              margin: 0,
                               fontSize: typography.fontSize.lg,
                               fontWeight: notif.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
@@ -1396,16 +1397,16 @@ function ProfessorDashboard() {
                               }} />
                             )}
                           </div>
-                          <p style={{ 
-                            color: colors.gray500, 
+                          <p style={{
+                            color: colors.gray500,
                             margin: `${spacing.sm} 0`,
                             fontWeight: notif.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base
                           }}>
                             {notif.message}
                           </p>
-                          <p style={{ 
-                            color: colors.gray400, 
+                          <p style={{
+                            color: colors.gray400,
                             fontSize: typography.fontSize.sm,
                             margin: `${spacing.sm} 0 0 0`,
                           }}>
@@ -1491,8 +1492,8 @@ function ProfessorDashboard() {
                 boxShadow: shadows.lg,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold
@@ -1514,27 +1515,27 @@ function ProfessorDashboard() {
                       }}
                     >
                       <div style={{ marginBottom: spacing.lg }}>
-                        <h3 style={{ 
-                          color: colors.primary, 
-                          marginBottom: spacing.md, 
+                        <h3 style={{
+                          color: colors.primary,
+                          marginBottom: spacing.md,
                           fontSize: typography.fontSize.xl,
                           fontWeight: typography.fontWeight.bold
                         }}>
                           {workshop.title}
                         </h3>
-                        <div style={{ 
-                          display: "grid", 
-                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
-                          gap: spacing.md, 
-                          marginTop: spacing.lg 
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                          gap: spacing.md,
+                          marginTop: spacing.lg
                         }}>
                           <div>
                             <strong style={{ color: colors.primary }}>Status:</strong>{" "}
-                            <span style={{ 
-                              color: workshop.status === 'draft' ? colors.warning : workshop.status === 'published' ? colors.success : colors.gray500,
+                            <span style={{
+                              color: workshop.status === 'pending' ? colors.warning : workshop.status === 'published' ? colors.success : colors.gray500,
                               fontWeight: typography.fontWeight.semibold
                             }}>
-                              {workshop.status === 'draft' ? 'Pending Approval' : workshop.status === 'published' ? 'Published' : workshop.status}
+                              {workshop.status === 'pending' ? 'Pending Approval' : workshop.status === 'published' ? 'Published' : workshop.status}
                             </span>
                           </div>
                           <div>
@@ -1551,11 +1552,11 @@ function ProfessorDashboard() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div style={{ marginTop: spacing.xl }}>
-                        <h4 style={{ 
-                          color: colors.primary, 
-                          marginBottom: spacing.lg, 
+                        <h4 style={{
+                          color: colors.primary,
+                          marginBottom: spacing.lg,
                           fontSize: typography.fontSize.lg,
                           fontWeight: typography.fontWeight.bold
                         }}>
@@ -1573,8 +1574,8 @@ function ProfessorDashboard() {
                             }}
                           >
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
-                              <strong style={{ 
-                                color: colors.warning, 
+                              <strong style={{
+                                color: colors.warning,
                                 fontSize: typography.fontSize.sm,
                                 fontWeight: typography.fontWeight.semibold
                               }}>
@@ -1584,10 +1585,10 @@ function ProfessorDashboard() {
                                 {editRequest.timestamp}
                               </span>
                             </div>
-                            <p style={{ 
-                              color: colors.gray700, 
-                              margin: 0, 
-                              lineHeight: typography.lineHeight.relaxed, 
+                            <p style={{
+                              color: colors.gray700,
+                              margin: 0,
+                              lineHeight: typography.lineHeight.relaxed,
                               whiteSpace: "pre-wrap",
                               fontSize: typography.fontSize.base
                             }}>
@@ -1596,7 +1597,7 @@ function ProfessorDashboard() {
                           </div>
                         ))}
                       </div>
-                      
+
                       <div style={{ marginTop: spacing.lg, display: "flex", gap: spacing.md }}>
                         <button
                           onClick={() => navigate(`/professor/workshops?edit=${workshop._id}`)}

@@ -25,6 +25,7 @@ import {
   markReminderSent,
   createReminderNotification
 } from "../../services/notificationService";
+import userService from "../../services/userService";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, pillButtonStyles, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 import WalletBadge from "../Wallet/WalletBadge";
@@ -188,10 +189,54 @@ function StudentDashboard() {
     return () => window.removeEventListener('newEventCreated', handleNewEvent);
   }, []);
 
-  const fetchNotifications = () => {
+  const fetchNotifications = async () => {
     try {
-      const notifs = getStudentNotifications();
-      setNotifications(notifs);
+      // Fetch backend notifications (system-wide notifications with per-user status)
+      let backendNotifs = [];
+      try {
+        const backendRes = await userService.getMyNotifications();
+        backendNotifs = Array.isArray(backendRes?.notifications) ? backendRes.notifications : [];
+      } catch (backendErr) {
+        // If backend fails, continue with localStorage only
+        console.error('Error fetching backend notifications:', backendErr);
+      }
+      
+      // Fetch localStorage notifications (legacy/local notifications)
+      const localNotifs = getStudentNotifications();
+      
+      // Mark backend notifications with source identifier
+      const markedBackendNotifs = backendNotifs.map(n => ({
+        ...n,
+        source: 'system' // Mark as backend notification
+      }));
+      
+      // Mark local notifications with source identifier
+      const markedLocalNotifs = localNotifs.map(n => ({
+        ...n,
+        source: 'user' // Mark as local notification
+      }));
+      
+      // Combine both, filtering out duplicates by ID
+      const allNotifs = [...markedBackendNotifs];
+      markedLocalNotifs.forEach(localNotif => {
+        const exists = allNotifs.some(n => {
+          const nId = String(n._id || n.id || '');
+          const localId = String(localNotif._id || localNotif.id || '');
+          return nId && localId && nId === localId;
+        });
+        if (!exists) {
+          allNotifs.push(localNotif);
+        }
+      });
+      
+      // Sort by creation date (newest first)
+      allNotifs.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.date || 0);
+        const dateB = new Date(b.createdAt || b.date || 0);
+        return dateB - dateA;
+      });
+      
+      setNotifications(allNotifs);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);
@@ -1398,9 +1443,21 @@ function StudentDashboard() {
                         <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                           {!notif.isRead && (
                             <button
-                              onClick={() => {
-                                markStudentNotificationRead(notif.id);
-                                fetchNotifications();
+                              onClick={async () => {
+                                try {
+                                  // Check if this is a backend notification (has _id and source is 'system')
+                                  if (notif._id && notif.source === 'system') {
+                                    // Mark as read in backend using per-user status
+                                    await userService.markNotificationRead(notif._id);
+                                    showToast.success('Notification marked as read');
+                                  } else {
+                                    // Mark as read in localStorage (legacy notifications)
+                                    markStudentNotificationRead(notif.id || notif._id);
+                                  }
+                                  fetchNotifications();
+                                } catch (err) {
+                                  showToast.error(err.message || 'Failed to mark notification as read');
+                                }
                               }}
                               style={{
                                 ...pillButtonStyles.success,
@@ -1411,9 +1468,21 @@ function StudentDashboard() {
                             </button>
                           )}
                           <button
-                            onClick={() => {
-                              deleteStudentNotification(notif.id);
-                              fetchNotifications();
+                            onClick={async () => {
+                              try {
+                                // Check if this is a backend notification (has _id and source is 'system')
+                                if (notif._id && notif.source === 'system') {
+                                  // Delete from backend using per-user status
+                                  await userService.deleteNotification(notif._id);
+                                  showToast.success('Notification deleted');
+                                } else {
+                                  // Delete from localStorage (legacy notifications)
+                                  deleteStudentNotification(notif.id || notif._id);
+                                }
+                                fetchNotifications();
+                              } catch (err) {
+                                showToast.error(err.message || 'Failed to delete notification');
+                              }
                             }}
                             style={{
                               padding: `${spacing.xs} ${spacing.md}`,

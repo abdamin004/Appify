@@ -3,8 +3,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../../Form.css';
 import '../../managerForm.css';
 import { createBazaar, listBazaars, updateEvent, getEventById } from '../../../services/eventService';
-import UserSelector from '../UserSelector';
-import { setRestrictedUsers } from '../../../services/eventRestrictionService';
+import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
 
@@ -23,7 +22,7 @@ function BazaarsManager({ editOnly = false }) {
     registrationDeadline: '',
     status: 'published',
   });
-  const [restrictedUserIds, setRestrictedUserIds] = useState([]);
+  const [allowedRoles, setAllowedRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [bazaars, setBazaars] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
@@ -34,14 +33,14 @@ function BazaarsManager({ editOnly = false }) {
       const url = new URL(window.location.href);
       url.searchParams.delete('edit');
       window.history.replaceState({}, '', url.toString());
-    } catch (_) {}
+    } catch (_) { }
   };
 
   async function refresh() {
     if (!editOnly) {
-      const rows = await listBazaars();
-      setBazaars(rows);
-    }
+    const rows = await listBazaars();
+    setBazaars(rows);
+  }
   }
   useEffect(() => { refresh(); }, [editOnly]);
 
@@ -61,11 +60,12 @@ function BazaarsManager({ editOnly = false }) {
           title: bazaar.title || '',
           shortDescription: bazaar.shortDescription || '',
           location: bazaar.location || '',
-          startDate: bazaar.startDate ? bazaar.startDate.slice(0,16) : '',
-          endDate: bazaar.endDate ? bazaar.endDate.slice(0,16) : '',
-          registrationDeadline: bazaar.registrationDeadline ? bazaar.registrationDeadline.slice(0,16) : '',
+          startDate: bazaar.startDate ? bazaar.startDate.slice(0, 16) : '',
+          endDate: bazaar.endDate ? bazaar.endDate.slice(0, 16) : '',
+          registrationDeadline: bazaar.registrationDeadline ? bazaar.registrationDeadline.slice(0, 16) : '',
           status: bazaar.status || 'published'
         });
+        setAllowedRoles(Array.isArray(bazaar.allowedRoles) ? bazaar.allowedRoles : []);
         setEditing(id);
       } else {
         showToast.error('Bazaar not found');
@@ -104,25 +104,25 @@ function BazaarsManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const createdBazaar = await createBazaar(form);
+      // Include allowedRoles in the form data
+      const payload = {
+        ...form,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
+      const createdBazaar = await createBazaar(payload);
       showToast.success('Bazaar created successfully');
       
-      // Save user restrictions if any
       const bazaarEvent = createdBazaar?.event || createdBazaar;
-      const eventId = bazaarEvent?._id || bazaarEvent?.id;
-      if (eventId && restrictedUserIds.length > 0) {
-        setRestrictedUsers(eventId, restrictedUserIds);
-      }
       
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
-      setRestrictedUserIds([]);
+      setAllowedRoles([]);
       
       // Create notifications for all users if event is published
       if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(bazaarEvent);
       }
-      
+
       await refresh();
       // Redirect to Event Office dashboard
       navigate('/EventOfficeDashboard');
@@ -131,19 +131,31 @@ function BazaarsManager({ editOnly = false }) {
     } finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { setEditing(row._id); setEditData({
-    title: row.title || '', shortDescription: row.shortDescription || '', location: row.location || '',
-    startDate: row.startDate ? row.startDate.slice(0,16) : '', endDate: row.endDate ? row.endDate.slice(0,16) : '',
-    registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', status: row.status || 'published'
-  }); };
+  const startEdit = (row) => { 
+    setEditing(row._id); 
+    setEditData({
+      title: row.title || '', 
+      shortDescription: row.shortDescription || '', 
+      location: row.location || '',
+      startDate: row.startDate ? row.startDate.slice(0,16) : '', 
+      endDate: row.endDate ? row.endDate.slice(0,16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', 
+      status: row.status || 'published'
+    });
+    setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
+  };
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { ...editData };
+      const payload = { 
+        ...editData,
+        allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
+      };
       await updateEvent(id, payload);
       showToast.success('Bazaar updated successfully');
-      setEditing(null); 
+      setEditing(null);
       setEditData({});
+      setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
@@ -161,15 +173,15 @@ function BazaarsManager({ editOnly = false }) {
       padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
     }}>
       <div style={{ position: 'relative' }}>
-        <div style={{ 
-          position: 'absolute', 
-          top: -40, 
-          right: -40, 
-          width: 260, 
-          height: 260, 
-          background: 'rgba(212,175,55,0.12)', 
-          borderRadius: '50%', 
-          filter: 'blur(60px)' 
+        <div style={{
+          position: 'absolute',
+          top: -40,
+          right: -40,
+          width: 260,
+          height: 260,
+          background: 'rgba(212,175,55,0.12)',
+          borderRadius: '50%',
+          filter: 'blur(60px)'
         }} />
       </div>
       <div style={{
@@ -215,15 +227,15 @@ function BazaarsManager({ editOnly = false }) {
 
         {!editOnly && (
           <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing.xl,
               marginBottom: spacing.lg,
             }}>Create Bazaar</h2>
             {!editing && (
-          <form className="form managerForm" onSubmit={onCreate}>
+        <form className="form managerForm" onSubmit={onCreate}>
           <label>
             <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
             <span>Title</span>
@@ -254,10 +266,10 @@ function BazaarsManager({ editOnly = false }) {
               <span>Registration Deadline</span>
             </label>
           </div>
-          <UserSelector 
-            selectedUserIds={restrictedUserIds}
-            onChange={setRestrictedUserIds}
-            label="Restrict Event to Specific Users"
+          <RoleSelector 
+            selectedRoles={allowedRoles}
+            onChange={setAllowedRoles}
+            label="Restrict Event to Specific Roles"
           />
           <button 
             className="submit" 
@@ -305,9 +317,9 @@ function BazaarsManager({ editOnly = false }) {
                 paddingBottom: spacing.lg,
                 borderBottom: `2px solid ${colors.gray200}`,
               }}>
-                <h2 style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold, 
+                <h2 style={{
+                  color: colors.primary,
+                  fontWeight: typography.fontWeight.bold,
                   fontSize: typography.fontSize.xl,
                   margin: 0,
                 }}>✏️ Edit Bazaar</h2>
@@ -315,109 +327,114 @@ function BazaarsManager({ editOnly = false }) {
               <div style={{ display: 'grid', gap: spacing.lg }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Title *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.title} 
-                      onChange={e=>setEditData({ ...editData, title: e.target.value })} 
+                    <input
+                      className="input"
+                      required
+                      value={editData.title}
+                      onChange={e => setEditData({ ...editData, title: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Short Description</span>
-                    <input 
-                      className="input" 
-                      value={editData.shortDescription} 
-                      onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} 
+                    <input
+                      className="input"
+                      value={editData.shortDescription}
+                      onChange={e => setEditData({ ...editData, shortDescription: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Start Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.startDate} 
-                      onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      required
+                      value={editData.startDate}
+                      onChange={e => setEditData({ ...editData, startDate: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>End Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.endDate} 
-                      onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      required
+                      value={editData.endDate}
+                      onChange={e => setEditData({ ...editData, endDate: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Location *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.location} 
-                      onChange={e=>setEditData({ ...editData, location: e.target.value })} 
+                    <input
+                      className="input"
+                      required
+                      value={editData.location}
+                      onChange={e => setEditData({ ...editData, location: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                   <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
+                    <span style={{
+                      display: 'block',
+                      color: colors.primary,
                       fontWeight: typography.fontWeight.semibold,
                       marginBottom: spacing.xs,
                       fontSize: typography.fontSize.sm,
                     }}>Registration Deadline</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      value={editData.registrationDeadline} 
-                      onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      value={editData.registrationDeadline}
+                      onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
                       style={{ ...inputStyles.base, width: '100%' }}
                     />
                   </label>
                 </div>
+                <RoleSelector 
+                  selectedRoles={allowedRoles}
+                  onChange={setAllowedRoles}
+                  label="Restrict Event to Specific Roles"
+                />
                 <div style={{ 
                   display: 'flex', 
                   gap: spacing.md, 
@@ -429,7 +446,7 @@ function BazaarsManager({ editOnly = false }) {
                     type="button" 
                     onClick={() => onSave(currentEditId)} 
                     disabled={loading}
-                    style={{ 
+                    style={{
                       ...buttonStyles.primary,
                       flex: 1,
                       padding: `${spacing.md} ${spacing.xl}`,
@@ -460,87 +477,87 @@ function BazaarsManager({ editOnly = false }) {
 
         {!editOnly && (
           <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
+            <h2 style={{
+              color: colors.primary,
+              fontWeight: typography.fontWeight.bold,
+              fontSize: typography.fontSize.lg,
               marginTop: spacing['3xl'],
               marginBottom: spacing.lg,
             }}>Existing Bazaars</h2>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-              gap: spacing.lg 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: spacing.lg
             }}>
               {bazaars.map((bz) => (
-            <div key={bz._id} style={{ 
-              border: `1px solid ${colors.gray200}`, 
-              borderRadius: borderRadius.xl, 
-              padding: spacing.lg, 
-              background: colors.white,
-              boxShadow: shadows.md,
-              transition: transitions.normal,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = shadows.lg;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = shadows.md;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            >
-              {editing !== bz._id && (
-                <div>
-                  <div style={{ 
-                    fontWeight: typography.fontWeight.extrabold, 
-                    color: colors.primary,
-                    fontSize: typography.fontSize.lg,
-                    marginBottom: spacing.sm,
-                  }}>
-                    {bz.title}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray700, 
-                    fontSize: typography.fontSize.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    {bz.shortDescription || '—'}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs, 
-                    marginTop: spacing.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    📍 {bz.location}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.md,
-                  }}>
-                    From {new Date(bz.startDate).toLocaleString()} to {bz.endDate ? new Date(bz.endDate).toLocaleString() : '—'}
-                  </div>
-                  <button 
-                    className="submit" 
-                    onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)} 
-                    style={{ 
-                      ...buttonStyles.primary,
-                      width: '100%',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
-                  >
-                    Edit
-                  </button>
+                <div key={bz._id} style={{
+                  border: `1px solid ${colors.gray200}`,
+                  borderRadius: borderRadius.xl,
+                  padding: spacing.lg,
+                  background: colors.white,
+                  boxShadow: shadows.md,
+                  transition: transitions.normal,
+                }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.lg;
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = shadows.md;
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  {editing !== bz._id && (
+                    <div>
+                      <div style={{
+                        fontWeight: typography.fontWeight.extrabold,
+                        color: colors.primary,
+                        fontSize: typography.fontSize.lg,
+                        marginBottom: spacing.sm,
+                      }}>
+                        {bz.title}
+                      </div>
+                      <div style={{
+                        color: colors.gray700,
+                        fontSize: typography.fontSize.sm,
+                        marginBottom: spacing.xs,
+                      }}>
+                        {bz.shortDescription || '—'}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginTop: spacing.sm,
+                        marginBottom: spacing.xs,
+                      }}>
+                        📍 {bz.location}
+                      </div>
+                      <div style={{
+                        color: colors.gray500,
+                        fontSize: typography.fontSize.xs,
+                        marginBottom: spacing.md,
+                      }}>
+                        From {new Date(bz.startDate).toLocaleString()} to {bz.endDate ? new Date(bz.endDate).toLocaleString() : '—'}
+                      </div>
+                      <button
+                        className="submit"
+                        onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)}
+                        style={{
+                          ...buttonStyles.primary,
+                          width: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.boxShadow = shadows.accentHover;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.boxShadow = shadows.accent;
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
               ))}
             </div>
           </>

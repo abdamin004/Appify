@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../Navbar";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
+import QRCodeGenerator from "../QRCode/QRCodeGenerator";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
@@ -30,6 +31,7 @@ function EventOfficeDashboard() {
   const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
+  const [qrCodeEvent, setQrCodeEvent] = useState(null);
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
     // Load approved workshops from localStorage
     try {
@@ -39,7 +41,7 @@ function EventOfficeDashboard() {
       return new Set();
     }
   });
-  
+
   const storedUser = localStorage.getItem("user");
   const user = storedUser
     ? JSON.parse(storedUser)
@@ -102,8 +104,8 @@ function EventOfficeDashboard() {
       const workshops = await listPendingWorkshops();
       // Filter out already approved workshops (frontend-only approval)
       const approvedSet = approvedWorkshops;
-      const pending = Array.isArray(workshops) 
-        ? workshops.filter(w => !approvedSet.has(w._id) && w.status === 'draft')
+      const pending = Array.isArray(workshops)
+        ? workshops.filter(w => !approvedSet.has(w._id) && w.status === 'pending')
         : [];
       setPendingWorkshops(pending);
     } catch (err) {
@@ -196,10 +198,14 @@ function EventOfficeDashboard() {
     setApprovedVendorsError("");
 
     try {
+      console.log('Fetching vendor requests...');
       const [pendingRes, approvedRes] = await Promise.all([
         adminService.listPendingVendorApplications(),
         adminService.listApprovedVendorApplications(),
       ]);
+
+      console.log('Pending response:', pendingRes);
+      console.log('Approved response:', approvedRes);
 
       const pendingList = Array.isArray(pendingRes?.applications)
         ? pendingRes.applications
@@ -212,6 +218,9 @@ function EventOfficeDashboard() {
         : Array.isArray(approvedRes)
           ? approvedRes
           : [];
+
+      console.log('Pending list:', pendingList);
+      console.log('Approved list:', approvedList);
 
       setVendorRequests(pendingList.map(normalizePendingApplication));
       setApprovedVendorRequests(approvedList.map(normalizeApprovedApplication));
@@ -249,29 +258,29 @@ function EventOfficeDashboard() {
     // Frontend-only approval - no backend calls
     const confirmed = await confirmDialog("Are you sure you want to approve and publish this workshop?", "Approve Workshop");
     if (!confirmed) return;
-    
+
     // Find the workshop to get its details
     const workshop = pendingWorkshops.find(w => w._id === workshopId);
     if (!workshop) {
       showToast.error("Workshop not found");
       return;
     }
-    
+
     // Add to approved set and save to localStorage
     const newApproved = new Set(approvedWorkshops);
     newApproved.add(workshopId);
     setApprovedWorkshops(newApproved);
-    
+
     // Save to localStorage
     try {
       localStorage.setItem('approvedWorkshops', JSON.stringify(Array.from(newApproved)));
     } catch (err) {
       console.error('Failed to save approved workshops to localStorage', err);
     }
-    
+
     // Immediately remove from pending list
     setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
-    
+
     // Create notification for the professor who created the workshop
     if (workshop.createdBy) {
       createProfessorNotification(workshop.createdBy, {
@@ -281,12 +290,12 @@ function EventOfficeDashboard() {
         workshopTitle: workshop.title,
       });
     }
-    
+
     // Create notifications for all users about the newly published workshop
     const publishedWorkshop = { ...workshop, status: 'published' };
     const { notifyAllUsersAboutNewEvent } = await import('../../services/eventService');
     notifyAllUsersAboutNewEvent(publishedWorkshop);
-    
+
     // Show success message
     showToast.success("Workshop approved and published successfully!");
   };
@@ -301,12 +310,12 @@ function EventOfficeDashboard() {
         showToast.error("Workshop not found");
         return;
       }
-      
+
       // Immediately remove from pending list (optimistic update)
       setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
-      
+
       await rejectWorkshop(workshopId);
-      
+
       // Create notification for the professor who created the workshop
       if (workshop.createdBy) {
         createProfessorNotification(workshop.createdBy, {
@@ -316,7 +325,7 @@ function EventOfficeDashboard() {
           workshopTitle: workshop.title,
         });
       }
-      
+
       showToast.success("Workshop rejected successfully!");
     } catch (err) {
       console.error("Error rejecting workshop:", err);
@@ -341,12 +350,12 @@ function EventOfficeDashboard() {
         showToast.error("Workshop not found");
         return;
       }
-      
+
       // Append edit request to description
       const currentDescription = workshop.description || "";
       const editRequestNote = `\n\n--- EDIT REQUEST FROM EVENTS OFFICE (${new Date().toLocaleString()}) ---\n${editRequestModal.editRequest}\n--- END EDIT REQUEST ---`;
       const updatedDescription = currentDescription + editRequestNote;
-      
+
       await updateEvent(editRequestModal.workshopId, { description: updatedDescription });
       showToast.success("Edit request sent successfully! The professor will see your request in the workshop details.");
       setEditRequestModal({ open: false, workshopId: null, editRequest: "" });
@@ -384,10 +393,10 @@ function EventOfficeDashboard() {
         // Don't log to avoid console spam since this endpoint may not exist
         backendNotifications = [];
       }
-      
+
       // Fetch frontend Events Office notifications
       const frontendNotifications = getEventOfficeNotifications();
-      
+
       // Merge notifications (frontend first, then backend)
       // Convert frontend notifications to match backend format
       const formattedFrontend = frontendNotifications.map(n => ({
@@ -395,7 +404,7 @@ function EventOfficeDashboard() {
         read: n.isRead,
         _id: n.id,
       }));
-      
+
       setNotifications([...formattedFrontend, ...backendNotifications]);
     } catch (err) {
       console.error("Error fetching notifications:", err);
@@ -422,7 +431,7 @@ function EventOfficeDashboard() {
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
-      
+
       const seenIds = getSeenEventIds();
       const newEvents = publishedEvents.filter(e => {
         const eventId = String(e._id || e.id);
@@ -436,7 +445,7 @@ function EventOfficeDashboard() {
         newEvents.forEach(event => {
           const eventId = String(event._id || event.id);
           const eventType = event.type || 'Event';
-          
+
           createEventOfficeNotification({
             type: 'NewEvent',
             message: `New ${eventType}: ${event.title}`,
@@ -482,32 +491,32 @@ function EventOfficeDashboard() {
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      
+
       if (!res.ok) return;
-      
+
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
-      
+
       const storedUser = localStorage.getItem("user");
       const user = storedUser ? JSON.parse(storedUser) : null;
       const userId = user && (user._id || user.id);
       if (!userId) return;
-      
+
       const sentReminders = getSentReminders(userId);
       const now = new Date();
-      
+
       events.forEach(event => {
         if (!event.startDate) return;
-        
+
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
         const eventTitle = event.title || 'Event';
         const eventType = event.type || 'Event';
-        
+
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
         const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
-        
+
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
           markReminderSent(userId, oneDayReminderId);
           createReminderNotification({
@@ -519,7 +528,7 @@ function EventOfficeDashboard() {
             reminderType: '1day',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -532,11 +541,11 @@ function EventOfficeDashboard() {
             }
           }
         }
-        
+
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
         const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
-        
+
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
           markReminderSent(userId, oneHourReminderId);
           createReminderNotification({
@@ -548,7 +557,7 @@ function EventOfficeDashboard() {
             reminderType: '1hour',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -562,7 +571,7 @@ function EventOfficeDashboard() {
           }
         }
       });
-      
+
       fetchReminders();
       fetchNotifications();
     } catch (err) {
@@ -992,15 +1001,15 @@ function EventOfficeDashboard() {
 
           {/* Content */}
           {activeTab === "browse" && (
-            <EventList 
-              enableFavorites={false} 
+            <EventList
+              enableFavorites={false}
               hideArchived={true}
             />
           )}
           {activeTab === "archived" && (
-            <EventList 
-              enableFavorites={false} 
-              showArchivedOnly={true} 
+            <EventList
+              enableFavorites={false}
+              showArchivedOnly={true}
             />
           )}
 
@@ -1014,8 +1023,8 @@ function EventOfficeDashboard() {
                 border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold,
@@ -1263,8 +1272,8 @@ function EventOfficeDashboard() {
                     })}
                   </div>
                 )}
-                </div>
               </div>
+            </div>
           )}
 
           {activeTab === "workshop-approvals" && (
@@ -1277,8 +1286,8 @@ function EventOfficeDashboard() {
                 border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold,
@@ -1301,28 +1310,28 @@ function EventOfficeDashboard() {
                       }}
                     >
                       <div style={{ marginBottom: spacing.lg }}>
-                        <h3 style={{ 
-                          color: colors.primary, 
-                          marginBottom: spacing.md, 
+                        <h3 style={{
+                          color: colors.primary,
+                          marginBottom: spacing.md,
                           fontSize: typography.fontSize.xl,
                           fontWeight: typography.fontWeight.bold,
                         }}>
                           {workshop.title}
                         </h3>
                         {workshop.shortDescription && (
-                          <p style={{ 
-                            color: colors.gray500, 
+                          <p style={{
+                            color: colors.gray500,
                             marginBottom: spacing.sm,
                             fontSize: typography.fontSize.base,
                           }}>
                             {workshop.shortDescription}
                           </p>
                         )}
-                        <div style={{ 
-                          display: "grid", 
-                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
-                          gap: spacing.md, 
-                          marginTop: spacing.md 
+                        <div style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                          gap: spacing.md,
+                          marginTop: spacing.md
                         }}>
                           <div>
                             <strong style={{ color: colors.primary }}>Location:</strong>{" "}
@@ -1453,8 +1462,8 @@ function EventOfficeDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold,
@@ -1482,9 +1491,9 @@ function EventOfficeDashboard() {
               {reminders.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
               ) : (
-                <div style={{ 
-                  display: "flex", 
-                  flexDirection: "column", 
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
                   gap: spacing.lg,
                   overflowY: "auto",
                   flex: 1,
@@ -1508,9 +1517,9 @@ function EventOfficeDashboard() {
                           <div style={{ flex: 1 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                              <h3 style={{ 
-                                color: colors.primary, 
-                                margin: 0, 
+                              <h3 style={{
+                                color: colors.primary,
+                                margin: 0,
                                 fontSize: typography.fontSize.lg,
                                 fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
@@ -1527,8 +1536,8 @@ function EventOfficeDashboard() {
                                 }} />
                               )}
                             </div>
-                            <p style={{ 
-                              color: colors.gray500, 
+                            <p style={{
+                              color: colors.gray500,
                               margin: `${spacing.sm} 0`,
                               fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                               fontSize: typography.fontSize.base,
@@ -1536,8 +1545,8 @@ function EventOfficeDashboard() {
                               {reminder.message}
                             </p>
                             {reminder.eventStartDate && (
-                              <p style={{ 
-                                color: colors.gray400, 
+                              <p style={{
+                                color: colors.gray400,
                                 fontSize: typography.fontSize.sm,
                                 margin: `${spacing.xs} 0`,
                               }}>
@@ -1559,8 +1568,8 @@ function EventOfficeDashboard() {
                                 View Event
                               </button>
                             )}
-                            <p style={{ 
-                              color: colors.gray400, 
+                            <p style={{
+                              color: colors.gray400,
                               fontSize: typography.fontSize.sm,
                               margin: `${spacing.sm} 0 0 0`,
                             }}>
@@ -1683,8 +1692,8 @@ function EventOfficeDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold,
@@ -1748,9 +1757,9 @@ function EventOfficeDashboard() {
               {notifications.length === 0 ? (
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
               ) : (
-                <div style={{ 
-                  display: "flex", 
-                  flexDirection: "column", 
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
                   gap: spacing.lg,
                   overflowY: "auto",
                   flex: 1,
@@ -1780,15 +1789,15 @@ function EventOfficeDashboard() {
                               {notif.type === 'NewEvent' && (
                                 <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                               )}
-                              <h3 style={{ 
-                                color: colors.primary, 
-                                margin: 0, 
+                              <h3 style={{
+                                color: colors.primary,
+                                margin: 0,
                                 fontSize: typography.fontSize.lg,
                                 fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
-                                {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' : 
-                                 notif.type === 'NewEvent' ? 'New Event Available' : 
-                                 notif.type || 'Notification'}
+                                {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' :
+                                  notif.type === 'NewEvent' ? 'New Event Available' :
+                                    notif.type || 'Notification'}
                               </h3>
                               {!isRead && (
                                 <span style={{
@@ -1801,13 +1810,13 @@ function EventOfficeDashboard() {
                                 }} />
                               )}
                             </div>
-                            <p style={{ 
-                              color: colors.gray500, 
+                            <p style={{
+                              color: colors.gray500,
                               margin: `${spacing.sm} 0`,
                               fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                               fontSize: typography.fontSize.base,
                             }}>
-                              {notif.type === 'WorkshopSubmitted' 
+                              {notif.type === 'WorkshopSubmitted'
                                 ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
                                 : notif.message || 'No message'}
                             </p>
@@ -1826,8 +1835,8 @@ function EventOfficeDashboard() {
                                 View Event
                               </button>
                             )}
-                            <p style={{ 
-                              color: colors.gray400, 
+                            <p style={{
+                              color: colors.gray400,
                               fontSize: typography.fontSize.sm,
                               margin: `${spacing.sm} 0 0 0`,
                             }}>
@@ -1907,8 +1916,8 @@ function EventOfficeDashboard() {
                 border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold,
@@ -1916,12 +1925,12 @@ function EventOfficeDashboard() {
                 Gym Sessions
               </h2>
               {(!gymSessions || gymSessions.length === 0) ? (
-                <div style={{ 
+                <div style={{
                   textAlign: "center",
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No gym sessions scheduled</p>
@@ -1954,35 +1963,35 @@ function EventOfficeDashboard() {
                         const typeKeys = Object.keys(byType).sort();
                         return (
                           <div key={month}>
-                            <div style={{ 
-                              background: colors.bgCard, 
-                              padding: `${spacing.lg} ${spacing.xl}`, 
-                              borderRadius: borderRadius.xl, 
+                            <div style={{
+                              background: colors.bgCard,
+                              padding: `${spacing.lg} ${spacing.xl}`,
+                              borderRadius: borderRadius.xl,
                               boxShadow: shadows.md,
                               border: `1px solid ${colors.gray200}`,
                             }}>
-                              <h3 style={{ 
-                                margin: 0, 
+                              <h3 style={{
+                                margin: 0,
                                 color: colors.primary,
                                 fontSize: typography.fontSize.xl,
                                 fontWeight: typography.fontWeight.bold,
                               }}>{month}</h3>
-                              <div style={{ 
-                                display: 'grid', 
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-                                gap: spacing.lg, 
-                                marginTop: spacing.lg 
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                gap: spacing.lg,
+                                marginTop: spacing.lg
                               }}>
                                 {typeKeys.map((tk) => (
-                                  <div key={tk} style={{ 
-                                    background: colors.white, 
-                                    border: `1px solid ${colors.gray200}`, 
-                                    borderRadius: borderRadius.xl, 
-                                    padding: spacing.lg 
+                                  <div key={tk} style={{
+                                    background: colors.white,
+                                    border: `1px solid ${colors.gray200}`,
+                                    borderRadius: borderRadius.xl,
+                                    padding: spacing.lg
                                   }}>
-                                    <div style={{ 
-                                      fontWeight: typography.fontWeight.extrabold, 
-                                      color: colors.primary, 
+                                    <div style={{
+                                      fontWeight: typography.fontWeight.extrabold,
+                                      color: colors.primary,
                                       marginBottom: spacing.sm,
                                       fontSize: typography.fontSize.base,
                                     }}>{tk}</div>
@@ -1996,13 +2005,13 @@ function EventOfficeDashboard() {
                                             return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                           };
                                           return (
-                                            <li key={s._id || s.id} style={{ 
-                                              padding: `${spacing.sm} 0`, 
-                                              borderTop: `1px solid ${colors.gray100}`, 
-                                              display: 'flex', 
-                                              justifyContent: 'space-between', 
-                                              alignItems: 'center', 
-                                              gap: spacing.md 
+                                            <li key={s._id || s.id} style={{
+                                              padding: `${spacing.sm} 0`,
+                                              borderTop: `1px solid ${colors.gray100}`,
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                              alignItems: 'center',
+                                              gap: spacing.md
                                             }}>
                                               <div>
                                                 <div style={{
@@ -2010,8 +2019,8 @@ function EventOfficeDashboard() {
                                                   fontWeight: typography.fontWeight.medium,
                                                   color: colors.gray700,
                                                 }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{ 
-                                                  fontSize: typography.fontSize.xs, 
+                                                <div style={{
+                                                  fontSize: typography.fontSize.xs,
                                                   color: colors.gray500,
                                                   marginTop: spacing.xs,
                                                 }}>
@@ -2019,14 +2028,14 @@ function EventOfficeDashboard() {
                                                 </div>
                                               </div>
                                               <div style={{ display: 'flex', gap: spacing.sm }}>
-                                                <button 
-                                                  onClick={() => navigate(`/events-office/gym-sessions/edit/${s._id}`)} 
-                                                  style={{ 
-                                                    padding: `${spacing.xs} ${spacing.md}`, 
-                                                    background: colors.info, 
-                                                    color: colors.white, 
-                                                    border: 'none', 
-                                                    borderRadius: borderRadius.md, 
+                                                <button
+                                                  onClick={() => navigate(`/events-office/gym-sessions/edit/${s._id}`)}
+                                                  style={{
+                                                    padding: `${spacing.xs} ${spacing.md}`,
+                                                    background: colors.info,
+                                                    color: colors.white,
+                                                    border: 'none',
+                                                    borderRadius: borderRadius.md,
                                                     cursor: 'pointer',
                                                     fontSize: typography.fontSize.sm,
                                                     fontWeight: typography.fontWeight.semibold,
@@ -2034,14 +2043,14 @@ function EventOfficeDashboard() {
                                                 >
                                                   Edit
                                                 </button>
-                                                <button 
-                                                  onClick={() => handleDeleteGymSession(s._id)} 
-                                                  style={{ 
-                                                    padding: `${spacing.xs} ${spacing.md}`, 
-                                                    background: colors.error, 
-                                                    color: colors.white, 
-                                                    border: 'none', 
-                                                    borderRadius: borderRadius.md, 
+                                                <button
+                                                  onClick={() => handleDeleteGymSession(s._id)}
+                                                  style={{
+                                                    padding: `${spacing.xs} ${spacing.md}`,
+                                                    background: colors.error,
+                                                    color: colors.white,
+                                                    border: 'none',
+                                                    borderRadius: borderRadius.md,
                                                     cursor: 'pointer',
                                                     fontSize: typography.fontSize.sm,
                                                     fontWeight: typography.fontWeight.semibold,
@@ -2100,16 +2109,16 @@ function EventOfficeDashboard() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ 
-              color: colors.primary, 
+            <h2 style={{
+              color: colors.primary,
               marginBottom: spacing.xl,
               fontSize: typography.fontSize['2xl'],
               fontWeight: typography.fontWeight.bold,
             }}>
               Request Edits for Workshop
             </h2>
-            <p style={{ 
-              color: colors.gray500, 
+            <p style={{
+              color: colors.gray500,
               marginBottom: spacing.lg,
               fontSize: typography.fontSize.base,
             }}>
@@ -2166,6 +2175,12 @@ function EventOfficeDashboard() {
       )}
 
       {/* QR Code Generator Modal */}
+      {qrCodeEvent && (
+        <QRCodeGenerator
+          event={qrCodeEvent}
+          onClose={() => setQrCodeEvent(null)}
+        />
+      )}
       </div>
     </div>
   );

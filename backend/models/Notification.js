@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+// Per-user status subdocument
+const userStatusSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  isRead: { type: Boolean, default: false },
+  readAt: { type: Date },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date }
+}, { _id: false });
+
 const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -26,12 +35,17 @@ const notificationSchema = new mongoose.Schema({
   event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
   organization: { type: String, ref: 'Organization' },
 
-  // State
+  // Per-user status tracking
+  userStatus: [userStatusSchema],
+
+  // Legacy field for backward compatibility (deprecated - use userStatus instead)
   isRead: { type: Boolean, default: false, index: true },
   readAt: { type: Date }
 }, { timestamps: true });
 
-notificationSchema.index({ recipientsRoles: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ recipientsRoles: 1, createdAt: -1 });
+notificationSchema.index({ 'userStatus.userId': 1 });
+notificationSchema.index({ 'userStatus.isDeleted': 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);
 

@@ -33,10 +33,11 @@ exports.getVendorApplicationsForPoll = async (req, res) => {
       });
     }
 
-    // Build filter for pending vendor applications
+    // Build filter for pending vendor applications only
+    // Exclude approved, rejected, cancelled, and any other non-pending statuses
     const filter = {
       event: eventId,
-      status: 'pending'
+      status: 'pending' // Only pending applications can be used in polls
     };
 
     // Optionally filter by setup duration
@@ -49,10 +50,13 @@ exports.getVendorApplicationsForPoll = async (req, res) => {
       .populate('event', 'title type startDate endDate')
       .sort({ createdAt: -1 });
 
+    // Double-check: filter out any non-pending applications (safety check)
+    const pendingApplications = applications.filter(app => app.status === 'pending');
+
     res.status(200).json({
       success: true,
-      count: applications.length,
-      applications: applications.map(app => ({
+      count: pendingApplications.length,
+      applications: pendingApplications.map(app => ({
         _id: app._id,
         organization: app.organization,
         vendorUser: app.vendorUser,
@@ -61,11 +65,11 @@ exports.getVendorApplicationsForPoll = async (req, res) => {
         setupDurationWeeks: app.setupDurationWeeks,
         setupLocation: app.setupLocation,
         attendees: app.attendees,
-        createdAt: app.createdAt
+        createdAt: app.createdAt,
+        status: app.status // Include status for frontend verification
       }))
     });
   } catch (error) {
-    console.error('Error getting vendor applications for poll:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
@@ -151,9 +155,6 @@ exports.createPoll = async (req, res) => {
       const inputIdsAsStrings = vendorApplicationIds.map(String);
       const missingIds = inputIdsAsStrings.filter(id => !foundIds.includes(id));
       
-      console.log('Debug - Input IDs:', vendorApplicationIds);
-      console.log('Debug - Found IDs:', foundIds);
-      console.log('Debug - Missing IDs:', missingIds);
       
       return res.status(400).json({ 
         success: false,
@@ -182,6 +183,20 @@ exports.createPoll = async (req, res) => {
       });
     }
 
+    // Check if all vendor applications have status 'pending'
+    const nonPendingApplications = vendorApplications.filter(app => app.status !== 'pending');
+    if (nonPendingApplications.length > 0) {
+      const nonPendingIds = nonPendingApplications.map(app => ({
+        id: String(app._id),
+        status: app.status
+      }));
+      
+      return res.status(400).json({ 
+        success: false,
+        message: `Polls can only be created for pending vendor applications. Found ${nonPendingApplications.length} application(s) with non-pending status. Application IDs and statuses: ${nonPendingIds.map(n => `${n.id} (${n.status})`).join(', ')}` 
+      });
+    }
+
     // Check if vendor applications have overlapping durations
     // This is the key requirement - they should be requesting the same duration
     const setupDurations = vendorApplications.map(app => ({
@@ -193,8 +208,6 @@ exports.createPoll = async (req, res) => {
     // Check if all have the same setup duration (optional validation)
     const uniqueDurations = [...new Set(setupDurations.map(d => d.duration))];
     if (uniqueDurations.length > 1) {
-      // Allow different durations but warn
-      console.log('Warning: Vendor applications have different setup durations');
     }
 
     // Validate voting date ranges
@@ -234,7 +247,6 @@ exports.createPoll = async (req, res) => {
       poll
     });
   } catch (error) {
-    console.error('Error creating poll:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
@@ -279,7 +291,6 @@ exports.listPolls = async (req, res) => {
       }
     }
 
-    console.log('Poll filter:', JSON.stringify(filter, null, 2));
     const polls = await Poll.find(filter)
       .populate('event', 'title type startDate endDate location')
       .populate({
@@ -289,7 +300,6 @@ exports.listPolls = async (req, res) => {
       .populate('createdBy', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
-    console.log(`Found ${polls.length} polls matching filter`);
 
     // Calculate vote counts for each poll and check if user has voted
     const userId = req.user ? req.user._id : null;
@@ -318,7 +328,6 @@ exports.listPolls = async (req, res) => {
       polls: pollsWithVotes
     });
   } catch (error) {
-    console.error('Error listing polls:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
@@ -383,7 +392,6 @@ exports.getPoll = async (req, res) => {
       poll: pollObj
     });
   } catch (error) {
-    console.error('Error getting poll:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
@@ -489,7 +497,6 @@ exports.voteOnPoll = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error voting on poll:', error);
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 
@@ -557,7 +564,33 @@ exports.closePoll = async (req, res) => {
       poll: pollObj
     });
   } catch (error) {
-    console.error('Error closing poll:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal Server Error', 
+      error: error.message 
+    });
+  }
+};
+
+// Delete a poll (EventOffice only)
+exports.deletePoll = async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const poll = await Poll.findByIdAndDelete(pollId);
+
+    if (!poll) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Poll not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Poll deleted successfully'
+    });
+  } catch (error) {
     res.status(500).json({ 
       success: false,
       message: 'Internal Server Error', 

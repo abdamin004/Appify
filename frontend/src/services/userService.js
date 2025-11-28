@@ -16,4 +16,9 @@ export const assignRole = (payload) => fetchJson(`${API_BASE}/admin/assign-role`
 export const blockUser = (id, action) => fetchJson(`${API_BASE}/admin/block-user/${id}`, { method: 'PATCH', body: JSON.stringify({ action }) });
 export const deleteAdmin = (id) => fetchJson(`${API_BASE}/admin/delete-admin/${id}`, { method: 'DELETE' });
 
-export default { listUsers, createAdmin, assignRole, blockUser, deleteAdmin };
+// User notifications (for all user roles including students)
+export const getMyNotifications = () => fetchJson(`${API_BASE}/users/me/notifications`);
+export const markNotificationRead = (id) => fetchJson(`${API_BASE}/users/me/notifications/${id}/read`, { method: 'PATCH' });
+export const deleteNotification = (id) => fetchJson(`${API_BASE}/users/me/notifications/${id}`, { method: 'DELETE' });
+
+export default { listUsers, createAdmin, assignRole, blockUser, deleteAdmin, getMyNotifications, markNotificationRead, deleteNotification };

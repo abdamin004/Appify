@@ -61,13 +61,30 @@ export default function UserManagement() {
       showToast.error('Cannot change the role of the default admin account');
       return;
     }
+    // Prevent resending verification email if already sent for the same role
+    const roleToSend = normalizeRole(newRole);
+    if (user && user.verificationTokenSent && !user.isVerified && user.role === roleToSend) {
+      showToast.error('Verification email already sent for this role. User must verify their email first.');
+      return;
+    }
     try {
-      const roleToSend = normalizeRole(newRole);
-      await userService.assignRole({ userId: id, role: roleToSend });
-      // reflect change locally
-      setUsers(prev => prev.map(u => u._id === id ? { ...u, role: roleToSend, isVerified: true } : u));
+      const response = await userService.assignRole({ userId: id, role: roleToSend });
+      // Update user with response data
+      setUsers(prev => prev.map(u => {
+        if (u._id === id) {
+          return {
+            ...u,
+            role: roleToSend,
+            isVerified: response.user?.isVerified ?? u.isVerified,
+            verificationTokenSent: response.user?.verificationTokenSent ?? u.verificationTokenSent
+          };
+        }
+        return u;
+      }));
       setSelectedRoles(prev => ({ ...prev, [id]: roleToSend }));
-      showToast.success('Role assigned successfully');
+      showToast.success(response.message || 'Role assigned successfully');
+      // Reload to get latest data
+      load();
     } catch (err) { 
       const errorMsg = err?.message || 'Failed to assign role';
       showToast.error(errorMsg);
@@ -243,16 +260,40 @@ export default function UserManagement() {
                           )}
                         </td>
                         <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>
-                          <span style={{
-                            padding: `${spacing.xs} ${spacing.sm}`,
-                            borderRadius: borderRadius.md,
-                            fontSize: typography.fontSize.xs,
-                            fontWeight: typography.fontWeight.semibold,
-                            background: u.isVerified ? colors.successLight : colors.gray100,
-                            color: u.isVerified ? colors.success : colors.gray600
-                          }}>
-                            {u.isVerified ? 'Yes' : 'No'}
-                          </span>
+                          {u.isVerified ? (
+                            <span style={{
+                              padding: `${spacing.xs} ${spacing.sm}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.xs,
+                              fontWeight: typography.fontWeight.semibold,
+                              background: colors.successLight,
+                              color: colors.success
+                            }}>
+                              Verified
+                            </span>
+                          ) : u.verificationTokenSent ? (
+                            <span style={{
+                              padding: `${spacing.xs} ${spacing.sm}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.xs,
+                              fontWeight: typography.fontWeight.semibold,
+                              background: colors.warningLight || '#FEF3C7',
+                              color: colors.warning || '#D97706'
+                            }}>
+                              Email Sent, Not Verified
+                            </span>
+                          ) : (
+                            <span style={{
+                              padding: `${spacing.xs} ${spacing.sm}`,
+                              borderRadius: borderRadius.md,
+                              fontSize: typography.fontSize.xs,
+                              fontWeight: typography.fontWeight.semibold,
+                              background: colors.gray100,
+                              color: colors.gray600
+                            }}>
+                              Not Verified
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>
                           <span style={{
@@ -299,14 +340,27 @@ export default function UserManagement() {
                               </button>
                             )}
                             {/* Verify & Assign button: visible when user not verified OR selected role differs from current */}
-                            {!isDefault && (u.isVerified === false || (selectedRoles[u._id] && selectedRoles[u._id] !== u.role)) && (
+                            {/* Not shown if current role is Student AND no role change is selected (students get verification email on signup) */}
+                            {/* Shown if role is being changed FROM Student TO Staff/TA/Professor */}
+                            {!isDefault && (() => {
+                              const selectedRole = selectedRoles[u._id] || u.role;
+                              const roleChanged = selectedRoles[u._id] && selectedRoles[u._id] !== u.role;
+                              const isChangingFromStudent = u.role === 'Student' && selectedRole !== 'Student';
+                              const shouldShow = (selectedRole !== 'Student' || isChangingFromStudent) && 
+                                                (u.isVerified === false || roleChanged);
+                              return shouldShow;
+                            })() && (
                               <button 
                                 onClick={()=>handleAssign(u._id, (selectedRoles[u._id] || u.role))} 
+                                disabled={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role}
                                 style={{ 
                                   ...buttonStyles.primary,
                                   padding: `${spacing.xs} ${spacing.sm}`,
-                                  fontSize: typography.fontSize.xs
+                                  fontSize: typography.fontSize.xs,
+                                  opacity: (u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role) ? 0.5 : 1,
+                                  cursor: (u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role) ? 'not-allowed' : 'pointer'
                                 }}
+                                title={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role ? 'Verification email already sent for this role. User must verify their email first.' : ''}
                               >
                                 Verify & Assign
                               </button>

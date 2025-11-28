@@ -7,13 +7,20 @@ const path = require('path');
 const connectDB = require('./config/db');
 
 // Connect to database
-connectDB().then(() => {
+connectDB().then(async () => {
   // initialize a default admin if none exists
   try {
     require('./utils/initAdmin')();
-
   } catch (err) {
     console.error('initAdmin failed to run:', err);
+  }
+
+  // Seed courts after database connection is established
+  try {
+    const seedCourts = require('./models/seedCourt');
+    await seedCourts();
+  } catch (err) {
+    console.error('seedCourts failed to run:', err);
   }
 }).catch(err => {
   console.error('Failed to connect to DB on startup:', err);
