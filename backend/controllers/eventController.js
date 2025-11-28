@@ -512,10 +512,20 @@ module.exports = {
                 });
             }
 
-            // Add user to event's registeredUsers array
-            event.registeredUsers = event.registeredUsers || [];
-            event.registeredUsers.push(userId);
-            await event.save();
+            // Add user to event's registeredUsers array using findByIdAndUpdate
+            // This avoids full document validation which can fail for Workshop discriminators
+            const updatedEvent = await Event.findByIdAndUpdate(
+                eventId,
+                { $addToSet: { registeredUsers: userId } },
+                { new: true, runValidators: false }
+            );
+
+            if (!updatedEvent) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
 
             // Add event to user's registeredEvents array
             user.registeredEvents = user.registeredEvents || [];
@@ -526,10 +536,10 @@ module.exports = {
                 success: true,
                 message: 'Successfully registered for the event',
                 event: {
-                    id: event._id,
-                    title: event.title,
-                    startDate: event.startDate,
-                    location: event.location
+                    id: updatedEvent._id,
+                    title: updatedEvent.title,
+                    startDate: updatedEvent.startDate,
+                    location: updatedEvent.location
                 }
             });
 
@@ -581,11 +591,20 @@ module.exports = {
                 });
             }
 
-            // Remove user from event's registeredUsers array
-            event.registeredUsers = event.registeredUsers.filter(
-                id => id.toString() !== userId.toString()
+            // Remove user from event's registeredUsers array using findByIdAndUpdate
+            // This avoids full document validation which can fail for Workshop discriminators
+            const updatedEvent = await Event.findByIdAndUpdate(
+                eventId,
+                { $pull: { registeredUsers: userId } },
+                { new: true, runValidators: false }
             );
-            await event.save();
+
+            if (!updatedEvent) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
 
             // Remove event from user's registeredEvents array
             user.registeredEvents = user.registeredEvents.filter(

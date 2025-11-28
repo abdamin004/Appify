@@ -5,7 +5,7 @@ import '../../managerForm.css';
 import { createTrip, listTrips, updateEvent, getEventById } from '../../../services/eventService';
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from '../../../utils/designSystem';
+import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles, transitions } from '../../../utils/designSystem';
 
 function TripsManager({ editOnly = false }) {
   const navigate = useNavigate();
