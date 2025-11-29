@@ -290,6 +290,198 @@ export function getStudentUnreadCount() {
   return notifications.filter(n => !n.isRead).length;
 }
 
+// ========== Staff Notifications ==========
+
+const STAFF_NOTIFICATION_KEY = 'staffNotifications';
+const STAFF_SEEN_EVENTS_KEY = 'staffSeenEventIds';
+
+// Get notifications for staff
+export function getStaffNotifications() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STAFF_NOTIFICATION_KEY);
+    if (!stored) return [];
+    const notifications = JSON.parse(stored);
+    return Array.isArray(notifications) ? notifications : [];
+  } catch (err) {
+    console.error('Error loading staff notifications:', err);
+    return [];
+  }
+}
+
+// Create a notification for staff
+export function createStaffNotification(notification) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const existing = getStaffNotifications();
+    const newNotification = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      ...notification,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    };
+    const updated = [newNotification, ...existing];
+    localStorage.setItem(STAFF_NOTIFICATION_KEY, JSON.stringify(updated));
+    return newNotification;
+  } catch (err) {
+    console.error('Error creating staff notification:', err);
+  }
+}
+
+// Mark a notification as read for staff
+export function markStaffNotificationRead(notificationId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getStaffNotifications();
+    const updated = notifications.map(n => 
+      n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
+    );
+    localStorage.setItem(STAFF_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error marking staff notification as read:', err);
+  }
+}
+
+// Mark all notifications as read for staff
+export function markAllStaffNotificationsRead() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getStaffNotifications();
+    const updated = notifications.map(n => ({
+      ...n,
+      isRead: true,
+      readAt: n.isRead ? n.readAt : new Date().toISOString(),
+    }));
+    localStorage.setItem(STAFF_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error marking all staff notifications as read:', err);
+  }
+}
+
+// Delete a notification for staff
+export function deleteStaffNotification(notificationId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getStaffNotifications();
+    const updated = notifications.filter(n => n.id !== notificationId);
+    localStorage.setItem(STAFF_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error deleting staff notification:', err);
+  }
+}
+
+// Delete all notifications for staff
+export function deleteAllStaffNotifications() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(STAFF_NOTIFICATION_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.error('Error deleting all staff notifications:', err);
+  }
+}
+
+// Get unread count for staff
+export function getStaffUnreadCount() {
+  const notifications = getStaffNotifications();
+  return notifications.filter(n => !n.isRead).length;
+}
+
+// ========== TA Notifications ==========
+
+const TA_NOTIFICATION_KEY = 'taNotifications';
+const TA_SEEN_EVENTS_KEY = 'taSeenEventIds';
+
+// Get notifications for TA
+export function getTaNotifications() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(TA_NOTIFICATION_KEY);
+    if (!stored) return [];
+    const notifications = JSON.parse(stored);
+    return Array.isArray(notifications) ? notifications : [];
+  } catch (err) {
+    console.error('Error loading TA notifications:', err);
+    return [];
+  }
+}
+
+// Create a notification for TA
+export function createTaNotification(notification) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const existing = getTaNotifications();
+    const newNotification = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      ...notification,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    };
+    const updated = [newNotification, ...existing];
+    localStorage.setItem(TA_NOTIFICATION_KEY, JSON.stringify(updated));
+    return newNotification;
+  } catch (err) {
+    console.error('Error creating TA notification:', err);
+  }
+}
+
+// Mark a notification as read for TA
+export function markTaNotificationRead(notificationId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getTaNotifications();
+    const updated = notifications.map(n => 
+      n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
+    );
+    localStorage.setItem(TA_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error marking TA notification as read:', err);
+  }
+}
+
+// Mark all notifications as read for TA
+export function markAllTaNotificationsRead() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getTaNotifications();
+    const updated = notifications.map(n => ({
+      ...n,
+      isRead: true,
+      readAt: n.isRead ? n.readAt : new Date().toISOString(),
+    }));
+    localStorage.setItem(TA_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error marking all TA notifications as read:', err);
+  }
+}
+
+// Delete a notification for TA
+export function deleteTaNotification(notificationId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const notifications = getTaNotifications();
+    const updated = notifications.filter(n => n.id !== notificationId);
+    localStorage.setItem(TA_NOTIFICATION_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error deleting TA notification:', err);
+  }
+}
+
+// Delete all notifications for TA
+export function deleteAllTaNotifications() {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(TA_NOTIFICATION_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.error('Error deleting all TA notifications:', err);
+  }
+}
+
+// Get unread count for TA
+export function getTaUnreadCount() {
+  const notifications = getTaNotifications();
+  return notifications.filter(n => !n.isRead).length;
+}
+
 // Get seen event IDs (to track which events have been seen)
 export function getSeenEventIds() {
   if (typeof localStorage === 'undefined') return new Set();
@@ -352,8 +544,10 @@ export function markReminderSent(userId, reminderId) {
 export function createReminderNotification(notification) {
   if (typeof localStorage === 'undefined') return;
   try {
-    // Add to student notifications (shared by students, staff, TA)
+    // Add to separate notifications for each role
     createStudentNotification(notification);
+    createStaffNotification(notification);
+    createTaNotification(notification);
     
     // Add to event office notifications
     createEventOfficeNotification(notification);

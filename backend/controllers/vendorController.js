@@ -410,14 +410,32 @@ exports.cancelLoyaltyApplication = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'You cannot cancel another vendor\'s application' });
         }
 
-        // Only pending applications can be cancelled
-        if (application.status !== 'pending') {
-            return res.status(400).json({ success: false, message: 'Only pending applications can be cancelled' });
+        // Only pending or approved applications can be cancelled
+        if (application.status !== 'pending' && application.status !== 'approved') {
+            return res.status(400).json({ success: false, message: 'Only pending or approved applications can be cancelled' });
         }
+
+        // Store the previous status before cancelling
+        const wasApproved = application.status === 'approved';
+        const orgName = application.organization;
 
         // Mark as cancelled
         application.status = 'cancelled';
         await application.save();
+        
+        // If it was an approved application, create a notification about the cancellation
+        if (wasApproved && orgName) {
+            try {
+                await Notification.create({
+                    type: 'LoyaltyPartnerAdded', // Reusing the type, but the message will indicate cancellation
+                    message: `${orgName} has been removed from the GUC loyalty program.`,
+                    recipientsRoles: ['Student', 'Staff', 'TA', 'Professor', 'Vendor'],
+                    organization: orgName
+                });
+            } catch (notifyErr) {
+                console.error('Failed to create loyalty cancellation notification:', notifyErr?.message || notifyErr);
+            }
+        }
 
         return res.json({
             success: true,

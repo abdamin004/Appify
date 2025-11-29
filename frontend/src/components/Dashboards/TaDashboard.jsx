@@ -8,13 +8,14 @@ import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManu
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import { showToast, confirmDialog } from "../../utils/toast";
+import userService from "../../services/userService";
 import { 
-  getStudentNotifications, 
-  createStudentNotification, 
-  markStudentNotificationRead, 
-  markAllStudentNotificationsRead, 
-  deleteStudentNotification,
-  deleteAllStudentNotifications,
+  getTaNotifications, 
+  createTaNotification, 
+  markTaNotificationRead, 
+  markAllTaNotificationsRead, 
+  deleteTaNotification,
+  deleteAllTaNotifications,
   getSeenEventIds,
   markEventsAsSeen,
   getSentReminders,
@@ -92,6 +93,15 @@ function TADashboard() {
     };
     window.addEventListener('newEventCreated', handleNewEvent);
     return () => window.removeEventListener('newEventCreated', handleNewEvent);
+  }, []);
+
+  // Listen for loyalty partner added events
+  useEffect(() => {
+    const handleLoyaltyPartnerAdded = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('loyaltyPartnerAdded', handleLoyaltyPartnerAdded);
+    return () => window.removeEventListener('loyaltyPartnerAdded', handleLoyaltyPartnerAdded);
   }, []);
 
   useEffect(() => {
@@ -185,10 +195,26 @@ function TADashboard() {
     }
   }, [activeTab]);
 
-  const fetchNotifications = () => {
+  const fetchNotifications = async () => {
     try {
-      const notifs = getStudentNotifications();
-      setNotifications(notifs);
+      // Fetch only frontend notifications (localStorage)
+      const localNotifs = getTaNotifications();
+      
+      // Convert frontend notifications to match backend format for consistency
+      const formattedFrontend = localNotifs.map(n => ({
+        ...n,
+        read: n.isRead,
+        _id: n.id,
+      }));
+      
+      // Sort by creation date (newest first)
+      formattedFrontend.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.date || 0);
+        const dateB = new Date(b.createdAt || b.date || 0);
+        return dateB - dateA;
+      });
+      
+      setNotifications(formattedFrontend);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);
@@ -247,7 +273,7 @@ function TADashboard() {
         newEvents.forEach(event => {
           const eventId = String(event._id || event.id);
           const eventType = event.type || 'Event';
-          createStudentNotification({
+            createTaNotification({
             type: 'NewEvent',
             message: `New ${eventType}: ${event.title}`,
             eventId: eventId,
@@ -277,7 +303,7 @@ function TADashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getStudentNotifications();
+      const notifs = getTaNotifications();
       const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
       setReminders(reminderNotifs);
     } catch (err) {
@@ -880,7 +906,7 @@ function TADashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markStudentNotificationRead(reminder.id);
+                        markTaNotificationRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -977,7 +1003,7 @@ function TADashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markStudentNotificationRead(reminder.id);
+                                markTaNotificationRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -996,7 +1022,7 @@ function TADashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStudentNotification(reminder.id);
+                              deleteTaNotification(reminder.id);
                               fetchReminders();
                             }}
                             style={{
@@ -1284,11 +1310,12 @@ function TADashboard() {
                   Notifications
                 </h2>
                 <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length > 0 && (
+                  {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
                     <button
                       onClick={() => {
-                        markAllStudentNotificationsRead();
+                        markAllTaNotificationsRead();
                         fetchNotifications();
+                        showToast.success('All notifications marked as read');
                       }}
                       style={{
                         ...buttonStyles.primary,
@@ -1304,8 +1331,9 @@ function TADashboard() {
                       onClick={async () => {
                         const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
                         if (confirmed) {
-                          deleteAllStudentNotifications();
+                          deleteAllTaNotifications();
                           fetchNotifications();
+                          showToast.success('All notifications deleted');
                         }
                       }}
                       style={{
@@ -1340,16 +1368,19 @@ function TADashboard() {
                 <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {notifications.filter(n => n.type !== 'EventReminder').map((notif) => (
+                  {notifications.filter(n => n.type !== 'EventReminder').map((notif) => {
+                    const isRead = notif.read || notif.isRead;
+                    
+                    return (
                     <div
-                      key={notif.id}
+                      key={notif.id || notif._id}
                       style={{
                         padding: spacing.xl,
-                        background: notif.isRead ? colors.gray50 : colors.white,
+                        background: isRead ? colors.gray50 : colors.white,
                         borderRadius: borderRadius.xl,
-                        border: notif.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
+                        border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
                         position: "relative",
-                        boxShadow: notif.isRead ? shadows.sm : shadows.md,
+                        boxShadow: isRead ? shadows.sm : shadows.md,
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
@@ -1358,15 +1389,20 @@ function TADashboard() {
                             {notif.type === 'NewEvent' && (
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                             )}
+                            {notif.type === 'LoyaltyPartnerAdded' && (
+                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
+                            )}
                             <h3 style={{ 
                               color: colors.primary, 
                               margin: 0, 
                               fontSize: typography.fontSize.lg,
-                              fontWeight: notif.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
+                              fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' : 'Notification'}
+                              {notif.type === 'NewEvent' ? 'New Event Available' : 
+                               notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' : 
+                               'Notification'}
                             </h3>
-                            {!notif.isRead && (
+                            {!isRead && (
                               <span style={{
                                 background: colors.error,
                                 color: colors.white,
@@ -1380,7 +1416,7 @@ function TADashboard() {
                           <p style={{ 
                             color: colors.gray500, 
                             margin: `${spacing.sm} 0`,
-                            fontWeight: notif.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                            fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base
                           }}>
                             {notif.message}
@@ -1409,10 +1445,10 @@ function TADashboard() {
                           </p>
                         </div>
                         <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                          {!notif.isRead && (
+                          {!isRead && (
                             <button
                               onClick={() => {
-                                markStudentNotificationRead(notif.id);
+                                markTaNotificationRead(notif.id);
                                 fetchNotifications();
                               }}
                               style={{
@@ -1431,8 +1467,9 @@ function TADashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStudentNotification(notif.id);
+                              deleteTaNotification(notif.id);
                               fetchNotifications();
+                              showToast.success('Notification deleted');
                             }}
                             style={{
                               padding: `${spacing.xs} ${spacing.md}`,
@@ -1462,7 +1499,8 @@ function TADashboard() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -338,6 +338,8 @@ export async function notifyAllUsersAboutNewEvent(event) {
     const notificationService = await import('./notificationService');
     const {
       createStudentNotification,
+      createStaffNotification,
+      createTaNotification,
       createEventOfficeNotification,
       markEventsAsSeen,
       createProfessorNotification
@@ -361,25 +363,44 @@ export async function notifyAllUsersAboutNewEvent(event) {
       eventType: eventType,
     };
 
-    // Create student notification (shared by students, staff, TA)
+    // Create separate notifications for each role
     createStudentNotification(notification);
+    createStaffNotification(notification);
+    createTaNotification(notification);
 
     // Create event office notification
     createEventOfficeNotification(notification);
 
-    // Create notifications for all professors (get all professor IDs from localStorage)
-    // We'll create a notification for each professor we can find
+    // Create notifications for all professors
+    // First try to get all professors from backend (if user has admin/EventOffice permissions)
     try {
-      const allKeys = Object.keys(localStorage);
-      const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
-      professorKeys.forEach(key => {
-        const professorId = key.replace('professorNotifications_', '');
+      const adminService = await import('./adminService');
+      const professors = await adminService.listAllUsers('Professor');
+      const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
+      
+      // Create notification for each professor
+      professorList.forEach(professor => {
+        const professorId = String(professor._id || professor.id);
         if (professorId) {
           createProfessorNotification(professorId, notification);
         }
       });
     } catch (profErr) {
-      console.log('Could not create professor notifications:', profErr);
+      // If backend fetch fails (e.g., user doesn't have admin permissions), 
+      // fall back to localStorage method for professors who have already logged in
+      console.log('Could not fetch professors from backend, trying localStorage method:', profErr);
+      try {
+        const allKeys = Object.keys(localStorage);
+        const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
+        professorKeys.forEach(key => {
+          const professorId = key.replace('professorNotifications_', '');
+          if (professorId) {
+            createProfessorNotification(professorId, notification);
+          }
+        });
+      } catch (localStorageErr) {
+        console.log('Could not create professor notifications from localStorage:', localStorageErr);
+      }
     }
 
     // Show browser notification if permission granted

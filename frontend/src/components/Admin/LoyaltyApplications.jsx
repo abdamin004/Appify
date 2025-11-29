@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
 import { showToast, confirmDialog } from '../../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
+import { 
+  createStudentNotification, 
+  createStaffNotification, 
+  createTaNotification,
+  createProfessorNotification 
+} from '../../services/notificationService';
 
 export default function LoyaltyApplications() {
   const navigate = useNavigate();
@@ -31,10 +37,108 @@ export default function LoyaltyApplications() {
   const handleReview = async (id, action) => {
     const notes = window.prompt('Optional notes/reason (press Enter to skip):');
     try {
-      await adminService.reviewLoyaltyApplication(id, action, notes || '');
+      // Find the application in the current list to get full details
+      const currentApp = apps.find(a => String(a._id) === String(id));
+      
+      const result = await adminService.reviewLoyaltyApplication(id, action, notes || '');
       showToast.success(`Application ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+      
+      // If approved, create frontend notifications for all user roles
+      if (action === 'approve') {
+        // Use the application from result, or fall back to currentApp, or reload to get fresh data
+        let app = result?.application || currentApp;
+        
+        // If we still don't have the app, reload the list to get fresh data
+        if (!app) {
+          try {
+            const freshRes = await adminService.listLoyaltyApplications('approved');
+            app = freshRes.applications?.find(a => String(a._id) === String(id));
+          } catch (reloadErr) {
+            console.error('Error reloading application:', reloadErr);
+          }
+        }
+        
+        // If we still don't have app data, use currentApp or form data from the UI
+        if (!app && currentApp) {
+          app = currentApp;
+        }
+        
+        if (app) {
+          const orgName = app.organization || app.vendorUser?.companyName || 'A vendor';
+          const discountRate = app.discountRate;
+          const promoCode = app.promoCode;
+          const discountInfo = typeof discountRate === 'number'
+            ? `${discountRate}%`
+            : 'a special';
+          const promoInfo = promoCode ? ` Use code ${promoCode}.` : '';
+          
+          const notification = {
+            type: 'LoyaltyPartnerAdded',
+            message: `${orgName} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
+            organization: orgName,
+            discountRate: discountRate,
+            promoCode: promoCode,
+            date: new Date().toISOString(),
+          };
+          
+          // Create notifications for all user roles
+          try {
+            const studentNotif = createStudentNotification(notification);
+            const staffNotif = createStaffNotification(notification);
+            const taNotif = createTaNotification(notification);
+            
+            if (!studentNotif || !staffNotif || !taNotif) {
+              console.warn('Some notification creations returned undefined');
+            }
+            
+            // Create notifications for all professors
+            try {
+              const professors = await adminService.listAllUsers('Professor');
+              const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
+              
+              let professorCount = 0;
+              professorList.forEach(professor => {
+                const professorId = String(professor._id || professor.id);
+                if (professorId) {
+                  createProfessorNotification(professorId, notification);
+                  professorCount++;
+                }
+              });
+              console.log(`Created notifications for ${professorCount} professors`);
+            } catch (profErr) {
+              console.error('Could not create professor loyalty notifications:', profErr);
+              // Fall back to localStorage method
+              try {
+                const allKeys = Object.keys(localStorage);
+                const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
+                professorKeys.forEach(key => {
+                  const professorId = key.replace('professorNotifications_', '');
+                  if (professorId) {
+                    createProfessorNotification(professorId, notification);
+                  }
+                });
+              } catch (localStorageErr) {
+                console.error('Could not create professor notifications from localStorage:', localStorageErr);
+              }
+            }
+            
+            // Dispatch event to refresh notifications in all dashboards
+            window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
+            
+            console.log('Loyalty notifications created successfully for:', { orgName, discountRate, promoCode });
+          } catch (notifErr) {
+            console.error('Error creating loyalty notifications:', notifErr);
+            showToast.error('Notifications created but some may have failed');
+          }
+        } else {
+          console.error('Could not find application data to create notifications. Result:', result, 'CurrentApp:', currentApp);
+          showToast.warning('Application approved but notifications may not have been created');
+        }
+      }
+      
       load();
     } catch (err) {
+      console.error('Error reviewing loyalty application:', err);
       showToast.error(err.message || 'Failed to review application');
     }
   };

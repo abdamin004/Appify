@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
+import adminService from '../../services/adminService';
 import { showToast, confirmDialog } from '../../utils/toast';
+import { 
+  createStudentNotification, 
+  createStaffNotification, 
+  createTaNotification,
+  createProfessorNotification 
+} from '../../services/notificationService';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
 
 const LoyaltyApplicationsList = () => {
@@ -27,14 +34,75 @@ const LoyaltyApplicationsList = () => {
   };
 
   const handleCancel = async (applicationId) => {
-    const confirmed = await confirmDialog('Are you sure you want to cancel this loyalty application? This action cannot be undone.', 'Cancel Application');
+    const app = applications.find(a => a._id === applicationId);
+    const isApproved = app?.status === 'approved';
+    const message = isApproved 
+      ? 'Are you sure you want to cancel this approved loyalty program? This will remove it from the loyalty program list and notify all users. This action cannot be undone.'
+      : 'Are you sure you want to cancel this loyalty application? This action cannot be undone.';
+    const title = isApproved ? 'Cancel Loyalty Program' : 'Cancel Application';
+    
+    const confirmed = await confirmDialog(message, title);
     if (!confirmed) {
       return;
     }
 
     try {
       await vendorService.cancelLoyaltyApplication(applicationId);
-      showToast.success('Loyalty application cancelled successfully');
+      
+      // If it was an approved program, create frontend notifications for all users
+      if (isApproved && app) {
+        const orgName = app.organization || 'A vendor';
+        const notification = {
+          type: 'LoyaltyPartnerAdded',
+          message: `${orgName} has been removed from the GUC loyalty program.`,
+          organization: orgName,
+          date: new Date().toISOString(),
+        };
+        
+        try {
+          // Create notifications for all user roles
+          createStudentNotification(notification);
+          createStaffNotification(notification);
+          createTaNotification(notification);
+          
+          // Create notifications for all professors
+          try {
+            const professors = await adminService.listAllUsers('Professor');
+            const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
+            
+            professorList.forEach(professor => {
+              const professorId = String(professor._id || professor.id);
+              if (professorId) {
+                createProfessorNotification(professorId, notification);
+              }
+            });
+          } catch (profErr) {
+            console.error('Could not create professor cancellation notifications:', profErr);
+            // Fall back to localStorage method
+            try {
+              const allKeys = Object.keys(localStorage);
+              const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
+              professorKeys.forEach(key => {
+                const professorId = key.replace('professorNotifications_', '');
+                if (professorId) {
+                  createProfessorNotification(professorId, notification);
+                }
+              });
+            } catch (localStorageErr) {
+              console.error('Could not create professor notifications from localStorage:', localStorageErr);
+            }
+          }
+          
+          // Dispatch event to refresh notifications in all dashboards
+          window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
+        } catch (notifErr) {
+          console.error('Error creating cancellation notifications:', notifErr);
+        }
+      }
+      
+      showToast.success(isApproved 
+        ? 'Loyalty program cancelled successfully. Users have been notified.' 
+        : 'Loyalty application cancelled successfully');
       fetchApplications();
     } catch (err) {
       showToast.error(err.message || 'Failed to cancel application');
@@ -197,7 +265,7 @@ const LoyaltyApplicationsList = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {app.status === 'pending' && (
+                  {(app.status === 'pending' || app.status === 'approved') && (
                     <button
                       onClick={() => handleCancel(app._id)}
                       style={{
@@ -208,10 +276,19 @@ const LoyaltyApplicationsList = () => {
                         borderRadius: '6px',
                         fontSize: '0.9rem',
                         fontWeight: '600',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#fecaca';
+                        e.target.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#fee2e2';
+                        e.target.style.transform = 'translateY(0)';
                       }}
                     >
-                      Cancel
+                      {app.status === 'approved' ? 'Cancel Program' : 'Cancel'}
                     </button>
                   )}
                   {app.status === 'cancelled' && (
@@ -225,7 +302,16 @@ const LoyaltyApplicationsList = () => {
                         borderRadius: '6px',
                         fontSize: '0.9rem',
                         fontWeight: '600',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#e5e7eb';
+                        e.target.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#f3f4f6';
+                        e.target.style.transform = 'translateY(0)';
                       }}
                     >
                       Delete

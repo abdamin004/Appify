@@ -189,54 +189,35 @@ function StudentDashboard() {
     return () => window.removeEventListener('newEventCreated', handleNewEvent);
   }, []);
 
+  // Listen for loyalty partner added events
+  useEffect(() => {
+    const handleLoyaltyPartnerAdded = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('loyaltyPartnerAdded', handleLoyaltyPartnerAdded);
+    return () => window.removeEventListener('loyaltyPartnerAdded', handleLoyaltyPartnerAdded);
+  }, []);
+
   const fetchNotifications = async () => {
     try {
-      // Fetch backend notifications (system-wide notifications with per-user status)
-      let backendNotifs = [];
-      try {
-        const backendRes = await userService.getMyNotifications();
-        backendNotifs = Array.isArray(backendRes?.notifications) ? backendRes.notifications : [];
-      } catch (backendErr) {
-        // If backend fails, continue with localStorage only
-        console.error('Error fetching backend notifications:', backendErr);
-      }
-      
-      // Fetch localStorage notifications (legacy/local notifications)
+      // Fetch only frontend notifications (localStorage)
       const localNotifs = getStudentNotifications();
       
-      // Mark backend notifications with source identifier
-      const markedBackendNotifs = backendNotifs.map(n => ({
+      // Convert frontend notifications to match backend format for consistency
+      const formattedFrontend = localNotifs.map(n => ({
         ...n,
-        source: 'system' // Mark as backend notification
+        read: n.isRead,
+        _id: n.id,
       }));
-      
-      // Mark local notifications with source identifier
-      const markedLocalNotifs = localNotifs.map(n => ({
-        ...n,
-        source: 'user' // Mark as local notification
-      }));
-      
-      // Combine both, filtering out duplicates by ID
-      const allNotifs = [...markedBackendNotifs];
-      markedLocalNotifs.forEach(localNotif => {
-        const exists = allNotifs.some(n => {
-          const nId = String(n._id || n.id || '');
-          const localId = String(localNotif._id || localNotif.id || '');
-          return nId && localId && nId === localId;
-        });
-        if (!exists) {
-          allNotifs.push(localNotif);
-        }
-      });
       
       // Sort by creation date (newest first)
-      allNotifs.sort((a, b) => {
+      formattedFrontend.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.date || 0);
         const dateB = new Date(b.createdAt || b.date || 0);
         return dateB - dateA;
       });
       
-      setNotifications(allNotifs);
+      setNotifications(formattedFrontend);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setNotifications([]);
@@ -1308,11 +1289,12 @@ function StudentDashboard() {
                   Notifications
                 </h2>
                 <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.isRead).length > 0 && (
+                  {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
                     <button
                       onClick={() => {
                         markAllStudentNotificationsRead();
                         fetchNotifications();
+                        showToast.success('All notifications marked as read');
                       }}
                       style={{
                         ...pillButtonStyles.neutral,
@@ -1329,6 +1311,7 @@ function StudentDashboard() {
                         if (confirmed) {
                           deleteAllStudentNotifications();
                           fetchNotifications();
+                          showToast.success('All notifications deleted');
                         }
                       }}
                       style={{
@@ -1374,14 +1357,14 @@ function StudentDashboard() {
                 <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {notifications.map((notif) => (
                     <div
-                      key={notif.id}
+                      key={notif.id || notif._id}
                       style={{
                         padding: spacing.xl,
-                        background: notif.isRead ? colors.gray50 : colors.white,
+                        background: (notif.read || notif.isRead) ? colors.gray50 : colors.white,
                         borderRadius: borderRadius.xl,
-                        border: notif.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
+                        border: (notif.read || notif.isRead) ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
                         position: "relative",
-                        boxShadow: notif.isRead ? shadows.sm : shadows.md,
+                        boxShadow: (notif.read || notif.isRead) ? shadows.sm : shadows.md,
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
@@ -1390,15 +1373,20 @@ function StudentDashboard() {
                             {notif.type === 'NewEvent' && (
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                             )}
+                            {notif.type === 'LoyaltyPartnerAdded' && (
+                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
+                            )}
                             <h3 style={{ 
                               color: colors.primary, 
                               margin: 0, 
                               fontSize: typography.fontSize.lg,
-                              fontWeight: notif.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
+                              fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' : 'Notification'}
+                              {notif.type === 'NewEvent' ? 'New Event Available' : 
+                               notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' : 
+                               'Notification'}
                             </h3>
-                            {!notif.isRead && (
+                            {!(notif.read || notif.isRead) && (
                               <span style={{
                                 background: colors.error,
                                 color: colors.white,
@@ -1412,7 +1400,7 @@ function StudentDashboard() {
                           <p style={{ 
                             color: colors.gray500, 
                             margin: `${spacing.sm} 0`,
-                            fontWeight: notif.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                            fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base,
                           }}>
                             {notif.message}
@@ -1443,21 +1431,9 @@ function StudentDashboard() {
                         <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                           {!notif.isRead && (
                             <button
-                              onClick={async () => {
-                                try {
-                                  // Check if this is a backend notification (has _id and source is 'system')
-                                  if (notif._id && notif.source === 'system') {
-                                    // Mark as read in backend using per-user status
-                                    await userService.markNotificationRead(notif._id);
-                                    showToast.success('Notification marked as read');
-                                  } else {
-                                    // Mark as read in localStorage (legacy notifications)
-                                    markStudentNotificationRead(notif.id || notif._id);
-                                  }
-                                  fetchNotifications();
-                                } catch (err) {
-                                  showToast.error(err.message || 'Failed to mark notification as read');
-                                }
+                              onClick={() => {
+                                markStudentNotificationRead(notif.id);
+                                fetchNotifications();
                               }}
                               style={{
                                 ...pillButtonStyles.success,
@@ -1468,21 +1444,10 @@ function StudentDashboard() {
                             </button>
                           )}
                           <button
-                            onClick={async () => {
-                              try {
-                                // Check if this is a backend notification (has _id and source is 'system')
-                                if (notif._id && notif.source === 'system') {
-                                  // Delete from backend using per-user status
-                                  await userService.deleteNotification(notif._id);
-                                  showToast.success('Notification deleted');
-                                } else {
-                                  // Delete from localStorage (legacy notifications)
-                                  deleteStudentNotification(notif.id || notif._id);
-                                }
-                                fetchNotifications();
-                              } catch (err) {
-                                showToast.error(err.message || 'Failed to delete notification');
-                              }
+                            onClick={() => {
+                              deleteStudentNotification(notif.id);
+                              fetchNotifications();
+                              showToast.success('Notification deleted');
                             }}
                             style={{
                               padding: `${spacing.xs} ${spacing.md}`,
