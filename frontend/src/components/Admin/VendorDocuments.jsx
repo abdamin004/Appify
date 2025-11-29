@@ -79,7 +79,7 @@ export default function VendorDocuments({ hideBackButton = false, backPath = '/A
     setTimeout(() => fetchVendorDocuments(), 0);
   };
 
-  const handleViewDocument = async (vendorId, documentType) => {
+  const handleViewDocument = async (vendorId, documentType, vendorName = 'vendor') => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -126,6 +126,69 @@ export default function VendorDocuments({ hideBackButton = false, backPath = '/A
     } catch (err) {
       console.error('Error viewing document:', err);
       showToast.error(err.message || 'Failed to view document');
+    }
+  };
+
+  const handleDownloadDocument = async (vendorId, documentType, vendorName = 'vendor') => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showToast.error('Please login to download documents');
+        return;
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      // Add download=true query parameter to force download
+      const url = `${API_BASE}/admin/vendor-documents/${vendorId}/${documentType}?download=true`;
+      
+      // Fetch the document with authentication
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download document: ${response.statusText}`);
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Get filename from Content-Disposition header or create one
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${vendorName}_${documentType}.${blob.type.includes('pdf') ? 'pdf' : blob.type.includes('png') ? 'png' : 'jpg'}`;
+      
+      if (contentDisposition) {
+        // Try to extract filename from Content-Disposition header
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+          // Decode URI if needed
+          try {
+            filename = decodeURIComponent(filename);
+          } catch (e) {
+            // If decoding fails, use as is
+          }
+        }
+      }
+      
+      // Create a download link and trigger download
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      
+      showToast.success('Document downloaded successfully');
+    } catch (err) {
+      console.error('Error downloading document:', err);
+      showToast.error(err.message || 'Failed to download document');
     }
   };
 
@@ -210,40 +273,52 @@ export default function VendorDocuments({ hideBackButton = false, backPath = '/A
                   <p><b>ID:</b> {doc.vendor?.id || 'N/A'}</p>
                   <p><b>Email:</b> {doc.vendor?.email || 'N/A'}</p>
                   <p><b>Tax Card:</b> {doc.vendor?.taxCardAvailable ? (
-                    <span>
-                      Available - <button
-                        onClick={() => handleViewDocument(doc.vendor.id, 'taxCard')}
+                    <span style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span>Available</span>
+                      <button
+                        onClick={() => handleViewDocument(doc.vendor.id, 'taxCard', doc.vendor.companyName || 'vendor')}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: colors.primary,
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 'inherit',
-                          fontFamily: 'inherit'
+                          ...buttonStyles.secondary,
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          fontSize: typography.fontSize.sm,
                         }}
                       >
-                        View/Download
+                        👁️ View
+                      </button>
+                      <button
+                        onClick={() => handleDownloadDocument(doc.vendor.id, 'taxCard', doc.vendor.companyName || 'vendor')}
+                        style={{
+                          ...buttonStyles.primary,
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      >
+                        ⬇️ Download
                       </button>
                     </span>
                   ) : "Not Provided"}</p>
                   <p><b>Logo:</b> {doc.vendor?.logoAvailable ? (
-                    <span>
-                      Available - <button
-                        onClick={() => handleViewDocument(doc.vendor.id, 'logo')}
+                    <span style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span>Available</span>
+                      <button
+                        onClick={() => handleViewDocument(doc.vendor.id, 'logo', doc.vendor.companyName || 'vendor')}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: colors.primary,
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 'inherit',
-                          fontFamily: 'inherit'
+                          ...buttonStyles.secondary,
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          fontSize: typography.fontSize.sm,
                         }}
                       >
-                        View/Download
+                        👁️ View
+                      </button>
+                      <button
+                        onClick={() => handleDownloadDocument(doc.vendor.id, 'logo', doc.vendor.companyName || 'vendor')}
+                        style={{
+                          ...buttonStyles.primary,
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          fontSize: typography.fontSize.sm,
+                        }}
+                      >
+                        ⬇️ Download
                       </button>
                     </span>
                   ) : "Not Provided"}</p>

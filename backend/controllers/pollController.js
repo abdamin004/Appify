@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Poll = require('../models/Poll');
 const VendorApplication = require('../models/VendorApplication');
 const Event = require('../models/Event');
+const Booth = require('../models/Booth');
 const User = require('../models/User');
 
 // Get vendor applications that can be used for creating polls
@@ -18,15 +19,18 @@ exports.getVendorApplicationsForPoll = async (req, res) => {
     }
 
     // Validate event exists and is a Booth
-    const event = await Event.findById(eventId);
+    // Try to find as Booth first (discriminator), then fall back to Event
+    let event = await Booth.findById(eventId);
     if (!event) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Event not found' 
-      });
-    }
-
-    if (event.type !== 'Booth') {
+      // Fallback: check if it exists as any event
+      const anyEvent = await Event.findById(eventId);
+      if (!anyEvent) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'Event not found' 
+        });
+      }
+      // If found via Event but not via Booth, it's not a Booth event
       return res.status(400).json({ 
         success: false,
         message: 'Polls can only be created for Booth events' 
@@ -106,15 +110,18 @@ exports.createPoll = async (req, res) => {
     }
 
     // Validate event exists and is a Booth event
-    const event = await Event.findById(eventId);
+    // Try to find as Booth first (discriminator), then fall back to Event
+    let event = await Booth.findById(eventId);
     if (!event) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Event not found' 
-      });
-    }
-
-    if (event.type !== 'Booth') {
+      // Fallback: check if it exists as any event
+      const anyEvent = await Event.findById(eventId);
+      if (!anyEvent) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'Event not found' 
+        });
+      }
+      // If found via Event but not via Booth, it's not a Booth event
       return res.status(400).json({ 
         success: false,
         message: 'Polls can only be created for Booth events' 

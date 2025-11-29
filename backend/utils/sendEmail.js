@@ -153,11 +153,14 @@ const sendVendorApplicationApprovalEmail = async (vendor, application, event) =>
       </div>
       
       <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 5px; margin: 15px 0;">
-        <h4 style="color: #92400e; margin-top: 0;">Payment Required</h4>
-        <p><strong>Participation Fee:</strong> $${participationFee.toFixed(2)}</p>
-        <p><strong>Payment Deadline:</strong> ${paymentDeadline}</p>
-        <p style="color: #92400e; font-weight: bold;">Please complete your payment within 3 days to secure your participation.</p>
-        <p><a href="${paymentUrl}" style="display: inline-block; background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Pay Now</a></p>
+        <h4 style="color: #92400e; margin-top: 0;">💰 Payment Required</h4>
+        <p style="font-size: 18px; margin: 10px 0;"><strong>Participation Fee: $${participationFee.toFixed(2)}</strong></p>
+        <p><strong>Payment Deadline:</strong> <span style="color: #dc2626; font-weight: bold;">${paymentDeadline}</span></p>
+        <p style="color: #92400e; font-weight: bold; margin-top: 10px;">⚠️ Important: Payment must be completed within 3 days of approval (by ${paymentDeadline}) to secure your participation.</p>
+        ${event.type === 'Booth' && application.setupDurationWeeks ? `<p style="font-size: 12px; color: #6b7280; margin-top: 5px;">Fee calculated based on: ${application.setupDurationWeeks} week(s) × location tier</p>` : ''}
+        ${event.type === 'Bazaar' ? `<p style="font-size: 12px; color: #6b7280; margin-top: 5px;">Fee calculated based on: ${application.boothSize} booth size × location tier</p>` : ''}
+        <p style="margin-top: 15px;"><a href="${paymentUrl}" style="display: inline-block; background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">💳 Pay Now</a></p>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">You can pay via credit card or wallet balance. Payment link is also available in your vendor dashboard.</p>
       </div>
       
       ${application.notes ? `<p><strong>Notes from reviewer:</strong> ${application.notes}</p>` : ''}
