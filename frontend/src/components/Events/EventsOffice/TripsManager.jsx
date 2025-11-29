@@ -580,7 +580,7 @@ function TripsManager({ editOnly = false }) {
                     marginTop: spacing.sm,
                     marginBottom: spacing.xs,
                   }}>
-                    📍 {t.location} • ${t.price}
+                    📍 {t.location} • {t.price} EGP
                   </div>
                   <div style={{ 
                     color: colors.gray500, 

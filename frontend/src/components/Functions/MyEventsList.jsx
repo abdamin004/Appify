@@ -327,12 +327,10 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
     }
   };
 
-  // Gate by attendance (frontend-only): require attended flag or local attendance
+  // Rating allowed if: event has ended AND user is registered
   const canRate = (evt) => {
-    const attendedFlag = (evt && evt.attended === true) || (evt?.event && evt.event.attended === true);
-    const id = getEventId(evt);
-    const attendedLocal = id ? attendedSet.has(String(id)) : false;
-    return Boolean(attendedFlag || attendedLocal);
+    if (!hasEventEnded(evt)) return false;
+    return isRegistered(evt);
   };
 
   // Check if user is registered for the event (for comments - requirement 17)
@@ -674,24 +672,31 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
                 />
                 {!allowed && (
                   <span style={{ color: "#9ca3af", fontSize: 12 }}>
-                    Rating available after you mark attendance
+                    {!hasEventEnded(evt) 
+                      ? 'Rating available after event ends' 
+                      : !isRegistered(evt)
+                      ? 'Register to rate this event'
+                      : 'Rating available'}
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => toggleAttendedLocal(id)}
-                  style={{
-                    padding: '6px 10px',
-                    background: attendedSet.has(String(id)) ? 'rgba(34,197,94,0.15)' : 'rgba(212,175,55,0.15)',
-                    color: attendedSet.has(String(id)) ? '#16a34a' : '#b8941f',
-                    border: attendedSet.has(String(id)) ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(212,175,55,0.3)',
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {attendedSet.has(String(id)) ? 'Attended' : 'Mark Attended'}
-                </button>
+                {/* Show "Mark Attended" button only after event has ended */}
+                {hasEventEnded(evt) && isRegistered(evt) && (
+                  <button
+                    type="button"
+                    onClick={() => toggleAttendedLocal(id)}
+                    style={{
+                      padding: '6px 10px',
+                      background: attendedSet.has(String(id)) ? 'rgba(34,197,94,0.15)' : 'rgba(212,175,55,0.15)',
+                      color: attendedSet.has(String(id)) ? '#16a34a' : '#b8941f',
+                      border: attendedSet.has(String(id)) ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(212,175,55,0.3)',
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {attendedSet.has(String(id)) ? '✓ Attended' : 'Mark Attended'}
+                  </button>
+                )}
                 {isPayable && (
                   <div style={{ width: '100%', marginTop: spacing.sm }}>
                     <PaymentActions
