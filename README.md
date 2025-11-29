@@ -45,84 +45,31 @@ At the moment, only minor issues exist:
 ## 🔄 System Flow
 
 This section provides a high-level walkthrough of how the Appify platform works from login to event participation.  
-Screenshots and screen recordings will be added to illustrate the full user journey.
+Screenshots will be added to illustrate the full user journey.
 
 ---
 
-### 1️⃣ User Registration & Verification  
-- Students/Staff/TA/Professors register using their GUC email  
-- Vendors register using company details + document uploads  
-- Email verification flow triggers for all academic users  
-- Admins approve roles for Staff/TA/Professors
+### Events Office Dashboard
+![edash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0121.jpg)
 
-📸 *Screenshot Placeholder:*  
-`[ Insert screenshot of registration page here ]`
+### Admin Dashboard
+![adash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0122.jpg)
 
-🎥 *Screen Recording Placeholder:*  
-`[ Insert short clip showing verification email flow ]`
-
----
-
-### 2️⃣ Logging In & Dashboard Overview  
-- Users log in based on role  
-- Dashboard shows upcoming events, announcements, and new notifications
-
-📸 *Screenshot Placeholder:*  
-`[ Insert dashboard screenshot here ]`
-
----
-
-### 3️⃣ Browsing & Discovering Events  
-- Users explore all event types: Workshops, Trips, Bazaars, Booths, Conferences  
-- Search, filter, and sorting logic helps narrow results
-
-📸 *Screenshot Placeholder:*  
-`[ Insert events list screenshot here ]`
-
-🎥 *Screen Recording Placeholder:*  
-`[ Insert clip showing search + filter in action ]`
-
----
-
-### 4️⃣ Event Registration  
-- Users register for workshops/trips directly  
-- Receipt automatically emailed
-
-📸 *Screenshot Placeholder:*  
-`[ Insert registration form screenshot ]`  
-
-🎥 *Screen Recording Placeholder:*  
-`[ Insert clip: user paying for an event ]`
-
----
-
-### 5️⃣ Professor & Events Office Workflows  
-📸 *Screenshot Placeholder:*  
-`[ Insert workshop creation form screenshot ]`
-
-🎥 *Screen Recording Placeholder:*  
-`[ Insert clip of approval workflow ]`
-
----
-
-### 6️⃣ Vendor Participation Flow  
-📸 *Screenshot Placeholder:*  
-`[ Insert vendor application page screenshot ]`
+### Vendor Dashboard
+![vdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0123.jpg)
 
 
-📸 *Screenshot Placeholder:*  
-`[ Insert notifications dropdown screenshot ]`
+### Professor Dashboard
+![pdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0124.jpg)
 
----
 
-### 🎬 Full System Walkthrough (Will Be Added Soon)
+### Staff Dashboard
+![sdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0125.jpg)
 
-📹 *Video Placeholder:*  
-`[ Insert full demo video or YouTube link here ]`
 
----
+### Staff Dashboard
+![tadash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0126.jpg)
 
-This section will be updated as screenshots and demo recordings are finalized.
  
 ## 🛠️ **Tech Stack**
 
@@ -513,5 +460,6 @@ Appify was developed solely as part of a **university academic project**, and is
 You are free to view the code for learning purposes, but redistribution, sublicensing, or commercial use is not permitted unless explicitly approved by the project owners.
 
 If you wish to reuse any part of this project, please contact the team first.
+
 
 
