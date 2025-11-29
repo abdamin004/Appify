@@ -470,10 +470,20 @@ All endpoints are prefixed with `/api` (e.g. `/api/auth/login`).
 > For full request/response schemas and additional endpoints (e.g. comments, favorites, loyalty program, courts, gym, polls), see the Postman Testing section.
 ---
 ## 🧪 API Testing with Postman
-
 All core backend functionalities were tested using **Postman**.  
 Below is a sample of the main test cases used to validate critical system behavior.
- ***INCOMPLETE***
+###Login
+![Login](https://github.com/abdamin004/Appify/blob/main/Screenshot%202025-11-29%20225150.png)
+### Events
+![Events](https://github.com/abdamin004/Appify/blob/main/Screenshot%202025-11-29%20225415.png)
+### Courts
+![Courts](https://github.com/abdamin004/Appify/blob/main/Screenshot%202025-11-29%20225515.png)
+### Logout 
+![Logout](https://github.com/abdamin004/Appify/blob/main/Screenshot%202025-11-29%20225802.png)
+### Notifications
+![Notifications](https://github.com/abdamin004/Appify/blob/main/Screenshot%202025-11-29%20230001.png)
+
+ 
 ---
 ## 🤝 Contribution Guidelines
 
@@ -503,4 +513,5 @@ Appify was developed solely as part of a **university academic project**, and is
 You are free to view the code for learning purposes, but redistribution, sublicensing, or commercial use is not permitted unless explicitly approved by the project owners.
 
 If you wish to reuse any part of this project, please contact the team first.
+
 
