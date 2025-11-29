@@ -20,7 +20,10 @@ import {
   markEventsAsSeen,
   getSentReminders,
   markReminderSent,
-  createReminderNotification
+  createReminderNotification,
+  getCurrentUserReminders,
+  markReminderRead,
+  deleteReminder
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
@@ -271,9 +274,9 @@ function StaffDashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getStaffNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -759,7 +762,7 @@ function StaffDashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markStaffNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -855,7 +858,7 @@ function StaffDashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markStaffNotificationRead(reminder.id);
+                                markReminderRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -868,7 +871,7 @@ function StaffDashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStaffNotification(reminder.id);
+                              deleteReminder(reminder.id);
                               fetchReminders();
                             }}
                             style={{

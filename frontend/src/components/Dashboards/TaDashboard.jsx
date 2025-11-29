@@ -20,7 +20,10 @@ import {
   markEventsAsSeen,
   getSentReminders,
   markReminderSent,
-  createReminderNotification
+  createReminderNotification,
+  getCurrentUserReminders,
+  markReminderRead,
+  deleteReminder
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
@@ -303,9 +306,9 @@ function TADashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getTaNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -938,7 +941,7 @@ function TADashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markTaNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -1035,7 +1038,7 @@ function TADashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markTaNotificationRead(reminder.id);
+                                markReminderRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -1054,7 +1057,7 @@ function TADashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteTaNotification(reminder.id);
+                              deleteReminder(reminder.id);
                               fetchReminders();
                             }}
                             style={{

@@ -10,7 +10,7 @@ import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManu
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import { showToast, confirmDialog } from "../../utils/toast";
-import { getProfessorNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, deleteAllNotifications, getUnreadCount, createProfessorNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import { getProfessorNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, deleteAllNotifications, getUnreadCount, createProfessorNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification, getCurrentUserReminders, markReminderRead, deleteReminder } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
@@ -190,14 +190,9 @@ function ProfessorDashboard() {
 
   const fetchReminders = () => {
     try {
-      const rawUser = localStorage.getItem('user');
-      if (!rawUser) return;
-      const u = JSON.parse(rawUser);
-      const professorId = u && (u._id || u.id);
-      if (!professorId) return;
-      const notifs = getProfessorNotifications(professorId);
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);

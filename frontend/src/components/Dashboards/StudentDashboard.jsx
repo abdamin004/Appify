@@ -23,7 +23,10 @@ import {
   markEventsAsSeen,
   getSentReminders,
   markReminderSent,
-  createReminderNotification
+  createReminderNotification,
+  getCurrentUserReminders,
+  markReminderRead,
+  deleteReminder
 } from "../../services/notificationService";
 import userService from "../../services/userService";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
@@ -297,9 +300,9 @@ function StudentDashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getStudentNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -1119,7 +1122,7 @@ function StudentDashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markStudentNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -1224,7 +1227,7 @@ function StudentDashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markStudentNotificationRead(reminder.id);
+                                markReminderRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -1237,7 +1240,7 @@ function StudentDashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStudentNotification(reminder.id);
+                              deleteReminder(reminder.id);
                               fetchReminders();
                             }}
                             style={{

@@ -7,7 +7,7 @@ import QRCodeGenerator from "../QRCode/QRCodeGenerator";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
 import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
-import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, deleteAllEventOfficeNotifications, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification } from "../../services/notificationService";
+import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, deleteAllEventOfficeNotifications, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification, getCurrentUserReminders, markReminderRead, deleteReminder } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
@@ -490,9 +490,9 @@ function EventOfficeDashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getEventOfficeNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -1488,7 +1488,7 @@ function EventOfficeDashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markEventOfficeNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -1594,7 +1594,7 @@ function EventOfficeDashboard() {
                             {!isRead && (
                               <button
                                 onClick={() => {
-                                  markEventOfficeNotificationRead(reminder.id);
+                                  markReminderRead(reminder.id);
                                   fetchReminders();
                                 }}
                                 style={{
@@ -1613,7 +1613,7 @@ function EventOfficeDashboard() {
                             )}
                             <button
                               onClick={() => {
-                                deleteEventOfficeNotification(reminder.id);
+                                deleteReminder(reminder.id);
                                 fetchReminders();
                               }}
                               style={{

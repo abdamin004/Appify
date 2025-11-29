@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Event = require('../models/Event');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 /**
  * Helper to avoid duplicate reminders for the same user + event + type
@@ -46,8 +47,30 @@ async function sendRemindersForOffset(offsetHours, type, label) {
         }
 
         // For each registered user, create a notification if not already created
+        // Only send to users with allowed roles: Student, Staff, TA, Professor, EventOffice
+        // IMPORTANT: Only create reminders for users who are actually registered for this event
+        const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice'];
+        
+        // Ensure registeredUsers is an array and contains valid user IDs
+        if (!Array.isArray(ev.registeredUsers) || ev.registeredUsers.length === 0) {
+            continue; // Skip events with no registered users
+        }
+        
         for (const userId of ev.registeredUsers) {
             if (!userId) continue;
+
+            // Double-check: Verify user is actually in the registeredUsers array
+            const isRegistered = ev.registeredUsers.some(id => String(id) === String(userId));
+            if (!isRegistered) {
+                console.log(`User ${userId} is not in registeredUsers array, skipping reminder`);
+                continue;
+            }
+
+            // Check if user exists and has an allowed role
+            const user = await User.findById(userId).select('role');
+            if (!user || !allowedRoles.includes(user.role)) {
+                continue; // Skip users with disallowed roles (e.g., Admin, Vendor)
+            }
 
             const exists = await reminderExists(userId, ev._id, type);
             if (exists) continue; // avoid duplicates
