@@ -4,7 +4,7 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import WorkshopParticipantsView from "./WorkshopParticipantsView";
-import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
@@ -103,12 +103,12 @@ function ProfessorDashboard() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/events`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         return; // Silently fail - not critical
       }
@@ -456,13 +456,13 @@ function ProfessorDashboard() {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
@@ -506,9 +506,41 @@ function ProfessorDashboard() {
     try {
       const ids = getFavouriteIds().map(String);
       if (!ids.length) { setFavouriteEvents([]); return; }
-      const res = await fetch(`${API_BASE}/events`);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+
+      let list = [];
+
+      // Fetch published events
+      try {
+        const res = await fetch(`${API_BASE}/events`);
+        const data = await res.json();
+        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      } catch (e) {
+        console.error("Error fetching events for favorites:", e);
+      }
+
+      // Add frontend-approved workshops
+      try {
+        const approvedSet = getApprovedWorkshops();
+        if (approvedSet.size > 0) {
+          const sortRes = await fetch(`${API_BASE}/events/sort`);
+          const sortData = await sortRes.json();
+          if (Array.isArray(sortData)) {
+            const approvedWorkshops = sortData.filter(
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
+            );
+            // Mark as published for display
+            approvedWorkshops.forEach(w => { w.status = 'published'; });
+
+            // Merge avoiding duplicates
+            const existingIds = new Set(list.map(e => e._id));
+            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
+            list = [...list, ...newWorkshops];
+          }
+        }
+      } catch (e) {
+        console.log('Error adding approved workshops to favorites:', e);
+      }
+
       const filtered = list.filter(ev => {
         const eventId = ev._id || ev.id;
         // Check if event is in favorites AND user has access
@@ -626,7 +658,7 @@ function ProfessorDashboard() {
                     href="/professor/workshops"
                     onClick={(e) => {
                       if (e && e.preventDefault) {
-                        try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) {}
+                        try { e.preventDefault(); navigate('/professor/workshops'); return; } catch (_) { }
                       }
                     }}
                     style={{
