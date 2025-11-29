@@ -6,6 +6,37 @@ function WorkshopParticipantsView({ workshops }) {
   const navigate = useNavigate();
   const [participantsData, setParticipantsData] = useState({}); // { [workshopId]: { participants: [], loading: boolean, error: string } }
   const [openWorkshopId, setOpenWorkshopId] = useState(null);
+  const [showEditRequests, setShowEditRequests] = useState({}); // { [workshopId]: boolean }
+
+  // Parse edit requests from workshop description
+  const parseEditRequests = (description) => {
+    if (!description) return [];
+    const requests = [];
+    const regex = /--- EDIT REQUEST FROM EVENTS OFFICE \(([^)]+)\) ---\s*([\s\S]*?)\s*--- END EDIT REQUEST ---/g;
+    let match;
+    while ((match = regex.exec(description)) !== null) {
+      requests.push({
+        timestamp: match[1],
+        request: match[2].trim(),
+      });
+    }
+    return requests;
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return { bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.3)', text: '#d97706', label: 'Pending Approval' };
+      case 'published':
+        return { bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.3)', text: '#10b981', label: 'Published' };
+      case 'rejected':
+        return { bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', label: 'Rejected' };
+      case 'draft':
+        return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280', label: 'Draft' };
+      default:
+        return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280', label: status || 'Unknown' };
+    }
+  };
 
   const fetchParticipants = async (workshopId) => {
     if (participantsData[workshopId]?.loading) return; // Already loading
@@ -120,6 +151,11 @@ function WorkshopParticipantsView({ workshops }) {
         const remainingSpots = capacity > 0 ? Math.max(0, capacity - registeredCount) : null;
         const isOpen = openWorkshopId === workshopId;
         const data = participantsData[workshopId];
+        const status = workshop.status || 'pending';
+        const statusStyle = getStatusColor(status);
+        const editRequests = parseEditRequests(workshop.description);
+        const hasEditRequests = editRequests.length > 0;
+        const showEditRequestsForThis = showEditRequests[workshopId] || false;
 
         return (
           <div
@@ -148,16 +184,52 @@ function WorkshopParticipantsView({ workshops }) {
                 }}
               >
                 <div style={{ flex: 1, minWidth: "200px" }}>
-                  <h3
-                    style={{
-                      fontSize: "1.3rem",
-                      fontWeight: "bold",
-                      color: "#003366",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {title}
-                  </h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
+                    <h3
+                      style={{
+                        fontSize: "1.3rem",
+                        fontWeight: "bold",
+                        color: "#003366",
+                        margin: 0,
+                      }}
+                    >
+                      {title}
+                    </h3>
+                    <div
+                      style={{
+                        padding: "4px 12px",
+                        background: statusStyle.bg,
+                        border: `1px solid ${statusStyle.border}`,
+                        borderRadius: "12px",
+                        fontSize: "0.75rem",
+                        fontWeight: "700",
+                        color: statusStyle.text,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      {statusStyle.label}
+                    </div>
+                    {hasEditRequests && (
+                      <div
+                        style={{
+                          padding: "4px 12px",
+                          background: "rgba(245, 158, 11, 0.15)",
+                          border: "1px solid rgba(245, 158, 11, 0.4)",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: "700",
+                          color: "#d97706",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <span>✏️</span>
+                        <span>{editRequests.length} Edit Request{editRequests.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                  </div>
                   <div
                     style={{
                       display: "flex",
@@ -235,6 +307,117 @@ function WorkshopParticipantsView({ workshops }) {
                 </div>
               </div>
             </div>
+
+            {hasEditRequests && (
+              <div
+                style={{
+                  padding: "20px 25px",
+                  background: "rgba(245, 158, 11, 0.08)",
+                  borderTop: "2px solid rgba(245, 158, 11, 0.3)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showEditRequestsForThis ? "15px" : "0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "1.2rem" }}>✏️</span>
+                    <h4
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: "700",
+                        color: "#d97706",
+                        margin: 0,
+                      }}
+                    >
+                      Edit Requests from Events Office ({editRequests.length})
+                    </h4>
+                  </div>
+                  <button
+                    onClick={() => setShowEditRequests(prev => ({ ...prev, [workshopId]: !prev[workshopId] }))}
+                    style={{
+                      padding: "8px 16px",
+                      background: showEditRequestsForThis ? "rgba(245, 158, 11, 0.2)" : "transparent",
+                      border: "1px solid rgba(245, 158, 11, 0.4)",
+                      borderRadius: "8px",
+                      fontSize: "0.85rem",
+                      fontWeight: "600",
+                      color: "#d97706",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "rgba(245, 158, 11, 0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!showEditRequestsForThis) {
+                        e.target.style.background = "transparent";
+                      }
+                    }}
+                  >
+                    {showEditRequestsForThis ? "Hide Requests" : "Show Requests"}
+                  </button>
+                </div>
+                {showEditRequestsForThis && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {editRequests.map((editRequest, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: "15px",
+                          background: "white",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(245, 158, 11, 0.3)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <strong style={{ color: "#d97706", fontSize: "0.85rem" }}>
+                            Request from Events Office
+                          </strong>
+                          <span style={{ color: "#6b7280", fontSize: "0.75rem" }}>
+                            {editRequest.timestamp}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            color: "#374151",
+                            margin: 0,
+                            lineHeight: "1.6",
+                            whiteSpace: "pre-wrap",
+                            fontSize: "0.9rem",
+                          }}
+                        >
+                          {editRequest.request}
+                        </p>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: "8px" }}>
+                      <button
+                        onClick={() => navigate(`/professor/workshops?edit=${workshopId}`)}
+                        style={{
+                          padding: "10px 20px",
+                          background: "#f59e0b",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontSize: "0.9rem",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = "#d97706";
+                          e.target.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = "#f59e0b";
+                          e.target.style.transform = "translateY(0)";
+                        }}
+                      >
+                        ✏️ Edit Workshop to Address Requests
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {isOpen && (
               <div

@@ -357,7 +357,49 @@ function EventOfficeDashboard() {
       const updatedDescription = currentDescription + editRequestNote;
 
       await updateEvent(editRequestModal.workshopId, { description: updatedDescription });
-      showToast.success("Edit request sent successfully! The professor will see your request in the workshop details.");
+      
+      // Fetch the workshop again to get the createdBy field (it might not be populated in pendingWorkshops)
+      let professorId = null;
+      try {
+        const { getEventById } = await import('../../services/eventService');
+        const updatedWorkshop = await getEventById(editRequestModal.workshopId);
+        if (updatedWorkshop) {
+          // Handle both populated and non-populated createdBy field
+          if (updatedWorkshop.createdBy) {
+            if (typeof updatedWorkshop.createdBy === 'object') {
+              professorId = updatedWorkshop.createdBy._id || updatedWorkshop.createdBy.id;
+            } else {
+              professorId = updatedWorkshop.createdBy; // It's already an ID string
+            }
+          }
+        }
+      } catch (fetchErr) {
+        console.error('Error fetching workshop for professor ID:', fetchErr);
+        // Fallback: try to get from the original workshop object
+        if (workshop.createdBy) {
+          if (typeof workshop.createdBy === 'object') {
+            professorId = workshop.createdBy._id || workshop.createdBy.id;
+          } else {
+            professorId = workshop.createdBy;
+          }
+        }
+      }
+      
+      if (professorId) {
+        const { createProfessorNotification } = await import('../../services/notificationService');
+        createProfessorNotification(String(professorId), {
+          type: 'EditRequest',
+          message: `The Event Office has requested edits to your workshop "${workshop.title || 'Untitled Workshop'}". Please review and update your workshop.`,
+          workshopId: editRequestModal.workshopId,
+          workshopTitle: workshop.title || 'Untitled Workshop',
+          editRequest: editRequestModal.editRequest,
+        });
+        console.log('Created notification for professor:', professorId);
+      } else {
+        console.warn('Could not find professor ID for workshop:', editRequestModal.workshopId);
+      }
+      
+      showToast.success("Edit request sent successfully! The professor will see your request in the workshop details and notifications.");
       setEditRequestModal({ open: false, workshopId: null, editRequest: "" });
       fetchPendingWorkshops();
     } catch (err) {
@@ -2297,11 +2339,27 @@ function EventOfficeDashboard() {
               }
               placeholder="Example: Please update the budget amount, add more details to the agenda, change the location to..."
               style={{
-                ...inputStyles.base,
                 width: "100%",
                 minHeight: "150px",
                 resize: "vertical",
                 marginBottom: spacing.xl,
+                padding: spacing.md,
+                border: `1px solid ${colors.gray300}`,
+                borderRadius: borderRadius.md,
+                fontSize: typography.fontSize.base,
+                fontFamily: typography.fontFamily,
+                color: colors.gray700,
+                background: colors.white,
+                transition: transitions.fast,
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = colors.accent;
+                e.target.style.outline = "none";
+                e.target.style.boxShadow = `0 0 0 3px ${colors.accent}20`;
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = colors.gray300;
+                e.target.style.boxShadow = "none";
               }}
             />
             <div style={{ display: "flex", gap: spacing.md, justifyContent: "flex-end" }}>
