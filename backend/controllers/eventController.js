@@ -266,6 +266,7 @@ module.exports = {
             // Show all published events (past and future)
             const events = await Event.find({ status: 'published' })
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                 .sort({ startDate: 1 })
                 .exec();
             const enriched = await attachApprovedParticipants(events);
@@ -290,6 +291,7 @@ module.exports = {
             };
             const events = await Event.find(baseMatch)
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                 .sort({ startDate: 1 })
                 .exec();
             const enriched = await attachApprovedParticipants(events);
@@ -312,12 +314,14 @@ module.exports = {
             if (startDate) {
                 events = await Event.find({ ...base, startDate: { $gte: new Date(startDate) } })
                     .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                     .sort({ startDate: 1 })
                     .exec();
             } else {
                 // No startDate filter provided: include all published events (past and future)
                 events = await Event.find(base)
                     .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                     .sort({ startDate: 1 })
                     .exec();
             }
@@ -331,7 +335,10 @@ module.exports = {
 
     async sortEvents(req, res) {
         try {
-            const events = await Event.find().sort({ startDate: 1 }).populate({ path: 'vendors', options: { strictPopulate: false } });
+            const events = await Event.find()
+                .sort({ startDate: 1 })
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' });
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });

@@ -65,7 +65,7 @@ const EventCard = ({ event, onClick, onDelete, onArchive, hasEventPassed, onGene
       <div className="event-content">
         <div className="event-header">
           <span className="type-badge" style={{ background: color.bg, color: color.text }}>{event.type}</span>
-          {event.price > 0 && <span className="price">${event.price}</span>}
+          {event.price > 0 && <span className="price">{event.price} EGP</span>}
         </div>
 
         <h3 className="event-title">{event.title}</h3>

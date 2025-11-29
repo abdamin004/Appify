@@ -150,7 +150,17 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
     }
   };
 
-  const isRegistered = !!(event && Array.isArray(event.registeredUsers) && currentUserId && event.registeredUsers.map(String).includes(String(currentUserId)));
+  // Check if user is registered - handle both populated objects and IDs
+  const isRegistered = (() => {
+    if (!event || !currentUserId) return false;
+    const registeredUsers = event.registeredUsers || [];
+    if (!Array.isArray(registeredUsers)) return false;
+    return registeredUsers.some(u => {
+      // Handle both populated objects and plain IDs
+      const userId = u?._id || u?.id || u;
+      return String(userId) === String(currentUserId);
+    });
+  })();
 
   const handleViewDetails = (e) => {
     e.stopPropagation();
@@ -264,7 +274,7 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
       <div className="event-content">
         <div className="event-header">
           <span className="type-badge" style={{ background: color.bg, color: color.text }}>{event.type === 'GymSession' ? 'Gym Session' : event.type}</span>
-          {event.price > 0 && <span className="price">${event.price}</span>}
+          {event.price > 0 && <span className="price">{event.price} EGP</span>}
         </div>
 
         <h3 className="event-title">{event.title}</h3>
