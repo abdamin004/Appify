@@ -918,6 +918,96 @@ exports.getSalesReport = async (req, res) => {
       });
     });
 
+    // Calculate Workshop revenue from actual payments
+    const Workshop = require('../models/Workshop');
+    const Payment = require('../models/Payment');
+    
+    // Get all paid workshop payments
+    const workshopPaymentFilter = {
+      status: 'paid',
+      method: { $in: ['wallet', 'card'] }
+    };
+    
+    if (startDate || endDate) {
+      workshopPaymentFilter.createdAt = {};
+      if (startDate) workshopPaymentFilter.createdAt.$gte = new Date(startDate);
+      if (endDate) workshopPaymentFilter.createdAt.$lte = new Date(endDate);
+    }
+    
+    const workshopPayments = await Payment.find(workshopPaymentFilter)
+      .populate('event', 'title type status startDate endDate location requiredBudget capacity fundingSource extraRequiredResourses')
+      .populate('user', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+    
+    // Filter to only Workshop events and apply filters
+    const filteredWorkshopPayments = workshopPayments.filter(payment => {
+      if (!payment.event || payment.event.type !== 'Workshop') return false;
+      
+      // Apply event filters
+      if (type && payment.event.type !== type) return false;
+      if (status && payment.event.status !== status) return false;
+      if (searchName && !payment.event.title.toLowerCase().includes(searchName.toLowerCase())) return false;
+      if (startDate && new Date(payment.event.startDate) < new Date(startDate)) return false;
+      if (endDate && new Date(payment.event.startDate) > new Date(endDate)) return false;
+      
+      return true;
+    });
+    
+    let workshopRevenue = 0;
+    const workshopDetails = [];
+    const workshopRevenueByEvent = {};
+    
+    filteredWorkshopPayments.forEach(payment => {
+      if (!payment.event) return;
+      
+      const amount = Number(payment.amount || 0);
+      workshopRevenue += amount;
+      
+      const eventKey = String(payment.event._id);
+      if (!workshopRevenueByEvent[eventKey]) {
+        workshopRevenueByEvent[eventKey] = {
+          eventId: payment.event._id,
+          title: payment.event.title,
+          type: payment.event.type,
+          status: payment.event.status,
+          startDate: payment.event.startDate,
+          endDate: payment.event.endDate,
+          location: payment.event.location,
+          requiredBudget: payment.event.requiredBudget || 0,
+          capacity: payment.event.capacity || 0,
+          fundingSource: payment.event.fundingSource || '',
+          payments: [],
+          totalRevenue: 0,
+          attendeeCount: 0
+        };
+      }
+      
+      workshopRevenueByEvent[eventKey].payments.push({
+        paymentId: payment._id,
+        userId: payment.user?._id,
+        userName: payment.user ? `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 'Unknown',
+        amount: amount,
+        method: payment.method || 'unknown',
+        paidAt: payment.createdAt
+      });
+      workshopRevenueByEvent[eventKey].totalRevenue += amount;
+      workshopRevenueByEvent[eventKey].attendeeCount += 1;
+      
+      workshopDetails.push({
+        paymentId: payment._id,
+        eventId: payment.event._id,
+        eventTitle: payment.event.title,
+        eventType: payment.event.type,
+        userId: payment.user?._id,
+        userName: payment.user ? `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 'Unknown',
+        amount: amount,
+        method: payment.method || 'unknown',
+        paidAt: payment.createdAt
+      });
+    });
+    
+    const workshopRevenueByEventArray = Object.values(workshopRevenueByEvent);
+
     // Calculate Vendor Application revenue (booth fees for paid applications)
     const vendorAppFilter = {};
     if (startDate || endDate) {
@@ -991,9 +1081,10 @@ exports.getSalesReport = async (req, res) => {
     const vendorRevenueByEventArray = Object.values(vendorRevenueByEvent);
 
     // Calculate totals
-    const totalRevenue = tripRevenue + vendorRevenue;
+    const totalRevenue = tripRevenue + vendorRevenue + workshopRevenue;
     const totalTripEvents = tripDetails.length;
     const totalVendorApplications = vendorDetails.length;
+    const totalWorkshopPayments = workshopDetails.length;
 
     // Revenue breakdown by event type
     const revenueByType = {};
@@ -1014,11 +1105,31 @@ exports.getSalesReport = async (req, res) => {
       revenueByType[event.type].count += event.applications.length;
     });
 
+    workshopRevenueByEventArray.forEach(event => {
+      if (!revenueByType[event.type]) {
+        revenueByType[event.type] = { type: event.type, revenue: 0, count: 0 };
+      }
+      revenueByType[event.type].revenue += event.totalRevenue;
+      revenueByType[event.type].count += event.attendeeCount;
+    });
+
     const revenueByTypeArray = Object.values(revenueByType);
 
-    // Top revenue events (combining trips and vendor events)
+    // Top revenue events (combining trips, workshops, and vendor events)
     let allRevenueEvents = [
       ...tripDetails.map(t => ({ ...t, source: 'Trip' })),
+      ...workshopRevenueByEventArray.map(w => ({
+        eventId: w.eventId,
+        title: w.title,
+        type: w.type,
+        status: w.status,
+        startDate: w.startDate,
+        endDate: w.endDate,
+        location: w.location,
+        revenue: w.totalRevenue,
+        source: 'Workshop',
+        attendeeCount: w.attendeeCount
+      })),
       ...vendorRevenueByEventArray.map(v => ({ 
         eventId: v.eventId,
         title: v.title,
@@ -1064,6 +1175,15 @@ exports.getSalesReport = async (req, res) => {
           : b.totalRevenue - a.totalRevenue;
       });
     }
+    
+    // Sort workshop revenue by event revenue
+    if (sortBy === 'revenue' || !sortBy) {
+      workshopRevenueByEventArray.sort((a, b) => {
+        return isAscending 
+          ? a.totalRevenue - b.totalRevenue
+          : b.totalRevenue - a.totalRevenue;
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1081,13 +1201,20 @@ exports.getSalesReport = async (req, res) => {
           totalRevenue: totalRevenue,
           tripRevenue: tripRevenue,
           vendorRevenue: vendorRevenue,
+          workshopRevenue: workshopRevenue,
           totalTripEvents: totalTripEvents,
-          totalVendorApplications: totalVendorApplications
+          totalVendorApplications: totalVendorApplications,
+          totalWorkshopPayments: totalWorkshopPayments
         },
         revenueByType: revenueByTypeArray,
         tripRevenue: {
           total: tripRevenue,
           events: tripDetails
+        },
+        workshopRevenue: {
+          total: workshopRevenue,
+          events: workshopRevenueByEventArray,
+          payments: workshopDetails
         },
         vendorRevenue: {
           total: vendorRevenue,

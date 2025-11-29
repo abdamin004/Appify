@@ -76,8 +76,13 @@ function VendorDashboard() {
     loadWalletBalance();
     
     // Listen to wallet updates
-    const handleWalletUpdate = () => {
-      loadWalletBalance();
+    const handleWalletUpdate = (e) => {
+      // Use balance from event detail if available (faster), otherwise fetch
+      if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
+        setWalletBalance(e.detail.balance);
+      } else {
+        loadWalletBalance();
+      }
     };
     window.addEventListener('wallet:updated', handleWalletUpdate);
     return () => {
@@ -476,7 +481,7 @@ function VendorDashboard() {
       }
 
       const confirmed = await confirmDialog(
-        `Pay $${fee.toFixed(2)} for participation fee?`,
+        `Pay $${fee.toFixed(2)} USD for participation fee?`,
         'Confirm Payment'
       );
       if (!confirmed) return;

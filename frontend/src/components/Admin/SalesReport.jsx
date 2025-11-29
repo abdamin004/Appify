@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from "../../utils/designSystem";
 
@@ -22,6 +22,9 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Debounce for event name search
+  const [titleDebounce, setTitleDebounce] = useState("");
 
   const buildQuery = useCallback(() => {
     const q = new URLSearchParams();
@@ -76,9 +79,45 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
     }
   }, [buildQuery]);
 
+  // Track if component has mounted to prevent duplicate fetches
+  const isMountedRef = useRef(false);
+
+  // initial fetch on mount
   useEffect(() => {
     fetchSales();
-  }, [fetchSales]);
+    isMountedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-filter event name with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTitle(titleDebounce);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [titleDebounce]);
+
+  // Fetch when title changes (after debounce)
+  useEffect(() => {
+    if (!isMountedRef.current || title !== titleDebounce) return; // Only fetch when debounced value matches and after mount
+    fetchSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title]);
+
+  // Auto-fetch when status, type, or sortOrder changes (but not on initial mount)
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    fetchSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, type, sortOrder]);
+
+  // Auto-fetch when dates change (but not on initial mount)
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    fetchSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
 
   const handleApply = async (e) => {
     e?.preventDefault();
@@ -86,8 +125,26 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
   };
 
   const handleReset = () => {
-    setType(""); setTitle(""); setStatus(""); setStartDate(""); setEndDate(""); setSortOrder("desc");
+    setType("");
+    setTitle("");
+    setTitleDebounce("");
+    setStatus("");
+    setStartDate("");
+    setEndDate("");
+    setSortOrder("desc");
     setTimeout(() => fetchSales(), 0);
+  };
+
+  const handleStatusChange = (e) => {
+    setStatus(e.target.value);
+  };
+
+  const handleTypeChange = (e) => {
+    setType(e.target.value);
+  };
+
+  const handleTitleChange = (e) => {
+    setTitleDebounce(e.target.value);
   };
 
   const formatDate = (d) => d ? new Date(d).toLocaleString() : "N/A";
@@ -106,20 +163,109 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
 
         {/* Filters */}
         <form onSubmit={handleApply} style={{ marginBottom: spacing.xl }}>
+          <h3
+            style={{
+              color: colors.primary,
+              marginTop: 0,
+              marginBottom: spacing.lg,
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.bold,
+            }}
+          >
+            Filters
+          </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: spacing.lg, marginBottom: spacing.lg }}>
-            <input type="text" placeholder="Event Type" value={type} onChange={e => setType(e.target.value)} style={{ ...inputStyles.base }} />
-            <input type="text" placeholder="Event Name" value={title} onChange={e => setTitle(e.target.value)} style={{ ...inputStyles.base }} />
-            <input type="text" placeholder="Status" value={status} onChange={e => setStatus(e.target.value)} style={{ ...inputStyles.base }} />
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inputStyles.base }} />
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inputStyles.base }} />
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ ...inputStyles.base }}>
-              <option value="desc">Revenue: High → Low</option>
-              <option value="asc">Revenue: Low → High</option>
-            </select>
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Type
+              </label>
+              <select
+                value={type}
+                onChange={handleTypeChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              >
+                <option value="">All Types</option>
+                <option value="Workshop">Workshop</option>
+                <option value="Trip">Trip</option>
+                <option value="Bazaar">Bazaar</option>
+                <option value="Booth">Booth</option>
+                <option value="Conference">Conference</option>
+                <option value="GymSession">Gym Session</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Name
+              </label>
+              <input
+                type="text"
+                placeholder="Search by event name..."
+                value={titleDebounce}
+                onChange={handleTitleChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Status
+              </label>
+              <select
+                value={status}
+                onChange={handleStatusChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              >
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Sort Order
+              </label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                style={{ ...inputStyles.base, width: "100%" }}
+              >
+                <option value="desc">Revenue: High → Low</option>
+                <option value="asc">Revenue: Low → High</option>
+              </select>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: spacing.md }}>
-            <button type="submit" style={{ ...buttonStyles.primary, padding: `${spacing.md} ${spacing.xl}` }}>Apply</button>
-            <button type="button" onClick={handleReset} style={{ ...buttonStyles.secondary, padding: `${spacing.md} ${spacing.xl}` }}>Reset</button>
+            <button type="submit" style={{ ...buttonStyles.primary, padding: `${spacing.md} ${spacing.xl}` }}>Apply Filters</button>
+            <button type="button" onClick={handleReset} style={{ ...buttonStyles.secondary, padding: `${spacing.md} ${spacing.xl}` }}>Reset Filters</button>
           </div>
         </form>
 
