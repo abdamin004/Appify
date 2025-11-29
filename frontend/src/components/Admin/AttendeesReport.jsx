@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   colors,
@@ -6,7 +6,6 @@ import {
   borderRadius,
   shadows,
   typography,
-  transitions,
   buttonStyles,
   inputStyles,
 } from "../../utils/designSystem";
@@ -33,6 +32,9 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Debounce for event name search
+  const [titleDebounce, setTitleDebounce] = useState("");
 
   // Helper: build query string used by backend
   const buildQuery = useCallback(() => {
@@ -98,11 +100,45 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
     }
   }, [buildQuery]);
 
+  // Track if component has mounted to prevent duplicate fetches
+  const isMountedRef = useRef(false);
+
   // initial fetch on mount
   useEffect(() => {
     fetchReports();
+    isMountedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-filter event name with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTitle(titleDebounce);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [titleDebounce]);
+
+  // Fetch when title changes (after debounce)
+  useEffect(() => {
+    if (!isMountedRef.current || title !== titleDebounce) return; // Only fetch when debounced value matches and after mount
+    fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title]);
+
+  // Auto-fetch when status or type changes (but not on initial mount)
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, type]);
+
+  // Auto-fetch when dates change (but not on initial mount)
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate]);
 
   const handleApply = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -113,17 +149,23 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
     setStatus("");
     setType("");
     setTitle("");
+    setTitleDebounce("");
     setStartDate("");
     setEndDate("");
     // fetch without filters
     setTimeout(() => fetchReports(), 0);
   };
 
-  const handleTitleKey = (e) => {
-    // Press Enter to apply search
-    if (e.key === "Enter") {
-      fetchReports();
-    }
+  const handleStatusChange = (e) => {
+    setStatus(e.target.value);
+  };
+
+  const handleTypeChange = (e) => {
+    setType(e.target.value);
+  };
+
+  const handleTitleChange = (e) => {
+    setTitleDebounce(e.target.value);
   };
 
   const content = (
@@ -203,46 +245,79 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
               marginBottom: spacing.lg,
             }}
           >
-            <input
-              type="text"
-              placeholder="Event Status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              style={{ ...inputStyles.base }}
-            />
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Status
+              </label>
+              <select
+                value={status}
+                onChange={handleStatusChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              >
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
 
-            <input
-              type="text"
-              placeholder="Event Type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              style={{ ...inputStyles.base }}
-            />
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Type
+              </label>
+              <select
+                value={type}
+                onChange={handleTypeChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              >
+                <option value="">All Types</option>
+                <option value="Workshop">Workshop</option>
+                <option value="Trip">Trip</option>
+                <option value="Bazaar">Bazaar</option>
+                <option value="Booth">Booth</option>
+                <option value="Conference">Conference</option>
+                <option value="GymSession">Gym Session</option>
+              </select>
+            </div>
 
-            <input
-              type="text"
-              placeholder="Event Name (press Enter to search)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={handleTitleKey}
-              style={{ ...inputStyles.base }}
-            />
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Event Name
+              </label>
+              <input
+                type="text"
+                placeholder="Search by event name..."
+                value={titleDebounce}
+                onChange={handleTitleChange}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
 
-            <input
-              type="date"
-              placeholder="Start Date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              style={{ ...inputStyles.base }}
-            />
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
 
-            <input
-              type="date"
-              placeholder="End Date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{ ...inputStyles.base }}
-            />
+            <div>
+              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
+                End Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ ...inputStyles.base, width: "100%" }}
+              />
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: spacing.md }}>
