@@ -11,7 +11,7 @@ import { createProfessorNotification, getEventOfficeNotifications, markEventOffi
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
-import VendorDocumentsPage from "../Admin/VendorDocuments";
+import VendorDocuments from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
 import { statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
@@ -1680,7 +1680,7 @@ function EventOfficeDashboard() {
           )}
 
           {activeTab === "vendor-documents" && (
-            <VendorDocumentsPage hideBackButton={true} />
+            <VendorDocuments hideBackButton={true} />
           )}
 
           {activeTab === "attendees-report" && (
