@@ -255,49 +255,65 @@ function EventOfficeDashboard() {
   };
 
   const handleApproveWorkshop = async (workshopId) => {
-    // Frontend-only approval - no backend calls
     const confirmed = await confirmDialog("Are you sure you want to approve and publish this workshop?", "Approve Workshop");
     if (!confirmed) return;
 
-    // Find the workshop to get its details
-    const workshop = pendingWorkshops.find(w => w._id === workshopId);
-    if (!workshop) {
-      showToast.error("Workshop not found");
-      return;
-    }
-
-    // Add to approved set and save to localStorage
-    const newApproved = new Set(approvedWorkshops);
-    newApproved.add(workshopId);
-    setApprovedWorkshops(newApproved);
-
-    // Save to localStorage
     try {
-      localStorage.setItem('approvedWorkshops', JSON.stringify(Array.from(newApproved)));
+      // Find the workshop to get its details
+      const workshop = pendingWorkshops.find(w => w._id === workshopId);
+      if (!workshop) {
+        showToast.error("Workshop not found");
+        return;
+      }
+
+      // Call backend to approve the workshop
+      const result = await approveWorkshop(workshopId);
+      
+      if (!result || !result.success) {
+        throw new Error(result?.message || result?.error || 'Failed to approve workshop');
+      }
+
+      // Add to approved set and save to localStorage
+      const newApproved = new Set(approvedWorkshops);
+      newApproved.add(workshopId);
+      setApprovedWorkshops(newApproved);
+
+      // Save to localStorage
+      try {
+        localStorage.setItem('approvedWorkshops', JSON.stringify(Array.from(newApproved)));
+      } catch (err) {
+        console.error('Failed to save approved workshops to localStorage', err);
+      }
+
+      // Remove from pending list
+      setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
+
+      // Create notification for the professor who created the workshop
+      if (workshop.createdBy) {
+        createProfessorNotification(workshop.createdBy, {
+          type: 'WorkshopApproved',
+          message: `Your workshop "${workshop.title}" has been approved and published successfully!`,
+          workshopId: workshopId,
+          workshopTitle: workshop.title,
+        });
+      }
+
+      // Create notifications for all users about the newly published workshop
+      const publishedWorkshop = result.workshop || { ...workshop, status: 'published' };
+      const { notifyAllUsersAboutNewEvent } = await import('../../services/eventService');
+      notifyAllUsersAboutNewEvent(publishedWorkshop);
+
+      // Refresh the pending workshops list
+      await fetchPendingWorkshops();
+
+      // Show success message
+      showToast.success(result.message || "Workshop approved and published successfully!");
     } catch (err) {
-      console.error('Failed to save approved workshops to localStorage', err);
+      console.error("Error approving workshop:", err);
+      showToast.error(err?.message || "Error approving workshop");
+      // Re-fetch to restore the list if approval failed
+      fetchPendingWorkshops();
     }
-
-    // Immediately remove from pending list
-    setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
-
-    // Create notification for the professor who created the workshop
-    if (workshop.createdBy) {
-      createProfessorNotification(workshop.createdBy, {
-        type: 'WorkshopApproved',
-        message: `Your workshop "${workshop.title}" has been approved and published successfully!`,
-        workshopId: workshopId,
-        workshopTitle: workshop.title,
-      });
-    }
-
-    // Create notifications for all users about the newly published workshop
-    const publishedWorkshop = { ...workshop, status: 'published' };
-    const { notifyAllUsersAboutNewEvent } = await import('../../services/eventService');
-    notifyAllUsersAboutNewEvent(publishedWorkshop);
-
-    // Show success message
-    showToast.success("Workshop approved and published successfully!");
   };
 
   const handleRejectWorkshop = async (workshopId) => {
@@ -311,10 +327,15 @@ function EventOfficeDashboard() {
         return;
       }
 
-      // Immediately remove from pending list (optimistic update)
-      setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
+      // Call backend to reject the workshop
+      const result = await rejectWorkshop(workshopId);
+      
+      if (!result || !result.success) {
+        throw new Error(result?.message || 'Failed to reject workshop');
+      }
 
-      await rejectWorkshop(workshopId);
+      // Remove from pending list
+      setPendingWorkshops(prev => prev.filter(w => w._id !== workshopId));
 
       // Create notification for the professor who created the workshop
       if (workshop.createdBy) {
@@ -326,7 +347,10 @@ function EventOfficeDashboard() {
         });
       }
 
-      showToast.success("Workshop rejected successfully!");
+      // Refresh the pending workshops list
+      await fetchPendingWorkshops();
+
+      showToast.success(result.message || "Workshop rejected successfully!");
     } catch (err) {
       console.error("Error rejecting workshop:", err);
       showToast.error(err?.message || "Error rejecting workshop");
