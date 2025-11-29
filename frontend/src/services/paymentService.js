@@ -61,6 +61,16 @@ export async function createCheckoutSession(eventId, applicationId = null) {
   throw lastErr || new Error('Unable to create checkout session');
 }
 
+export async function getEventPrice(eventId) {
+  try {
+    const res = await http('GET', `${API_BASE}/payments/price/${eventId}`);
+    return { amount: res.amount || 0, currency: res.currency || 'egp', eventType: res.eventType || 'Event' };
+  } catch (e) {
+    console.error('Failed to get event price:', e);
+    return { amount: 0, currency: 'egp', eventType: 'Event' };
+  }
+}
+
 export async function getWalletBalance() {
   const res = await http('GET', `${API_BASE}/payments/wallet/balance`);
   if (typeof res === 'number') return { balance: res };

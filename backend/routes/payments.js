@@ -23,9 +23,55 @@ function computeAmount(entity, type = 'event') {
     return { amount: fee, currency: 'usd' };
   }
 
-  // Trip: use price; Workshop: fallback to requiredBudget; Bazaar/Booth: participationFee
+  // For Workshops: calculate price per person based on capacity and funding source
+  if (entity.type === 'Workshop') {
+    const requiredBudget = Number(entity.requiredBudget || 0);
+    const capacity = Number(entity.capacity || 0);
+    const fundingSource = entity.fundingSource || '';
+    
+    // If funding is from Grant, Sponsor, or External, students don't pay
+    // The budget is covered by external funding sources
+    if (['Grant', 'Sponsor', 'External'].includes(fundingSource)) {
+      return { amount: 0, currency: 'egp' };
+    }
+    
+    // For Internal funding: students pay their share
+    // requiredBudget = total cost needed (venue, materials, instructor fees, etc.)
+    // capacity = maximum number of attendees
+    // Price per person = requiredBudget / capacity (fixed price, regardless of actual registrations)
+    //
+    // IMPORTANT: This price is FIXED per person. If capacity isn't filled:
+    // - Example: Budget = 1000 EGP, Capacity = 20, Price = 50 EGP/person
+    // - If only 10 register: Total collected = 500 EGP (500 EGP shortfall)
+    // - The Event Office must handle the shortfall (cancel, adjust budget, or cover from other sources)
+    //
+    // If capacity is 0 or invalid, use full budget as fallback (single person pays all)
+    if (capacity > 0 && requiredBudget > 0) {
+      const pricePerPerson = requiredBudget / capacity;
+      // Add extra fee if extra resources are required (10% surcharge)
+      const extraFee = entity.extraRequiredResourses ? (pricePerPerson * 0.1) : 0;
+      return { amount: Number((pricePerPerson + extraFee).toFixed(2)), currency: 'egp' };
+    }
+    
+    // Fallback: use full budget if capacity is invalid (shouldn't happen in normal flow)
+    return { amount: requiredBudget, currency: 'egp' };
+  }
+
+  // Trip: use price directly
+  if (entity.type === 'Trip') {
+    const amount = Number(entity.price || 0);
+    return { amount, currency: (entity.currency || 'egp').toLowerCase() };
+  }
+
+  // Bazaar/Booth: use participationFee if available
+  if (entity.type === 'Bazaar' || entity.type === 'Booth') {
+    const amount = Number(entity.participationFee || 0);
+    return { amount, currency: 'usd' };
+  }
+
+  // Default: use price, amount, or 0
   const amount = Number(
-    (entity.price ?? entity.amount ?? entity.requiredBudget ?? entity.participationFee ?? 0)
+    (entity.price ?? entity.amount ?? entity.participationFee ?? 0)
   ) || 0;
   const currency = (entity.currency || 'egp').toLowerCase();
   return { amount, currency };
@@ -155,6 +201,20 @@ router.post('/create-checkout-session', auth, async (req, res) => {
     return res.json({ url: `${successBase}${returnPath}?status=success&mock=1&eventId=${eventId || ''}&applicationId=${applicationId || ''}` });
   } catch (err) {
     return res.status(500).json({ message: err.message || 'Failed to create checkout session' });
+  }
+});
+
+// Get calculated price for an event (for frontend display)
+router.get('/price/:eventId', auth, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    
+    const { amount, currency } = computeAmount(event, 'event');
+    return res.json({ amount, currency, eventType: event.type || 'Event' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Failed to calculate price' });
   }
 });
 

@@ -217,6 +217,12 @@ function ProfessorDashboard() {
       const userId = u && (u._id || u.id);
       if (!userId) return;
 
+      // Validate user role - only allow Student, Staff, TA, Professor, EventOffice
+      const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice'];
+      if (!u || !allowedRoles.includes(u.role)) {
+        return; // Skip users with disallowed roles (e.g., Admin, Vendor)
+      }
+
       const sentReminders = getSentReminders(userId);
       const now = new Date();
 
@@ -296,7 +302,14 @@ function ProfessorDashboard() {
 
   // Wallet updates and payment success banner
   useEffect(() => {
-    const onWallet = () => { fetchWallet(); };
+    const onWallet = (e) => {
+      // Use balance from event detail if available (faster), otherwise fetch
+      if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
+        setWalletBalance(e.detail.balance);
+      } else {
+        fetchWallet();
+      }
+    };
     const onPaymentSuccess = (e) => {
       try {
         const amt = e?.detail?.amount;

@@ -108,7 +108,14 @@ function TADashboard() {
   }, []);
 
   useEffect(() => {
-    const onWallet = () => { fetchWallet(); };
+    const onWallet = (e) => {
+      // Use balance from event detail if available (faster), otherwise fetch
+      if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
+        setWalletBalance(e.detail.balance);
+      } else {
+        fetchWallet();
+      }
+    };
     const onPaymentSuccess = (e) => {
       try {
         const amt = e?.detail?.amount;
@@ -329,6 +336,12 @@ function TADashboard() {
 
       const userId = user && (user._id || user.id);
       if (!userId) return;
+
+      // Validate user role - only allow Student, Staff, TA, Professor, EventOffice
+      const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice'];
+      if (!user || !allowedRoles.includes(user.role)) {
+        return; // Skip users with disallowed roles (e.g., Admin, Vendor)
+      }
 
       const sentReminders = getSentReminders(userId);
       const now = new Date();
@@ -914,7 +927,7 @@ function TADashboard() {
                 </div>
               </div>
             ) : (
-              <MyEventsList events={registeredEvents} showRefundButton />
+              <MyEventsList events={registeredEvents} showRefundButton onRefresh={fetchRegisteredEvents} />
             )
           )}
 

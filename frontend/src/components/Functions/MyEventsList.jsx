@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getEventComments, addEventComment, rateEvent } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
 import { FaStar } from "react-icons/fa";
-import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance } from "../../services/paymentService";
+import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance, getEventPrice } from "../../services/paymentService";
 import PaymentActions from "../Payments/PaymentActions";
 import { showToast, confirmDialog } from "../../utils/toast";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
@@ -82,7 +82,7 @@ function RatingStars({ value = 0, onChange, disabled = false }) {
   );
 }
 
-function MyEventsList({ events, showRefundButton = false }) {
+function MyEventsList({ events, showRefundButton = false, onRefresh }) {
   const navigate = useNavigate();
   const [ratings, setRatings] = useState({});
   const [attendedSet, setAttendedSet] = useState(new Set(getAttendedIds().map(String)));
@@ -95,6 +95,7 @@ function MyEventsList({ events, showRefundButton = false }) {
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [paidLocal, setPaidLocal] = useState(new Set());
   const [refundedSet, setRefundedSet] = useState(new Set());
+  const [eventPrices, setEventPrices] = useState({}); // { [eventId]: { amount, currency } }
 
   // Check if current user is a professor and can edit this workshop
   const canEditWorkshop = (evt) => {
@@ -129,13 +130,48 @@ function MyEventsList({ events, showRefundButton = false }) {
       }
     }
     loadWallet();
-    const handler = () => loadWallet();
+    const handler = (e) => {
+      // Use balance from event detail if available, otherwise fetch
+      if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
+        setWalletBalance(e.detail.balance);
+      } else {
+        loadWallet();
+      }
+    };
     window.addEventListener('wallet:updated', handler);
     return () => {
       active = false;
       window.removeEventListener('wallet:updated', handler);
     };
   }, []);
+
+  // Fetch prices for all events
+  useEffect(() => {
+    if (!events || events.length === 0) return;
+    let active = true;
+    async function fetchPrices() {
+      const priceMap = {};
+      for (const evt of events) {
+        const eventId = getEventId(evt);
+        if (!eventId || priceMap[eventId]) continue;
+        try {
+          const priceData = await getEventPrice(eventId);
+          if (!active) return;
+          priceMap[eventId] = priceData;
+        } catch (err) {
+          console.error(`Failed to fetch price for event ${eventId}:`, err);
+          // Fallback to old calculation
+          const fallbackPrice = getPrice(evt);
+          priceMap[eventId] = { amount: fallbackPrice, currency: 'egp' };
+        }
+      }
+      if (active) {
+        setEventPrices(priceMap);
+      }
+    }
+    fetchPrices();
+    return () => { active = false; };
+  }, [events]);
 
   // Helpers to normalize event fields
   const getEventId = (evt) => evt?.event?._id || evt?._id || evt?.id;
@@ -148,10 +184,20 @@ function MyEventsList({ events, showRefundButton = false }) {
   const getLocation = (evt) => evt?.location || evt?.event?.location;
   const getCapacity = (evt) => evt?.capacity || evt?.event?.capacity;
   const getPrice = (evt) => {
+    const eventId = getEventId(evt);
+    // Use fetched price from backend if available (calculated correctly)
+    if (eventId && eventPrices[eventId]) {
+      return eventPrices[eventId].amount || 0;
+    }
+    // Fallback to old calculation (shouldn't happen if prices are fetched)
     const p = (evt?.event && (evt.event.price ?? evt.event.amount ?? evt.event.requiredBudget))
       ?? (evt?.price ?? evt?.amount ?? evt?.requiredBudget)
       ?? 0;
     return Number(p) || 0;
+  };
+
+  const getFundingSource = (evt) => {
+    return evt?.event?.fundingSource || evt?.fundingSource || '';
   };
 
   const handleCardPay = async (evt) => {
@@ -191,10 +237,18 @@ function MyEventsList({ events, showRefundButton = false }) {
       const res = await payWithWallet(eventId);
       if (res && (res.success || res.status === 'paid' || res.paid)) {
         setPaidLocal(prev => new Set(prev).add(String(eventId)));
+        // Use balance from response if available
+        const newBalance = res.balance !== undefined ? res.balance : walletBalance;
         try {
-          window.dispatchEvent(new CustomEvent('wallet:updated', { detail: { reason: 'wallet-pay', amount: price } }));
+          window.dispatchEvent(new CustomEvent('wallet:updated', { 
+            detail: { reason: 'wallet-pay', eventId, balance: newBalance, amount: price } 
+          }));
           window.dispatchEvent(new CustomEvent('payment:success', { detail: { method: 'Wallet', amount: price } }));
         } catch (_) {}
+        // Update wallet balance immediately
+        if (newBalance !== undefined) {
+          setWalletBalance(newBalance);
+        }
         showToast.success('Payment completed successfully!');
         return;
       }
@@ -208,10 +262,14 @@ function MyEventsList({ events, showRefundButton = false }) {
 
   async function handleRefundAndCancel(eventId) {
     try {
-      const confirmed = await confirmDialog('Cancel your registration and refund to wallet?', 'Confirm Cancellation');
+      const confirmed = await confirmDialog('Cancel your registration and refund to wallet? This will remove you from the event and allow you to register again.', 'Confirm Cancellation');
       if (!confirmed) return;
       const res = await refundAndCancel(eventId);
       const msg = (res && (res.message || (`Refunded ${res.refunded ?? ''} to wallet. New balance: ${res.balance ?? ''}`))) || 'Registration cancelled and refunded to wallet.';
+      // Update wallet balance immediately from response
+      if (res?.balance !== undefined) {
+        setWalletBalance(res.balance);
+      }
       try {
         const detail = { reason: 'refund', eventId, balance: res?.balance, amount: res?.refunded };
         window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
@@ -221,6 +279,14 @@ function MyEventsList({ events, showRefundButton = false }) {
       try {
         setRefundedSet(prev => new Set(prev).add(String(eventId)));
         setPaidLocal(prev => { const next = new Set(prev); next.delete(String(eventId)); return next; });
+      } catch (_) {}
+      // Refresh events list to remove from registered events
+      if (onRefresh) {
+        onRefresh();
+      }
+      // Also dispatch event for parent components to refresh
+      try {
+        window.dispatchEvent(new CustomEvent('event:unregistered', { detail: { eventId } }));
       } catch (_) {}
     } catch (e) {
       showToast.error(e?.message || 'Refund failed');
@@ -394,10 +460,15 @@ function MyEventsList({ events, showRefundButton = false }) {
         const canComment = isRegistered(evt); // Comments require registration only, not attendance
         const current = ratings[id] || 0;
         const price = getPrice(evt);
+        const fundingSource = getFundingSource(evt);
+        const eventType = getType(evt);
         const serverPaid = Boolean(evt?.paymentStatus || evt?.paid || evt?.event?.paymentStatus || evt?.event?.paid);
         const isPaid = (serverPaid && !refundedSet.has(String(id))) || paidLocal.has(String(id));
-        // Show payment only for registered events that require payment, are not paid, and not past
-        const requiresPayment = (getPrice(evt) || 0) > 0;
+        // For workshops: only show payment if funding is Internal (Grant/Sponsor/External are free)
+        // For other events: show payment if price > 0
+        const requiresPayment = eventType === 'Workshop' 
+          ? (price > 0 && ['Internal'].includes(fundingSource))
+          : (price > 0);
         const isPayable = isRegistered(evt) && requiresPayment && !isPaid && !hasEventEnded(evt);
         const canRefund =
           showRefundButton &&
@@ -472,7 +543,27 @@ function MyEventsList({ events, showRefundButton = false }) {
                       fontWeight: 700,
                     }}
                   >
-                    Due: {price}
+                    Due: {price} {eventPrices[getEventId(evt)]?.currency?.toUpperCase() || 'EGP'}
+                  </span>
+                )}
+                {/* Show free/funded badge for workshops */}
+                {eventType === 'Workshop' && price === 0 && isRegistered(evt) && (
+                  <span
+                    title={`This workshop is funded by ${fundingSource || 'external sources'}`}
+                    style={{
+                      padding: "6px 12px",
+                      background: "rgba(34,197,94,0.12)",
+                      color: "#22c55e",
+                      borderRadius: 8,
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <span>✓</span>
+                    <span>FREE {fundingSource ? `(${fundingSource} Funded)` : ''}</span>
                   </span>
                 )}
               </div>

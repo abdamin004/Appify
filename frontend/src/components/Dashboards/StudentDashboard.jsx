@@ -97,7 +97,14 @@ function StudentDashboard() {
 
   // Listen to wallet updates from child dialogs (wallet pay/refund/top-up)
   useEffect(() => {
-    const handler = () => { fetchWallet(); };
+    const handler = (e) => {
+      // Use balance from event detail if available (faster), otherwise fetch
+      if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
+        setWalletBalance(e.detail.balance);
+      } else {
+        fetchWallet();
+      }
+    };
     const onPaymentSuccess = (e) => {
       try {
         const amt = e?.detail?.amount;
@@ -322,25 +329,23 @@ function StudentDashboard() {
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
 
-      console.log(`Checking reminders for ${events.length} registered events`);
-
-      // Get user ID for tracking sent reminders
+      // Get user ID and validate role
       const storedUser = localStorage.getItem("user");
       const user = storedUser ? JSON.parse(storedUser) : null;
       const userId = user && (user._id || user.id);
-      if (!userId) {
-        console.log('No user ID found, skipping reminder check');
-        return;
+      if (!userId) return;
+
+      // Validate user role - only allow Student, Staff, TA, Professor, EventOffice
+      const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice'];
+      if (!user || !allowedRoles.includes(user.role)) {
+        return; // Skip users with disallowed roles (e.g., Admin, Vendor)
       }
 
       const sentReminders = getSentReminders(userId);
       const now = new Date();
 
       events.forEach(event => {
-        if (!event.startDate) {
-          console.log(`Event "${event.title || 'Unknown'}" has no startDate, skipping`);
-          return;
-        }
+        if (!event.startDate) return;
 
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
@@ -348,15 +353,11 @@ function StudentDashboard() {
         const eventType = event.type || 'Event';
 
         // Check for 1 day reminder (24 hours before)
-        // Show reminder if event is between 20-28 hours away (wider window)
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
-        const isOneDayTime = hoursUntilEvent >= 20 && hoursUntilEvent <= 28 && startDate > now;
-
-        console.log(`Event "${eventTitle}": ${hoursUntilEvent.toFixed(2)} hours away, 1-day reminder: ${isOneDayTime}`);
+        const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
 
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
-          console.log(`Creating 1-day reminder for event: ${eventTitle}`);
           markReminderSent(userId, oneDayReminderId);
           createReminderNotification({
             type: 'EventReminder',
@@ -382,15 +383,11 @@ function StudentDashboard() {
         }
 
         // Check for 1 hour reminder
-        // Show reminder if event is between 45-75 minutes away (wider window)
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
-        const isOneHourTime = minutesUntilEvent >= 45 && minutesUntilEvent <= 75 && startDate > now;
-
-        console.log(`Event "${eventTitle}": ${minutesUntilEvent.toFixed(2)} minutes away, 1-hour reminder: ${isOneHourTime}`);
+        const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
 
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
-          console.log(`Creating 1-hour reminder for event: ${eventTitle}`);
           markReminderSent(userId, oneHourReminderId);
           createReminderNotification({
             type: 'EventReminder',
@@ -863,6 +860,7 @@ function StudentDashboard() {
                 return hasAccess;
               })}
               showRefundButton
+              onRefresh={fetchRegisteredEvents}
             />
           )}
           {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createCheckoutSession, getWalletBalance, payWithWallet } from '../../services/paymentService';
+import { createCheckoutSession, getWalletBalance, payWithWallet, getEventPrice } from '../../services/paymentService';
 
 function toCurrency(amount, currency = 'EGP') {
   try {
@@ -13,20 +13,47 @@ export default function PayDialog({ open, onClose, event, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [wallet, setWallet] = useState({ balance: undefined });
   const [error, setError] = useState('');
+  const [priceData, setPriceData] = useState({ amount: 0, currency: 'EGP' });
 
-  const price = useMemo(() => {
-    if (!event) return 0;
-    // Support both plain event and nested { event }; fall back to requiredBudget for workshops
-    const p = (event.event && (event.event.price ?? event.event.amount ?? event.event.requiredBudget))
-      ?? (event.price ?? event.amount ?? event.requiredBudget)
-      ?? 0;
-    return Number(p) || 0;
-  }, [event]);
+  // Fetch price from backend when dialog opens
+  useEffect(() => {
+    if (!open || !event) return;
+    let active = true;
+    async function fetchPrice() {
+      try {
+        const eventId = event?.event?._id || event?._id || event?.id;
+        if (!eventId) {
+          // Fallback to old calculation
+          const p = (event.event && (event.event.price ?? event.event.amount ?? event.event.requiredBudget))
+            ?? (event.price ?? event.amount ?? event.requiredBudget)
+            ?? 0;
+          if (active) setPriceData({ amount: Number(p) || 0, currency: 'EGP' });
+          return;
+        }
+        const data = await getEventPrice(eventId);
+        if (active) {
+          setPriceData({ 
+            amount: data.amount || 0, 
+            currency: (data.currency || 'EGP').toUpperCase() 
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch event price:', err);
+        // Fallback to old calculation
+        if (active) {
+          const p = (event.event && (event.event.price ?? event.event.amount ?? event.event.requiredBudget))
+            ?? (event.price ?? event.amount ?? event.requiredBudget)
+            ?? 0;
+          setPriceData({ amount: Number(p) || 0, currency: 'EGP' });
+        }
+      }
+    }
+    fetchPrice();
+    return () => { active = false; };
+  }, [open, event]);
 
-  const currency = useMemo(() => {
-    if (!event) return 'EGP';
-    return event.currency || (event.event && event.event.currency) || 'EGP';
-  }, [event]);
+  const price = priceData.amount;
+  const currency = priceData.currency;
 
   useEffect(() => {
     let active = true;
@@ -53,17 +80,30 @@ export default function PayDialog({ open, onClose, event, onSuccess }) {
 
   async function handleWalletPay() {
     if (!event) return;
+    
+    // Explicit validation: check balance before attempting payment
+    if (typeof wallet.balance !== 'number' || wallet.balance < price) {
+      setError(`Insufficient wallet balance. You need ${toCurrency(price, currency)} but have ${toCurrency(wallet.balance || 0, currency)}.`);
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
       const id = event?.event?._id || event?._id || event?.id;
       const res = await payWithWallet(id);
       if (res && (res.success || res.paid || res.status === 'paid')) {
+        // Use balance from response if available
+        const newBalance = res.balance !== undefined ? res.balance : wallet.balance;
         try {
-          const detail = { reason: 'wallet-pay', eventId: id, balance: res.balance, amount: price };
+          const detail = { reason: 'wallet-pay', eventId: id, balance: newBalance, amount: price };
           window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
-          window.dispatchEvent(new CustomEvent('payment:success', { detail: { method: 'Wallet', amount: price } }));
+          window.dispatchEvent(new CustomEvent('payment:success', { detail: { method: 'Wallet', amount: price, currency } }));
         } catch (_) {}
+        // Update wallet balance immediately
+        if (newBalance !== undefined) {
+          setWallet({ balance: newBalance });
+        }
         onSuccess && onSuccess({ method: 'wallet', eventId: id });
         onClose && onClose();
         return;
