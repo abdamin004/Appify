@@ -34,5 +34,9 @@ export const getUnreadVendorNotificationsCount = (pendingOnly = false) => {
   const url = `${API_BASE}/admin/notifications/unread-count${pendingOnly ? '?pendingOnly=true' : ''}`;
   return fetchJson(url);
 };
+export const listAllUsers = (role = null) => {
+  const url = role ? `${API_BASE}/admin/users?role=${role}` : `${API_BASE}/admin/users`;
+  return fetchJson(url);
+};
 
-export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, listLoyaltyApplications, reviewLoyaltyApplication, getUnreadVendorNotificationsCount };
+export default { listAllComments,deleteComment, listPendingVendorApplications, listApprovedVendorApplications, reviewVendorApplication, listAdminNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification, listLoyaltyApplications, reviewLoyaltyApplication, getUnreadVendorNotificationsCount, listAllUsers };

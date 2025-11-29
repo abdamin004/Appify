@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
+import adminService from '../../services/adminService';
 import { showToast } from '../../utils/toast';
+import { 
+  createStudentNotification, 
+  createStaffNotification, 
+  createTaNotification,
+  createProfessorNotification 
+} from '../../services/notificationService';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../utils/designSystem';
 
 const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
@@ -58,9 +65,76 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
         termsAndConditions: formData.termsAndConditions.trim()
       };
 
-      await vendorService.applyToLoyaltyProgram(payload);
+      const result = await vendorService.applyToLoyaltyProgram(payload);
       
-      showToast.success('Loyalty program application submitted successfully!');
+      // Check if application was instantly approved (status: 'approved' in response)
+      const app = result?.application || result;
+      const isInstantlyApproved = app?.status === 'approved' || result?.message?.includes('live and visible');
+      
+      if (isInstantlyApproved) {
+        // Application was instantly approved - create frontend notifications
+        const orgName = app?.organization || formData.organization || 'A vendor';
+        const discountInfo = typeof app?.discountRate === 'number'
+          ? `${app.discountRate}%`
+          : typeof formData.discountRate === 'number'
+            ? `${formData.discountRate}%`
+            : 'a special';
+        const promoInfo = (app?.promoCode || formData.promoCode) ? ` Use code ${app?.promoCode || formData.promoCode}.` : '';
+        
+        const notification = {
+          type: 'LoyaltyPartnerAdded',
+          message: `${orgName} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
+          organization: orgName,
+          discountRate: app?.discountRate || formData.discountRate,
+          promoCode: app?.promoCode || formData.promoCode,
+          date: new Date().toISOString(),
+        };
+        
+        try {
+          // Create notifications for all user roles
+          createStudentNotification(notification);
+          createStaffNotification(notification);
+          createTaNotification(notification);
+          
+          // Create notifications for all professors
+          try {
+            const professors = await adminService.listAllUsers('Professor');
+            const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
+            
+            professorList.forEach(professor => {
+              const professorId = String(professor._id || professor.id);
+              if (professorId) {
+                createProfessorNotification(professorId, notification);
+              }
+            });
+          } catch (profErr) {
+            console.error('Could not create professor loyalty notifications:', profErr);
+            // Fall back to localStorage method
+            try {
+              const allKeys = Object.keys(localStorage);
+              const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
+              professorKeys.forEach(key => {
+                const professorId = key.replace('professorNotifications_', '');
+                if (professorId) {
+                  createProfessorNotification(professorId, notification);
+                }
+              });
+            } catch (localStorageErr) {
+              console.error('Could not create professor notifications from localStorage:', localStorageErr);
+            }
+          }
+          
+          // Dispatch event to refresh notifications in all dashboards
+          window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
+          
+          showToast.success('Loyalty program application approved instantly! Notifications sent to all users.');
+        } catch (notifErr) {
+          console.error('Error creating loyalty notifications:', notifErr);
+          showToast.success('Loyalty program application approved instantly!');
+        }
+      } else {
+        showToast.success('Loyalty program application submitted successfully!');
+      }
       
       if (onSuccess) {
         onSuccess();
