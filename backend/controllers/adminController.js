@@ -1356,12 +1356,23 @@ exports.downloadVendorDocument = async (req, res) => {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg'
     };
+    
+    // Check if download is requested (via query parameter)
+    const shouldDownload = req.query.download === 'true';
+    
+    // Get filename for download
+    const filename = `${vendor.companyName || 'vendor'}_${documentType}${ext}`;
     const contentType = contentTypes[ext] || 'application/octet-stream';
 
-    // Set headers for download
-    const filename = `${vendor.companyName}_${documentType}${ext}`;
+    // Set headers - use 'attachment' for download, 'inline' for viewing
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    if (shouldDownload) {
+      // Force download
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    } else {
+      // View in browser
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+    }
 
     // Stream the file
     const fileStream = fs.createReadStream(filePath);
