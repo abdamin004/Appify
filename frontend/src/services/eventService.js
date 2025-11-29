@@ -319,11 +319,11 @@ export function getApprovedWorkshops() {
 }
 
 export function approveWorkshop(workshopId) {
-  return http('PATCH', `${API_BASE}/events/publish/${workshopId}`);
+  return http('PUT', `${API_BASE}/events/workshops/${workshopId}/review`, { action: 'accept' });
 }
 
 export function rejectWorkshop(workshopId) {
-  return updateEvent(workshopId, { status: 'cancelled' });
+  return http('PUT', `${API_BASE}/events/workshops/${workshopId}/review`, { action: 'reject' });
 }
 
 // Archive event (mark as completed)
