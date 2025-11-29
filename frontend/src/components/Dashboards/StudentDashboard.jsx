@@ -606,6 +606,8 @@ function StudentDashboard() {
       showToast.success(res.message || 'Registered successfully');
       setGymStatus(prev => ({ ...prev, [sessionId]: { ok: true, msg: res.message || 'Registered successfully' } }));
       await fetchGymSessions();
+      // Refresh registered events so the new registration appears in "My Registered Events" tab
+      await fetchRegisteredEvents();
     } catch (err) {
       const msg = (err && err.message) || 'Failed to register';
       showToast.error(msg);

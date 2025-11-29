@@ -6,7 +6,9 @@ const NOTIFICATION_KEY_PREFIX = 'professorNotifications_';
 export function getProfessorNotifications(professorId) {
   if (!professorId || typeof localStorage === 'undefined') return [];
   try {
-    const key = `${NOTIFICATION_KEY_PREFIX}${professorId}`;
+    // Normalize professorId to string to ensure consistent key format
+    const normalizedId = String(professorId);
+    const key = `${NOTIFICATION_KEY_PREFIX}${normalizedId}`;
     const stored = localStorage.getItem(key);
     if (!stored) return [];
     const notifications = JSON.parse(stored);
@@ -19,10 +21,15 @@ export function getProfessorNotifications(professorId) {
 
 // Create a notification for a professor
 export function createProfessorNotification(professorId, notification) {
-  if (!professorId || typeof localStorage === 'undefined') return;
+  if (!professorId || typeof localStorage === 'undefined') {
+    console.warn('createProfessorNotification: Invalid professorId or localStorage not available', professorId);
+    return;
+  }
   try {
-    const key = `${NOTIFICATION_KEY_PREFIX}${professorId}`;
-    const existing = getProfessorNotifications(professorId);
+    // Normalize professorId to string to ensure consistent key format
+    const normalizedId = String(professorId);
+    const key = `${NOTIFICATION_KEY_PREFIX}${normalizedId}`;
+    const existing = getProfessorNotifications(normalizedId);
     const newNotification = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       ...notification,
@@ -31,6 +38,7 @@ export function createProfessorNotification(professorId, notification) {
     };
     const updated = [newNotification, ...existing];
     localStorage.setItem(key, JSON.stringify(updated));
+    console.log('createProfessorNotification: Created notification for professor', normalizedId, 'Type:', notification.type);
     return newNotification;
   } catch (err) {
     console.error('Error creating notification:', err);

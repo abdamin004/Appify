@@ -373,7 +373,15 @@ module.exports = {
             console.log('Fetching workshops for professor:', professorId);
             const workshops = await Workshop.find({ createdBy: professorId });
             console.log('Found workshops:', workshops.length, 'workshops');
-            console.log('Workshop statuses:', workshops.map(w => ({ title: w.title, status: w.status })));
+            // Debug: Check if descriptions are present
+            const workshopsWithDesc = workshops.filter(w => w.description).length;
+            const workshopsWithEditRequest = workshops.filter(w => w.description && w.description.includes('EDIT REQUEST')).length;
+            console.log('Workshop details:', {
+                total: workshops.length,
+                withDescription: workshopsWithDesc,
+                withEditRequest: workshopsWithEditRequest,
+                statuses: workshops.map(w => ({ title: w.title, status: w.status, hasDescription: !!w.description, descLength: w.description ? w.description.length : 0 }))
+            });
             res.status(200).json(workshops);
         } catch (err) {
             console.error('Error in getMyWorkshops:', err);

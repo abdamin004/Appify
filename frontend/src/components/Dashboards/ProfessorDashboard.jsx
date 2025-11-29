@@ -87,11 +87,20 @@ function ProfessorDashboard() {
   const fetchNotifications = () => {
     try {
       const rawUser = localStorage.getItem('user');
-      if (!rawUser) return;
+      if (!rawUser) {
+        console.log('fetchNotifications: No user found in localStorage');
+        setNotifications([]);
+        return;
+      }
       const u = JSON.parse(rawUser);
       const professorId = u && (u._id || u.id);
-      if (!professorId) return;
-      const notifs = getProfessorNotifications(professorId);
+      if (!professorId) {
+        console.log('fetchNotifications: No professor ID found');
+        setNotifications([]);
+        return;
+      }
+      const notifs = getProfessorNotifications(String(professorId));
+      console.log('fetchNotifications: Found', notifs.length, 'notifications for professor', professorId);
       setNotifications(notifs);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -384,6 +393,8 @@ function ProfessorDashboard() {
       showToast.success(res.message || 'Registered successfully');
       setGymStatus(prev => ({ ...prev, [sessionId]: { ok: true, msg: res.message || 'Registered successfully' } }));
       await fetchGymSessions();
+      // Refresh registered events so the new registration appears in "My Registered Events" tab
+      await fetchRegisteredEvents();
     } catch (err) {
       const msg = (err && err.message) || 'Failed to register';
       showToast.error(msg);
@@ -396,12 +407,16 @@ function ProfessorDashboard() {
   useEffect(() => {
     if (activeTab === "my-workshops") {
       fetchMyWorkshops(); // Always refetch to ensure we get latest status
+    } else if (activeTab === "edit-requests") {
+      fetchMyWorkshops(); // Always refetch to ensure we get latest edit requests
+      fetchNotifications(); // Also refresh notifications
     } else if (activeTab === "registered" && registeredEvents.length === 0) {
       fetchRegisteredEvents();
     } else if (activeTab === 'favourites') {
       fetchFavourites();
     } else if (activeTab === 'notifications') {
-      fetchNotifications();
+      fetchNotifications(); // Always refetch notifications
+      fetchMyWorkshops(); // Also refresh workshops to check for edit requests
     } else if (activeTab === 'reminders') {
       fetchReminders();
     } else if (activeTab === 'gym-sessions') {
@@ -414,6 +429,7 @@ function ProfessorDashboard() {
   const parseEditRequests = (description) => {
     if (!description) return [];
     const requests = [];
+    // Updated regex to handle the exact format: --- EDIT REQUEST FROM EVENTS OFFICE (timestamp) ---\nrequest\n--- END EDIT REQUEST ---
     const regex = /--- EDIT REQUEST FROM EVENTS OFFICE \(([^)]+)\) ---\s*([\s\S]*?)\s*--- END EDIT REQUEST ---/g;
     let match;
     while ((match = regex.exec(description)) !== null) {
@@ -431,18 +447,36 @@ function ProfessorDashboard() {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const u = rawUser ? JSON.parse(rawUser) : {};
       const professorId = u && (u._id || u.id);
-      if (!professorId) { setMyWorkshops([]); return; }
+      if (!professorId) { 
+        console.warn('fetchMyWorkshops: No professor ID found');
+        setMyWorkshops([]); 
+        return; 
+      }
 
-      const url = `${API_BASE}/events/workshops/mine?professorId=${encodeURIComponent(professorId)}`;
-      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      // The backend endpoint uses req.user._id, so we don't need to pass professorId as query param
+      // But the route might expect it, so let's try both approaches
+      const url = `${API_BASE}/events/workshops/mine`;
+      const res = await fetch(url, { 
+        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+      });
+      
       if (!res.ok) {
-        try { const err = await res.json(); console.error('fetchMyWorkshops failed:', err); } catch (_) { }
+        const errorText = await res.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        console.error('fetchMyWorkshops failed:', res.status, errorData);
         setMyWorkshops([]);
         return;
       }
+      
       const data = await res.json();
-      console.log('Fetched workshops:', data); // Debug log
-      setMyWorkshops(Array.isArray(data) ? data : []);
+      const workshops = Array.isArray(data) ? data : [];
+      console.log('fetchMyWorkshops: Fetched', workshops.length, 'workshops');
+      setMyWorkshops(workshops);
     } catch (err) {
       console.error("Error fetching my workshops:", err);
       setMyWorkshops([]);
@@ -615,47 +649,47 @@ function ProfessorDashboard() {
           >
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
+              display: "flex",
+              justifyContent: "space-between",
                 alignItems: "flex-start",
-                flexWrap: "wrap",
+              flexWrap: "wrap",
                 gap: spacing.lg,
-              }}
-            >
-              <div>
-                <h1
-                  style={{
+            }}
+          >
+            <div>
+              <h1
+                style={{
                     fontSize: typography.fontSize['3xl'],
                     fontWeight: typography.fontWeight.bold,
                     color: colors.primary,
                     marginBottom: spacing.sm,
-                  }}
-                >
-                  Welcome, Prof. {user.lastName || user.firstName}! 👋
-                </h1>
-                <p
-                  style={{
-                    fontSize: typography.fontSize.lg,
-                    color: colors.gray500,
-                    margin: 0,
-                  }}
-                >
-                  Manage your workshops and view university events
-                </p>
-                <div style={{ height: spacing.md }} />
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.md,
-                  alignItems: "center",
-                  flexShrink: 0,
-                  justifyContent: "center",
                 }}
               >
-                <div
-                  style={{
+                Welcome, Prof. {user.lastName || user.firstName}! 👋
+              </h1>
+              <p
+                style={{
+                    fontSize: typography.fontSize.lg,
+                    color: colors.gray500,
+                  margin: 0,
+                }}
+              >
+                Manage your workshops and view university events
+              </p>
+                <div style={{ height: spacing.md }} />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                  flexDirection: "column",
+                  gap: spacing.md,
+                alignItems: "center",
+                  flexShrink: 0,
+                  justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
                     display: "flex",
                     gap: spacing.md,
                     alignItems: "center",
@@ -684,21 +718,21 @@ function ProfessorDashboard() {
                   >
                     + Create Workshop
                   </a>
-                  <div
-                    style={{
+                <div
+                  style={{
                       ...statCardBase,
-                    }}
-                  >
+                  }}
+                >
                     <div style={statValueStyle}>
-                      {myWorkshops.length}
-                    </div>
+                  {myWorkshops.length}
+                </div>
                     <div style={statLabelStyle}>
                       My Workshops
                     </div>
                   </div>
 
-                  <div
-                    style={{
+                <div
+                  style={{
                       ...statCardBase,
                       position: "relative",
                     }}
@@ -709,19 +743,19 @@ function ProfessorDashboard() {
                     <div style={statLabelStyle}>
                       Notifications
                     </div>
-                  </div>
                 </div>
+              </div>
 
                 <div
-                  style={{
+                style={{
                     display: "flex",
                     justifyContent: "center",
                     width: "100%",
                     marginTop: spacing.md,
                   }}
                 >
-                  <div
-                    style={{
+              <div
+                style={{
                       transform: "translateX(30px)",
                     }}
                   >
@@ -732,7 +766,7 @@ function ProfessorDashboard() {
                       label="Wallet Balance"
                       style={{ width: "auto" }}
                     />
-                  </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -793,7 +827,7 @@ function ProfessorDashboard() {
                   {tab.label}
                   {tab.badgeCount > 0 && (
                     <span
-                      style={{
+            style={{
                         position: "absolute",
                         top: spacing.sm,
                         right: spacing.sm,
@@ -802,7 +836,7 @@ function ProfessorDashboard() {
                         borderRadius: borderRadius.full,
                         width: "20px",
                         height: "20px",
-                        display: "flex",
+              display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: typography.fontSize.xs,
@@ -818,7 +852,7 @@ function ProfessorDashboard() {
 
             return (
               <div
-                style={{
+              style={{
                   background: colors.bgCard,
                   padding: spacing.md,
                   borderRadius: borderRadius['2xl'],
@@ -1028,10 +1062,10 @@ function ProfessorDashboard() {
                                                 </div>
                                               </div>
                                               <div>
-                                                <button
+            <button
                                                   disabled={disabled}
                                                   onClick={() => !disabled && handleGymRegister(id)}
-                                                  style={{
+              style={{
                                                     ...(disabled ? {} : buttonStyles.primary),
                                                     padding: `${spacing.sm} ${spacing.lg}`,
                                                     background: disabled ? colors.gray200 : undefined,
@@ -1102,7 +1136,7 @@ function ProfessorDashboard() {
                   Event Reminders
                 </h2>
                 {reminders.filter(n => !n.isRead).length > 0 && (
-                  <button
+            <button
                     onClick={() => {
                       const rawUser = localStorage.getItem('user');
                       if (rawUser) {
@@ -1118,14 +1152,14 @@ function ProfessorDashboard() {
                         }
                       }
                     }}
-                    style={{
+              style={{
                       ...buttonStyles.primary,
                       padding: `${spacing.md} ${spacing.lg}`,
                       fontSize: typography.fontSize.sm
                     }}
                   >
                     Mark All as Read
-                  </button>
+            </button>
                 )}
               </div>
               {reminders.length === 0 ? (
@@ -1137,7 +1171,7 @@ function ProfessorDashboard() {
                     return (
                       <div
                         key={reminder.id}
-                        style={{
+              style={{
                           padding: spacing.xl,
                           background: isRead ? colors.gray50 : colors.white,
                           borderRadius: borderRadius.xl,
@@ -1187,11 +1221,11 @@ function ProfessorDashboard() {
                               </p>
                             )}
                             {reminder.eventId && (
-                              <button
+            <button
                                 onClick={() => {
                                   window.location.href = `/events/${reminder.eventId}`;
                                 }}
-                                style={{
+              style={{
                                   marginTop: spacing.md,
                                   ...buttonStyles.primary,
                                   padding: `${spacing.sm} ${spacing.lg}`,
@@ -1199,7 +1233,7 @@ function ProfessorDashboard() {
                                 }}
                               >
                                 View Event
-                              </button>
+            </button>
                             )}
                             <p style={{
                               color: colors.gray400,
@@ -1211,7 +1245,7 @@ function ProfessorDashboard() {
                           </div>
                           <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                             {!isRead && (
-                              <button
+            <button
                                 onClick={() => {
                                   const rawUser = localStorage.getItem('user');
                                   if (rawUser) {
@@ -1223,22 +1257,22 @@ function ProfessorDashboard() {
                                     }
                                   }
                                 }}
-                                style={{
+              style={{
                                   padding: `${spacing.sm} ${spacing.lg}`,
                                   background: colors.success,
                                   color: colors.white,
-                                  border: "none",
+                border: "none",
                                   borderRadius: borderRadius.md,
                                   fontSize: typography.fontSize.sm,
                                   fontWeight: typography.fontWeight.semibold,
-                                  cursor: "pointer",
+                cursor: "pointer",
                                 }}
                               >
                                 Mark Read
-                              </button>
+            </button>
                             )}
-                            <button
-                              onClick={() => {
+            <button
+              onClick={() => {
                                 const rawUser = localStorage.getItem('user');
                                 if (rawUser) {
                                   const u = JSON.parse(rawUser);
@@ -1248,16 +1282,16 @@ function ProfessorDashboard() {
                                     fetchReminders();
                                   }
                                 }
-                              }}
-                              style={{
+              }}
+              style={{
                                 padding: `${spacing.sm} ${spacing.lg}`,
                                 background: colors.error,
                                 color: colors.white,
-                                border: "none",
+                border: "none",
                                 borderRadius: borderRadius.md,
                                 fontSize: typography.fontSize.sm,
                                 fontWeight: typography.fontWeight.semibold,
-                                cursor: "pointer",
+                cursor: "pointer",
                               }}
                             >
                               Delete
@@ -1274,7 +1308,7 @@ function ProfessorDashboard() {
 
           {activeTab === "loyalty" && (
             <div
-              style={{
+                  style={{
                 background: colors.bgCard,
                 padding: spacing['3xl'],
                 borderRadius: borderRadius['2xl'],
@@ -1296,9 +1330,9 @@ function ProfessorDashboard() {
               }}
             >
               <StudentPollVoting />
-            </div>
+          </div>
           )}
-
+          
           {activeTab === "notifications" && (
             <div
               style={{
@@ -1319,32 +1353,32 @@ function ProfessorDashboard() {
                   Notifications
                 </h2>
                 <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.isRead).length > 0 && (
-                    <button
-                      onClick={() => {
-                        try {
-                          const rawUser = localStorage.getItem('user');
-                          if (rawUser) {
-                            const u = JSON.parse(rawUser);
-                            const professorId = u && (u._id || u.id);
-                            if (professorId) {
-                              markAllNotificationsRead(professorId);
-                              fetchNotifications();
-                            }
+                {notifications.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      try {
+                        const rawUser = localStorage.getItem('user');
+                        if (rawUser) {
+                          const u = JSON.parse(rawUser);
+                          const professorId = u && (u._id || u.id);
+                          if (professorId) {
+                            markAllNotificationsRead(professorId);
+                            fetchNotifications();
                           }
-                        } catch (err) {
-                          console.error('Error marking all as read:', err);
                         }
-                      }}
-                      style={{
+                      } catch (err) {
+                        console.error('Error marking all as read:', err);
+                      }
+                    }}
+                    style={{
                         ...buttonStyles.primary,
                         padding: `${spacing.md} ${spacing.lg}`,
                         fontSize: typography.fontSize.sm
-                      }}
-                    >
-                      Mark All as Read
-                    </button>
-                  )}
+                    }}
+                  >
+                    Mark All as Read
+                  </button>
+                )}
                   {notifications.length > 0 && (
                     <button
                       onClick={async () => {
@@ -1418,13 +1452,19 @@ function ProfessorDashboard() {
                             {notif.type === 'WorkshopRejected' && (
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>❌</span>
                             )}
-                            <h3 style={{
+                            {notif.type === 'EditRequest' && (
+                              <span style={{ fontSize: typography.fontSize['2xl'] }}>✏️</span>
+                            )}
+                            <h3 style={{ 
                               color: colors.primary,
-                              margin: 0,
+                              margin: 0, 
                               fontSize: typography.fontSize.lg,
                               fontWeight: notif.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
-                              {notif.type === 'WorkshopApproved' ? 'Workshop Approved' : notif.type === 'WorkshopRejected' ? 'Workshop Rejected' : 'Notification'}
+                              {notif.type === 'WorkshopApproved' ? 'Workshop Approved' : 
+                               notif.type === 'WorkshopRejected' ? 'Workshop Rejected' : 
+                               notif.type === 'EditRequest' ? 'Edit Request from Events Office' : 
+                               'Notification'}
                             </h3>
                             {!notif.isRead && (
                               <span style={{
@@ -1437,7 +1477,7 @@ function ProfessorDashboard() {
                               }} />
                             )}
                           </div>
-                          <p style={{
+                          <p style={{ 
                             color: colors.gray500,
                             margin: `${spacing.sm} 0`,
                             fontWeight: notif.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
@@ -1445,6 +1485,49 @@ function ProfessorDashboard() {
                           }}>
                             {notif.message}
                           </p>
+                          {notif.type === 'EditRequest' && notif.editRequest && (
+                            <div style={{
+                              marginTop: spacing.md,
+                              padding: spacing.md,
+                              background: 'rgba(245, 158, 11, 0.1)',
+                              borderRadius: borderRadius.md,
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                            }}>
+                              <strong style={{ color: '#d97706', fontSize: typography.fontSize.sm, display: 'block', marginBottom: spacing.xs }}>
+                                Request Details:
+                              </strong>
+                          <p style={{ 
+                                color: colors.gray700,
+                                margin: 0,
+                                whiteSpace: 'pre-wrap',
+                                fontSize: typography.fontSize.sm,
+                                lineHeight: typography.lineHeight.relaxed,
+                              }}>
+                                {notif.editRequest}
+                              </p>
+                            </div>
+                          )}
+                          {notif.type === 'EditRequest' && notif.workshopId && (
+                            <button
+                              onClick={() => navigate(`/professor/workshops?edit=${notif.workshopId}`)}
+                              style={{
+                                marginTop: spacing.md,
+                                ...buttonStyles.primary,
+                                padding: `${spacing.sm} ${spacing.lg}`,
+                                fontSize: typography.fontSize.sm,
+                                background: colors.warning,
+                                color: colors.white,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.opacity = 0.9;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.opacity = 1;
+                              }}
+                            >
+                              ✏️ Edit Workshop
+                            </button>
+                          )}
                           <p style={{
                             color: colors.gray400,
                             fontSize: typography.fontSize.sm,
@@ -1571,7 +1654,7 @@ function ProfessorDashboard() {
                         }}>
                           <div>
                             <strong style={{ color: colors.primary }}>Status:</strong>{" "}
-                            <span style={{
+                            <span style={{ 
                               color: workshop.status === 'pending' ? colors.warning : workshop.status === 'published' ? colors.success : colors.gray500,
                               fontWeight: typography.fontWeight.semibold
                             }}>
@@ -1592,7 +1675,7 @@ function ProfessorDashboard() {
                           </div>
                         </div>
                       </div>
-
+                      
                       <div style={{ marginTop: spacing.xl }}>
                         <h4 style={{
                           color: colors.primary,
@@ -1637,7 +1720,7 @@ function ProfessorDashboard() {
                           </div>
                         ))}
                       </div>
-
+                      
                       <div style={{ marginTop: spacing.lg, display: "flex", gap: spacing.md }}>
                         <button
                           onClick={() => navigate(`/professor/workshops?edit=${workshop._id}`)}
