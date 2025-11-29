@@ -540,35 +540,143 @@ export function markReminderSent(userId, reminderId) {
   }
 }
 
-// Create reminder notification (shared across all user types)
+// ========== User-Specific Reminder Notifications ==========
+// Reminders are stored per-user, not per-role, to ensure only registered users receive them
+
+const USER_REMINDER_KEY_PREFIX = 'userReminders_';
+
+// Get reminders for a specific user
+function getUserReminders(userId) {
+  if (!userId || typeof localStorage === 'undefined') return [];
+  try {
+    const key = `${USER_REMINDER_KEY_PREFIX}${userId}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) return [];
+    const reminders = JSON.parse(stored);
+    return Array.isArray(reminders) ? reminders : [];
+  } catch (err) {
+    console.error('Error loading user reminders:', err);
+    return [];
+  }
+}
+
+// Create a reminder notification for a specific user (not role-based)
+function createUserReminder(userId, notification) {
+  if (!userId || typeof localStorage === 'undefined') return;
+  try {
+    const key = `${USER_REMINDER_KEY_PREFIX}${userId}`;
+    const existing = getUserReminders(userId);
+    const newReminder = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      ...notification,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    };
+    const updated = [newReminder, ...existing];
+    localStorage.setItem(key, JSON.stringify(updated));
+    return newReminder;
+  } catch (err) {
+    console.error('Error creating user reminder:', err);
+  }
+}
+
+// Create reminder notification (only for the current user, not role-based)
+// This function should ONLY be called from checkForReminders which already verifies registration
 export function createReminderNotification(notification) {
   if (typeof localStorage === 'undefined') return;
   try {
-    // Add to separate notifications for each role
-    createStudentNotification(notification);
-    createStaffNotification(notification);
-    createTaNotification(notification);
-    
-    // Add to event office notifications
-    createEventOfficeNotification(notification);
-    
-    // Add to professor notifications (for all professors)
-    try {
-      const allKeys = Object.keys(localStorage);
-      const professorKeys = allKeys.filter(key => key.startsWith('professorNotifications_'));
-      professorKeys.forEach(key => {
-        const professorId = key.replace('professorNotifications_', '');
-        if (professorId) {
-          createProfessorNotification(professorId, notification);
-        }
-      });
-    } catch (profErr) {
-      console.log('Could not create professor reminder notifications:', profErr);
+    // Get current user from localStorage
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) {
+      console.log('No user found, cannot create reminder notification');
+      return;
     }
+    
+    const user = JSON.parse(storedUser);
+    const userId = String(user?._id || user?.id || '');
+    
+    if (!userId) {
+      console.log('No user ID found, cannot create reminder notification');
+      return;
+    }
+    
+    // Additional safety check: Ensure eventId is provided (should come from registered events only)
+    // This ensures we only create reminders for events the user is registered for
+    if (!notification?.eventId) {
+      console.log('No eventId in notification, skipping reminder creation');
+      return;
+    }
+    
+    // Create user-specific reminder (not role-based)
+    // This ensures reminders are only sent to the specific registered user
+    createUserReminder(userId, notification);
     
     return notification;
   } catch (err) {
     console.error('Error creating reminder notification:', err);
+  }
+}
+
+// Get reminders for the current user
+export function getCurrentUserReminders() {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return [];
+    
+    const user = JSON.parse(storedUser);
+    const userId = String(user?._id || user?.id || '');
+    
+    if (!userId) return [];
+    
+    return getUserReminders(userId);
+  } catch (err) {
+    console.error('Error getting current user reminders:', err);
+    return [];
+  }
+}
+
+// Mark a reminder as read for the current user
+export function markReminderRead(reminderId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return;
+    
+    const user = JSON.parse(storedUser);
+    const userId = String(user?._id || user?.id || '');
+    
+    if (!userId) return;
+    
+    const key = `${USER_REMINDER_KEY_PREFIX}${userId}`;
+    const reminders = getUserReminders(userId);
+    const updated = reminders.map(r => 
+      r.id === reminderId ? { ...r, isRead: true, readAt: new Date().toISOString() } : r
+    );
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error marking reminder as read:', err);
+  }
+}
+
+// Delete a reminder for the current user
+export function deleteReminder(reminderId) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return;
+    
+    const user = JSON.parse(storedUser);
+    const userId = String(user?._id || user?.id || '');
+    
+    if (!userId) return;
+    
+    const key = `${USER_REMINDER_KEY_PREFIX}${userId}`;
+    const reminders = getUserReminders(userId);
+    const updated = reminders.filter(r => r.id !== reminderId);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Error deleting reminder:', err);
   }
 }
 

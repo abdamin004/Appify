@@ -3,7 +3,7 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
-import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
 import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
@@ -11,11 +11,11 @@ import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
-import { 
-  getStudentNotifications, 
-  createStudentNotification, 
-  markStudentNotificationRead, 
-  markAllStudentNotificationsRead, 
+import {
+  getStudentNotifications,
+  createStudentNotification,
+  markStudentNotificationRead,
+  markAllStudentNotificationsRead,
   deleteStudentNotification,
   deleteAllStudentNotifications,
   getStudentUnreadCount,
@@ -23,7 +23,10 @@ import {
   markEventsAsSeen,
   getSentReminders,
   markReminderSent,
-  createReminderNotification
+  createReminderNotification,
+  getCurrentUserReminders,
+  markReminderRead,
+  deleteReminder
 } from "../../services/notificationService";
 import userService from "../../services/userService";
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
@@ -68,7 +71,7 @@ function StudentDashboard() {
     const pollInterval = setInterval(() => {
       checkForNewEvents();
     }, 30000); // Check every 30 seconds
-    
+
     // Start checking for reminders
     const reminderInterval = setInterval(() => {
       checkForReminders();
@@ -106,7 +109,7 @@ function StudentDashboard() {
         const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
         setBannerMsg(`${m1}${amtTxt}.${email}`);
         setTimeout(() => setBannerMsg(''), 6000);
-      } catch (_) {}
+      } catch (_) { }
     };
     window.addEventListener('wallet:updated', handler);
     window.addEventListener('payment:success', onPaymentSuccess);
@@ -125,9 +128,9 @@ function StudentDashboard() {
         const status = params.get('status');
         const eventId = params.get('eventId');
         if (sessionId) {
-          try { await confirmStripeReceipt(sessionId); } catch (_) {}
+          try { await confirmStripeReceipt(sessionId); } catch (_) { }
           // Refresh registered events to reflect paid flag
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          try { await fetchRegisteredEvents(); } catch (_) { }
           // Banner message
           try {
             const raw = localStorage.getItem('user');
@@ -135,7 +138,7 @@ function StudentDashboard() {
             const email = u?.email ? ` Receipt emailed to ${u.email}.` : '';
             setBannerMsg(`Payment successful.${email}`);
             setTimeout(() => setBannerMsg(''), 6000);
-          } catch (_) {}
+          } catch (_) { }
           // Clean the URL to avoid repeat calls on navigation
           const url = new URL(window.location.href);
           url.searchParams.delete('session_id');
@@ -143,8 +146,8 @@ function StudentDashboard() {
         } else if (status === 'success') {
           try {
             if (eventId) { await sendManualReceipt(eventId); }
-          } catch (_) {}
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          } catch (_) { }
+          try { await fetchRegisteredEvents(); } catch (_) { }
           setBannerMsg('Payment successful.');
           setTimeout(() => setBannerMsg(''), 6000);
           const url = new URL(window.location.href);
@@ -152,7 +155,7 @@ function StudentDashboard() {
           url.searchParams.delete('eventId');
           window.history.replaceState({}, document.title, url.toString());
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, []);
 
@@ -202,21 +205,21 @@ function StudentDashboard() {
     try {
       // Fetch only frontend notifications (localStorage)
       const localNotifs = getStudentNotifications();
-      
+
       // Convert frontend notifications to match backend format for consistency
       const formattedFrontend = localNotifs.map(n => ({
         ...n,
         read: n.isRead,
         _id: n.id,
       }));
-      
+
       // Sort by creation date (newest first)
       formattedFrontend.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.date || 0);
         const dateB = new Date(b.createdAt || b.date || 0);
         return dateB - dateA;
       });
-      
+
       setNotifications(formattedFrontend);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -243,13 +246,13 @@ function StudentDashboard() {
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
-      
+
       // Filter out restricted events that user can't access
       const accessibleEvents = publishedEvents.filter(e => {
         const eventId = e._id || e.id;
         return canUserAccessEvent(eventId);
       });
-      
+
       const seenIds = getSeenEventIds();
       const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
@@ -297,9 +300,9 @@ function StudentDashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getStudentNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -313,14 +316,14 @@ function StudentDashboard() {
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      
+
       if (!res.ok) return;
-      
+
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
-      
+
       console.log(`Checking reminders for ${events.length} registered events`);
-      
+
       // Get user ID for tracking sent reminders
       const storedUser = localStorage.getItem("user");
       const user = storedUser ? JSON.parse(storedUser) : null;
@@ -329,29 +332,29 @@ function StudentDashboard() {
         console.log('No user ID found, skipping reminder check');
         return;
       }
-      
+
       const sentReminders = getSentReminders(userId);
       const now = new Date();
-      
+
       events.forEach(event => {
         if (!event.startDate) {
           console.log(`Event "${event.title || 'Unknown'}" has no startDate, skipping`);
           return;
         }
-        
+
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
         const eventTitle = event.title || 'Event';
         const eventType = event.type || 'Event';
-        
+
         // Check for 1 day reminder (24 hours before)
         // Show reminder if event is between 20-28 hours away (wider window)
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
         const isOneDayTime = hoursUntilEvent >= 20 && hoursUntilEvent <= 28 && startDate > now;
-        
+
         console.log(`Event "${eventTitle}": ${hoursUntilEvent.toFixed(2)} hours away, 1-day reminder: ${isOneDayTime}`);
-        
+
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
           console.log(`Creating 1-day reminder for event: ${eventTitle}`);
           markReminderSent(userId, oneDayReminderId);
@@ -364,7 +367,7 @@ function StudentDashboard() {
             reminderType: '1day',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -377,15 +380,15 @@ function StudentDashboard() {
             }
           }
         }
-        
+
         // Check for 1 hour reminder
         // Show reminder if event is between 45-75 minutes away (wider window)
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
         const isOneHourTime = minutesUntilEvent >= 45 && minutesUntilEvent <= 75 && startDate > now;
-        
+
         console.log(`Event "${eventTitle}": ${minutesUntilEvent.toFixed(2)} minutes away, 1-hour reminder: ${isOneHourTime}`);
-        
+
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
           console.log(`Creating 1-hour reminder for event: ${eventTitle}`);
           markReminderSent(userId, oneHourReminderId);
@@ -398,7 +401,7 @@ function StudentDashboard() {
             reminderType: '1hour',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -412,7 +415,7 @@ function StudentDashboard() {
           }
         }
       });
-      
+
       // Refresh reminders list
       fetchReminders();
       fetchNotifications();
@@ -426,16 +429,16 @@ function StudentDashboard() {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         // Likely unauthorized if no token; keep empty list gracefully
-        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) {}
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
         return;
       }
@@ -540,7 +543,7 @@ function StudentDashboard() {
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/courts`, {
         signal: controller.signal,
       });
@@ -559,8 +562,8 @@ function StudentDashboard() {
               const slotDate = new Date(s.date);
               // combine with startTime
               if (!s.startTime) return false;
-              const [h, m] = s.startTime.split(':').map(x=>parseInt(x,10));
-              slotDate.setHours(h||0, m||0, 0, 0);
+              const [h, m] = s.startTime.split(':').map(x => parseInt(x, 10));
+              slotDate.setHours(h || 0, m || 0, 0, 0);
               return slotDate >= now;
             } catch (e) { return false; }
           })
@@ -642,8 +645,8 @@ function StudentDashboard() {
         slots.push({
           slotId: `fake-slot-${idx}-${i}`,
           date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(),
-          startTime: `${String(startHour).padStart(2,'0')}:00`,
-          endTime: `${String(endHour).padStart(2,'0')}:00`
+          startTime: `${String(startHour).padStart(2, '0')}:00`,
+          endTime: `${String(endHour).padStart(2, '0')}:00`
         });
       }
       return {
@@ -672,9 +675,41 @@ function StudentDashboard() {
     try {
       const ids = getFavouriteIds().map(String);
       if (!ids.length) { setFavouriteEvents([]); return; }
-      const res = await fetch(`${API_BASE}/events`);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+
+      let list = [];
+
+      // Fetch published events
+      try {
+        const res = await fetch(`${API_BASE}/events`);
+        const data = await res.json();
+        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      } catch (e) {
+        console.error("Error fetching events for favorites:", e);
+      }
+
+      // Add frontend-approved workshops
+      try {
+        const approvedSet = getApprovedWorkshops();
+        if (approvedSet.size > 0) {
+          const sortRes = await fetch(`${API_BASE}/events/sort`);
+          const sortData = await sortRes.json();
+          if (Array.isArray(sortData)) {
+            const approvedWorkshops = sortData.filter(
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
+            );
+            // Mark as published for display
+            approvedWorkshops.forEach(w => { w.status = 'published'; });
+
+            // Merge avoiding duplicates
+            const existingIds = new Set(list.map(e => e._id));
+            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
+            list = [...list, ...newWorkshops];
+          }
+        }
+      } catch (e) {
+        console.log('Error adding approved workshops to favorites:', e);
+      }
+
       const filtered = list.filter(ev => {
         const eventId = ev._id || ev.id;
         // Check if event is in favorites AND user has access
@@ -817,7 +852,7 @@ function StudentDashboard() {
           {/* Content */}
           {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />}
           {activeTab === "registered" && (
-            <MyEventsList 
+            <MyEventsList
               events={registeredEvents.filter(event => {
                 const eventId = event._id || event.id;
                 if (!eventId) return true;
@@ -826,13 +861,13 @@ function StudentDashboard() {
                   console.log('Removing restricted event from registered display:', eventId, event.title);
                 }
                 return hasAccess;
-              })} 
-              showRefundButton 
+              })}
+              showRefundButton
             />
           )}
           {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
           {activeTab === "courts" && <CourtsReserve courts={courts} onReserved={handleReserve} />}
-          
+
           {activeTab === "gym-sessions" && (
             <div
               style={{
@@ -843,8 +878,8 @@ function StudentDashboard() {
                 border: `1px solid ${colors.gray200}`,
               }}
             >
-              <h2 style={{ 
-                color: colors.primary, 
+              <h2 style={{
+                color: colors.primary,
                 marginBottom: spacing.xl,
                 fontSize: typography.fontSize['2xl'],
                 fontWeight: typography.fontWeight.bold,
@@ -852,38 +887,38 @@ function StudentDashboard() {
                 Gym Sessions
               </h2>
               {gymSessionsLoading ? (
-                <div style={{ 
+                <div style={{
                   textAlign: "center",
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>Loading sessions...</p>
                 </div>
               ) : gymSessionsError ? (
-                <div style={{ 
-                  color: colors.error, 
-                  background: colors.errorLight, 
-                  padding: spacing.lg, 
+                <div style={{
+                  color: colors.error,
+                  background: colors.errorLight,
+                  padding: spacing.lg,
                   borderRadius: borderRadius.xl,
                   marginBottom: spacing.lg,
                 }}>{gymSessionsError}</div>
               ) : (!gymSessions || gymSessions.length === 0) ? (
-                <div style={{ 
+                <div style={{
                   textAlign: "center",
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No gym sessions scheduled</p>
                 </div>
               ) : (() => {
                 const typeMap = {
-                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba', 
+                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba',
                   crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
                 };
                 const byMonth = (gymSessions || []).reduce((acc, s) => {
@@ -937,35 +972,35 @@ function StudentDashboard() {
                       const typeKeys = Object.keys(byType).sort();
                       return (
                         <div key={month}>
-                          <div style={{ 
-                            background: colors.bgCard, 
-                            padding: `${spacing.lg} ${spacing.xl}`, 
-                            borderRadius: borderRadius.xl, 
+                          <div style={{
+                            background: colors.bgCard,
+                            padding: `${spacing.lg} ${spacing.xl}`,
+                            borderRadius: borderRadius.xl,
                             boxShadow: shadows.md,
                             border: `1px solid ${colors.gray200}`,
                           }}>
-                            <h3 style={{ 
-                              margin: 0, 
+                            <h3 style={{
+                              margin: 0,
                               color: colors.primary,
                               fontSize: typography.fontSize.xl,
                               fontWeight: typography.fontWeight.bold,
                             }}>{month}</h3>
-                            <div style={{ 
-                              display: 'grid', 
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-                              gap: spacing.lg, 
-                              marginTop: spacing.lg 
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                              gap: spacing.lg,
+                              marginTop: spacing.lg
                             }}>
                               {typeKeys.map((tk) => (
-                                <div key={tk} style={{ 
-                                  background: colors.white, 
-                                  border: `1px solid ${colors.gray200}`, 
-                                  borderRadius: borderRadius.xl, 
-                                  padding: spacing.lg 
+                                <div key={tk} style={{
+                                  background: colors.white,
+                                  border: `1px solid ${colors.gray200}`,
+                                  borderRadius: borderRadius.xl,
+                                  padding: spacing.lg
                                 }}>
-                                  <div style={{ 
-                                    fontWeight: typography.fontWeight.extrabold, 
-                                    color: colors.primary, 
+                                  <div style={{
+                                    fontWeight: typography.fontWeight.extrabold,
+                                    color: colors.primary,
                                     marginBottom: spacing.sm,
                                     fontSize: typography.fontSize.base,
                                   }}>{tk}</div>
@@ -985,24 +1020,24 @@ function StudentDashboard() {
                                           return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                         };
                                         return (
-                                          <li key={id} style={{ 
-                                            padding: `${spacing.sm} 0`, 
-                                            borderTop: `1px solid ${colors.gray100}` 
+                                          <li key={id} style={{
+                                            padding: `${spacing.sm} 0`,
+                                            borderTop: `1px solid ${colors.gray100}`
                                           }}>
-                                            <div style={{ 
-                                              display:'flex', 
-                                              justifyContent:'space-between', 
-                                              alignItems:'center', 
-                                              gap: spacing.lg 
+                                            <div style={{
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                              alignItems: 'center',
+                                              gap: spacing.lg
                                             }}>
                                               <div>
-                                                <div style={{ 
+                                                <div style={{
                                                   fontSize: typography.fontSize.sm,
                                                   fontWeight: typography.fontWeight.medium,
                                                   color: colors.gray700,
                                                 }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{ 
-                                                  fontSize: typography.fontSize.xs, 
+                                                <div style={{
+                                                  fontSize: typography.fontSize.xs,
                                                   color: colors.gray500,
                                                   marginTop: spacing.xs,
                                                 }}>
@@ -1039,10 +1074,10 @@ function StudentDashboard() {
                                               </div>
                                             </div>
                                             {gymStatus[id] && gymStatus[id].msg && (
-                                              <div style={{ 
-                                                marginTop: spacing.sm, 
-                                                fontSize: typography.fontSize.xs, 
-                                                color: gymStatus[id].ok ? colors.success : colors.error 
+                                              <div style={{
+                                                marginTop: spacing.sm,
+                                                fontSize: typography.fontSize.xs,
+                                                color: gymStatus[id].ok ? colors.success : colors.error
                                               }}>
                                                 {gymStatus[id].msg}
                                               </div>
@@ -1063,7 +1098,7 @@ function StudentDashboard() {
               })()}
             </div>
           )}
-          
+
           {activeTab === "reminders" && (
             <div
               style={{
@@ -1075,8 +1110,8 @@ function StudentDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold,
@@ -1087,7 +1122,7 @@ function StudentDashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markStudentNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -1106,7 +1141,7 @@ function StudentDashboard() {
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏰</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No reminders at this time.</p>
@@ -1129,9 +1164,9 @@ function StudentDashboard() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                             <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                            <h3 style={{ 
-                              color: colors.primary, 
-                              margin: 0, 
+                            <h3 style={{
+                              color: colors.primary,
+                              margin: 0,
                               fontSize: typography.fontSize.lg,
                               fontWeight: reminder.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
@@ -1148,8 +1183,8 @@ function StudentDashboard() {
                               }} />
                             )}
                           </div>
-                          <p style={{ 
-                            color: colors.gray500, 
+                          <p style={{
+                            color: colors.gray500,
                             margin: `${spacing.sm} 0`,
                             fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base,
@@ -1157,8 +1192,8 @@ function StudentDashboard() {
                             {reminder.message}
                           </p>
                           {reminder.eventStartDate && (
-                            <p style={{ 
-                              color: colors.gray400, 
+                            <p style={{
+                              color: colors.gray400,
                               fontSize: typography.fontSize.sm,
                               margin: `${spacing.xs} 0`,
                             }}>
@@ -1180,8 +1215,8 @@ function StudentDashboard() {
                               View Event
                             </button>
                           )}
-                          <p style={{ 
-                            color: colors.gray400, 
+                          <p style={{
+                            color: colors.gray400,
                             fontSize: typography.fontSize.sm,
                             margin: `${spacing.sm} 0 0 0`,
                           }}>
@@ -1192,7 +1227,7 @@ function StudentDashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markStudentNotificationRead(reminder.id);
+                                markReminderRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -1205,7 +1240,7 @@ function StudentDashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStudentNotification(reminder.id);
+                              deleteReminder(reminder.id);
                               fetchReminders();
                             }}
                             style={{
@@ -1241,7 +1276,7 @@ function StudentDashboard() {
               )}
             </div>
           )}
-          
+
           {activeTab === "loyalty" && (
             <div
               style={{
@@ -1268,7 +1303,7 @@ function StudentDashboard() {
               <StudentPollVoting />
             </div>
           )}
-          
+
           {activeTab === "notifications" && (
             <div
               style={{
@@ -1280,8 +1315,8 @@ function StudentDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold,
@@ -1348,7 +1383,7 @@ function StudentDashboard() {
                   padding: `${spacing['6xl']} ${spacing.xl}`,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🔔</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No notifications at this time.</p>
@@ -1376,15 +1411,15 @@ function StudentDashboard() {
                             {notif.type === 'LoyaltyPartnerAdded' && (
                               <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
                             )}
-                            <h3 style={{ 
-                              color: colors.primary, 
-                              margin: 0, 
+                            <h3 style={{
+                              color: colors.primary,
+                              margin: 0,
                               fontSize: typography.fontSize.lg,
                               fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' : 
-                               notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' : 
-                               'Notification'}
+                              {notif.type === 'NewEvent' ? 'New Event Available' :
+                                notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
+                                  'Notification'}
                             </h3>
                             {!(notif.read || notif.isRead) && (
                               <span style={{
@@ -1397,8 +1432,8 @@ function StudentDashboard() {
                               }} />
                             )}
                           </div>
-                          <p style={{ 
-                            color: colors.gray500, 
+                          <p style={{
+                            color: colors.gray500,
                             margin: `${spacing.sm} 0`,
                             fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base,
@@ -1420,8 +1455,8 @@ function StudentDashboard() {
                               View Event
                             </button>
                           )}
-                          <p style={{ 
-                            color: colors.gray400, 
+                          <p style={{
+                            color: colors.gray400,
                             fontSize: typography.fontSize.sm,
                             margin: `${spacing.sm} 0 0 0`,
                           }}>

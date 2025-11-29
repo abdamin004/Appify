@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
-import { API_BASE, listGymSessions, registerForEvent } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import Navbar from "../Navbar";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
@@ -9,18 +9,21 @@ import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import { showToast, confirmDialog } from "../../utils/toast";
 import userService from "../../services/userService";
-import { 
-  getStaffNotifications, 
-  createStaffNotification, 
-  markStaffNotificationRead, 
-  markAllStaffNotificationsRead, 
+import {
+  getStaffNotifications,
+  createStaffNotification,
+  markStaffNotificationRead,
+  markAllStaffNotificationsRead,
   deleteStaffNotification,
   deleteAllStaffNotifications,
   getSeenEventIds,
   markEventsAsSeen,
   getSentReminders,
   markReminderSent,
-  createReminderNotification
+  createReminderNotification,
+  getCurrentUserReminders,
+  markReminderRead,
+  deleteReminder
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
@@ -51,9 +54,9 @@ function StaffDashboard() {
   const [gymBusyId, setGymBusyId] = useState(null);
   const [gymStatus, setGymStatus] = useState({});
 
-  useEffect(() => { 
-    fetchRegisteredEvents(); 
-    fetchWallet(); 
+  useEffect(() => {
+    fetchRegisteredEvents();
+    fetchWallet();
     fetchNotifications();
     fetchReminders();
     initializeSeenEvents();
@@ -118,7 +121,7 @@ function StaffDashboard() {
         const amtTxt = typeof amt === 'number' ? ` (${amt} EGP)` : '';
         setBannerMsg(`${m1}${amtTxt}. Receipt emailed to you.`);
         setTimeout(() => setBannerMsg(''), 6000);
-      } catch (_) {}
+      } catch (_) { }
     };
     window.addEventListener('wallet:updated', onWallet);
     window.addEventListener('payment:success', onPaymentSuccess);
@@ -136,16 +139,16 @@ function StaffDashboard() {
         const status = params.get('status');
         const eventId = params.get('eventId');
         if (sessionId) {
-          try { await confirmStripeReceipt(sessionId); } catch (_) {}
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          try { await confirmStripeReceipt(sessionId); } catch (_) { }
+          try { await fetchRegisteredEvents(); } catch (_) { }
           setBannerMsg('Payment successful. Receipt emailed to you.');
           setTimeout(() => setBannerMsg(''), 6000);
           const url = new URL(window.location.href);
           url.searchParams.delete('session_id');
           window.history.replaceState({}, document.title, url.toString());
         } else if (status === 'success') {
-          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) {}
-          try { await fetchRegisteredEvents(); } catch (_) {}
+          try { if (eventId) { await sendManualReceipt(eventId); } } catch (_) { }
+          try { await fetchRegisteredEvents(); } catch (_) { }
           setBannerMsg('Payment successful.');
           setTimeout(() => setBannerMsg(''), 6000);
           const url = new URL(window.location.href);
@@ -153,7 +156,7 @@ function StaffDashboard() {
           url.searchParams.delete('eventId');
           window.history.replaceState({}, document.title, url.toString());
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, []);
 
@@ -167,21 +170,21 @@ function StaffDashboard() {
     try {
       // Fetch only frontend notifications (localStorage)
       const localNotifs = getStaffNotifications();
-      
+
       // Convert frontend notifications to match backend format for consistency
       const formattedFrontend = localNotifs.map(n => ({
         ...n,
         read: n.isRead,
         _id: n.id,
       }));
-      
+
       // Sort by creation date (newest first)
       formattedFrontend.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.date || 0);
         const dateB = new Date(b.createdAt || b.date || 0);
         return dateB - dateA;
       });
-      
+
       setNotifications(formattedFrontend);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -193,12 +196,12 @@ function StaffDashboard() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/events`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
         return; // Silently fail - not critical
       }
@@ -221,13 +224,13 @@ function StaffDashboard() {
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
-      
+
       // Filter out restricted events that user can't access
       const accessibleEvents = publishedEvents.filter(e => {
         const eventId = e._id || e.id;
         return canUserAccessEvent(eventId);
       });
-      
+
       const seenIds = getSeenEventIds();
       const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
@@ -241,7 +244,7 @@ function StaffDashboard() {
         newEvents.forEach(event => {
           const eventId = String(event._id || event.id);
           const eventType = event.type || 'Event';
-            createStaffNotification({
+          createStaffNotification({
             type: 'NewEvent',
             message: `New ${eventType}: ${event.title}`,
             eventId: eventId,
@@ -271,9 +274,9 @@ function StaffDashboard() {
 
   const fetchReminders = () => {
     try {
-      const notifs = getStaffNotifications();
-      const reminderNotifs = notifs.filter(n => n.type === 'EventReminder');
-      setReminders(reminderNotifs);
+      // Get user-specific reminders (not role-based)
+      const userReminders = getCurrentUserReminders();
+      setReminders(userReminders);
     } catch (err) {
       console.error('Error fetching reminders:', err);
       setReminders([]);
@@ -286,32 +289,32 @@ function StaffDashboard() {
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      
+
       if (!res.ok) return;
-      
+
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
-      
+
       const storedUser = localStorage.getItem("user");
       const user = storedUser ? JSON.parse(storedUser) : null;
       const userId = user && (user._id || user.id);
       if (!userId) return;
-      
+
       const sentReminders = getSentReminders(userId);
       const now = new Date();
-      
+
       events.forEach(event => {
         if (!event.startDate) return;
-        
+
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
         const eventTitle = event.title || 'Event';
         const eventType = event.type || 'Event';
-        
+
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
         const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
-        
+
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
           markReminderSent(userId, oneDayReminderId);
           createReminderNotification({
@@ -323,7 +326,7 @@ function StaffDashboard() {
             reminderType: '1day',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -336,11 +339,11 @@ function StaffDashboard() {
             }
           }
         }
-        
+
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
         const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
-        
+
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
           markReminderSent(userId, oneHourReminderId);
           createReminderNotification({
@@ -352,7 +355,7 @@ function StaffDashboard() {
             reminderType: '1hour',
             eventStartDate: startDate.toISOString(),
           });
-          
+
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -366,7 +369,7 @@ function StaffDashboard() {
           }
         }
       });
-      
+
       fetchReminders();
       fetchNotifications();
     } catch (err) {
@@ -422,15 +425,15 @@ function StaffDashboard() {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      
+
       if (!res.ok) {
-        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch(_) {}
+        try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
       } else {
         const data = await res.json();
@@ -453,9 +456,41 @@ function StaffDashboard() {
     try {
       const ids = getFavouriteIds().map(String);
       if (!ids.length) { setFavouriteEvents([]); return; }
-      const res = await fetch(`${API_BASE}/events`);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+
+      let list = [];
+
+      // Fetch published events
+      try {
+        const res = await fetch(`${API_BASE}/events`);
+        const data = await res.json();
+        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
+      } catch (e) {
+        console.error("Error fetching events for favorites:", e);
+      }
+
+      // Add frontend-approved workshops
+      try {
+        const approvedSet = getApprovedWorkshops();
+        if (approvedSet.size > 0) {
+          const sortRes = await fetch(`${API_BASE}/events/sort`);
+          const sortData = await sortRes.json();
+          if (Array.isArray(sortData)) {
+            const approvedWorkshops = sortData.filter(
+              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
+            );
+            // Mark as published for display
+            approvedWorkshops.forEach(w => { w.status = 'published'; });
+
+            // Merge avoiding duplicates
+            const existingIds = new Set(list.map(e => e._id));
+            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
+            list = [...list, ...newWorkshops];
+          }
+        }
+      } catch (e) {
+        console.log('Error adding approved workshops to favorites:', e);
+      }
+
       const filtered = list.filter(ev => {
         const eventId = ev._id || ev.id;
         // Check if event is in favorites AND user has access
@@ -685,26 +720,26 @@ function StaffDashboard() {
                   boxShadow: shadows.md,
                 }}
               >
-                <div style={{ 
-                  fontSize: typography.fontSize.lg, 
-                  color: colors.gray500, 
-                  fontWeight: typography.fontWeight.medium 
+                <div style={{
+                  fontSize: typography.fontSize.lg,
+                  color: colors.gray500,
+                  fontWeight: typography.fontWeight.medium
                 }}>
                   Loading your registered events...
                 </div>
               </div>
             ) : (
-              <MyEventsList 
+              <MyEventsList
                 events={registeredEvents.filter(event => {
                   const eventId = event._id || event.id;
                   if (!eventId) return true;
                   return canUserAccessEvent(eventId);
-                })} 
-                showRefundButton 
+                })}
+                showRefundButton
               />
             )
           )}
-          
+
           {activeTab === "reminders" && (
             <div
               style={{
@@ -715,8 +750,8 @@ function StaffDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold
@@ -727,7 +762,7 @@ function StaffDashboard() {
                   <button
                     onClick={() => {
                       reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markStaffNotificationRead(reminder.id);
+                        markReminderRead(reminder.id);
                       });
                       fetchReminders();
                     }}
@@ -760,9 +795,9 @@ function StaffDashboard() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
                             <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                            <h3 style={{ 
-                              color: colors.primary, 
-                              margin: 0, 
+                            <h3 style={{
+                              color: colors.primary,
+                              margin: 0,
                               fontSize: typography.fontSize.lg,
                               fontWeight: reminder.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                             }}>
@@ -779,8 +814,8 @@ function StaffDashboard() {
                               }} />
                             )}
                           </div>
-                          <p style={{ 
-                            color: colors.gray500, 
+                          <p style={{
+                            color: colors.gray500,
                             margin: `${spacing.sm} 0`,
                             fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
                             fontSize: typography.fontSize.base
@@ -788,8 +823,8 @@ function StaffDashboard() {
                             {reminder.message}
                           </p>
                           {reminder.eventStartDate && (
-                            <p style={{ 
-                              color: colors.gray400, 
+                            <p style={{
+                              color: colors.gray400,
                               fontSize: typography.fontSize.sm,
                               margin: `${spacing.xs} 0`,
                             }}>
@@ -811,8 +846,8 @@ function StaffDashboard() {
                               View Event
                             </button>
                           )}
-                          <p style={{ 
-                            color: colors.gray400, 
+                          <p style={{
+                            color: colors.gray400,
                             fontSize: typography.fontSize.sm,
                             margin: `${spacing.sm} 0 0 0`,
                           }}>
@@ -823,7 +858,7 @@ function StaffDashboard() {
                           {!reminder.isRead && (
                             <button
                               onClick={() => {
-                                markStaffNotificationRead(reminder.id);
+                                markReminderRead(reminder.id);
                                 fetchReminders();
                               }}
                               style={{
@@ -836,7 +871,7 @@ function StaffDashboard() {
                           )}
                           <button
                             onClick={() => {
-                              deleteStaffNotification(reminder.id);
+                              deleteReminder(reminder.id);
                               fetchReminders();
                             }}
                             style={{
@@ -860,7 +895,7 @@ function StaffDashboard() {
               )}
             </div>
           )}
-          
+
           {activeTab === "loyalty" && (
             <div
               style={{
@@ -888,8 +923,8 @@ function StaffDashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{ 
-                  color: colors.primary, 
+                <h2 style={{
+                  color: colors.primary,
                   margin: 0,
                   fontSize: typography.fontSize['2xl'],
                   fontWeight: typography.fontWeight.bold
@@ -956,129 +991,129 @@ function StaffDashboard() {
                 <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
                   {notifications.map((notif) => {
                     const isRead = notif.read || notif.isRead;
-                    
+
                     return (
-                    <div
-                      key={notif.id || notif._id}
-                      style={{
-                        padding: spacing.xl,
-                        background: isRead ? colors.gray50 : colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
-                        position: "relative",
-                        boxShadow: isRead ? shadows.sm : shadows.md,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                            {notif.type === 'NewEvent' && (
-                              <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
-                            )}
-                            {notif.type === 'LoyaltyPartnerAdded' && (
-                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
-                            )}
-                            <h3 style={{ 
-                              color: colors.primary, 
-                              margin: 0, 
-                              fontSize: typography.fontSize.lg,
-                              fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
+                      <div
+                        key={notif.id || notif._id}
+                        style={{
+                          padding: spacing.xl,
+                          background: isRead ? colors.gray50 : colors.white,
+                          borderRadius: borderRadius.xl,
+                          border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
+                          position: "relative",
+                          boxShadow: isRead ? shadows.sm : shadows.md,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
+                              {notif.type === 'NewEvent' && (
+                                <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
+                              )}
+                              {notif.type === 'LoyaltyPartnerAdded' && (
+                                <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
+                              )}
+                              <h3 style={{
+                                color: colors.primary,
+                                margin: 0,
+                                fontSize: typography.fontSize.lg,
+                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
+                              }}>
+                                {notif.type === 'NewEvent' ? 'New Event Available' :
+                                  notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
+                                    'Notification'}
+                              </h3>
+                              {!isRead && (
+                                <span style={{
+                                  background: colors.error,
+                                  color: colors.white,
+                                  borderRadius: borderRadius.full,
+                                  width: "10px",
+                                  height: "10px",
+                                  display: "inline-block",
+                                }} />
+                              )}
+                            </div>
+                            <p style={{
+                              color: colors.gray500,
+                              margin: `${spacing.sm} 0`,
+                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
+                              fontSize: typography.fontSize.base
                             }}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' : 
-                               notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' : 
-                               'Notification'}
-                            </h3>
+                              {notif.message}
+                            </p>
+                            {notif.eventId && (
+                              <button
+                                onClick={() => {
+                                  window.location.href = `/events/${notif.eventId}`;
+                                }}
+                                style={{
+                                  marginTop: spacing.md,
+                                  ...buttonStyles.primary,
+                                  padding: `${spacing.sm} ${spacing.lg}`,
+                                  fontSize: typography.fontSize.sm
+                                }}
+                              >
+                                View Event
+                              </button>
+                            )}
+                            <p style={{
+                              color: colors.gray400,
+                              fontSize: typography.fontSize.sm,
+                              margin: `${spacing.sm} 0 0 0`,
+                            }}>
+                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
                             {!isRead && (
-                              <span style={{
+                              <button
+                                onClick={() => {
+                                  markStaffNotificationRead(notif.id);
+                                  fetchNotifications();
+                                }}
+                                style={{
+                                  ...pillButtonStyles.success,
+                                  fontSize: typography.fontSize.sm,
+                                }}
+                              >
+                                Mark Read
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                deleteStaffNotification(notif.id);
+                                fetchNotifications();
+                                showToast.success('Notification deleted');
+                              }}
+                              style={{
+                                padding: `${spacing.xs} ${spacing.md}`,
                                 background: colors.error,
                                 color: colors.white,
-                                borderRadius: borderRadius.full,
-                                width: "10px",
-                                height: "10px",
-                                display: "inline-block",
-                              }} />
-                            )}
-                          </div>
-                          <p style={{ 
-                            color: colors.gray500, 
-                            margin: `${spacing.sm} 0`,
-                            fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                            fontSize: typography.fontSize.base
-                          }}>
-                            {notif.message}
-                          </p>
-                          {notif.eventId && (
-                            <button
-                              onClick={() => {
-                                window.location.href = `/events/${notif.eventId}`;
-                              }}
-                              style={{
-                                marginTop: spacing.md,
-                                ...buttonStyles.primary,
-                                padding: `${spacing.sm} ${spacing.lg}`,
-                                fontSize: typography.fontSize.sm
-                              }}
-                            >
-                              View Event
-                            </button>
-                          )}
-                          <p style={{ 
-                            color: colors.gray400, 
-                            fontSize: typography.fontSize.sm,
-                            margin: `${spacing.sm} 0 0 0`,
-                          }}>
-                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                          {!isRead && (
-                            <button
-                              onClick={() => {
-                                markStaffNotificationRead(notif.id);
-                                fetchNotifications();
-                              }}
-                              style={{
-                                ...pillButtonStyles.success,
+                                border: 'none',
+                                borderRadius: borderRadius.lg,
                                 fontSize: typography.fontSize.sm,
+                                fontWeight: typography.fontWeight.semibold,
+                                cursor: 'pointer',
+                                transition: transitions.fast,
+                                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.transform = 'translateY(-1px)';
+                                e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
+                                e.target.style.background = '#b91c1c';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
+                                e.target.style.background = colors.error;
                               }}
                             >
-                              Mark Read
+                              🗑️ Delete
                             </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              deleteStaffNotification(notif.id);
-                              fetchNotifications();
-                              showToast.success('Notification deleted');
-                            }}
-                            style={{
-                              padding: `${spacing.xs} ${spacing.md}`,
-                              background: colors.error,
-                              color: colors.white,
-                              border: 'none',
-                              borderRadius: borderRadius.lg,
-                              fontSize: typography.fontSize.sm,
-                              fontWeight: typography.fontWeight.semibold,
-                              cursor: 'pointer',
-                              transition: transitions.fast,
-                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.transform = 'translateY(-1px)';
-                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                              e.target.style.background = '#b91c1c';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.transform = 'translateY(0)';
-                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                              e.target.style.background = colors.error;
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })}
                 </div>
@@ -1127,7 +1162,7 @@ function StaffDashboard() {
                   color: colors.gray500,
                 }}>
                   <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{ 
+                  <p style={{
                     color: colors.gray500,
                     fontSize: typography.fontSize.base,
                   }}>No gym sessions scheduled</p>
