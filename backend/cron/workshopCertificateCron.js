@@ -53,10 +53,10 @@ async function processWorkshopCertificates() {
 }
 
 module.exports = function startWorkshopCertificateCron() {
-  console.log('Workshop certificate cron job scheduled (runs every hour)');
+  console.log('Workshop certificate cron job scheduled (runs every hour at minute 10)');
 
-  // Run at minute 20 every hour
-  cron.schedule('20 * * * *', async () => {
+  // Run at minute 10 every hour
+  cron.schedule('10 * * * *', async () => {
     try {
       await processWorkshopCertificates();
     } catch (err) {
