@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from '../../utils/designSystem';
+import { showToast } from '../../utils/toast';
 
 export default function VendorDocuments({ hideBackButton = false, backPath = '/Admin' }) {
   const navigate = useNavigate();
@@ -76,6 +77,56 @@ export default function VendorDocuments({ hideBackButton = false, backPath = '/A
     setOrganization('');
     setVendorId('');
     setTimeout(() => fetchVendorDocuments(), 0);
+  };
+
+  const handleViewDocument = async (vendorId, documentType) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showToast.error('Please login to view documents');
+        return;
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const url = `${API_BASE}/admin/vendor-documents/${vendorId}/${documentType}`;
+      
+      // Fetch the document with authentication
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load document: ${response.statusText}`);
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a blob URL and open it in a new window
+      const blobUrl = URL.createObjectURL(blob);
+      const newWindow = window.open(blobUrl, '_blank');
+      
+      // Clean up the blob URL after a delay (the browser will keep it as long as the window is open)
+      if (newWindow) {
+        newWindow.addEventListener('beforeunload', () => {
+          URL.revokeObjectURL(blobUrl);
+        });
+      } else {
+        // If popup was blocked, create a download link instead
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${documentType}_${vendorId}.${blob.type.includes('pdf') ? 'pdf' : blob.type.includes('png') ? 'png' : 'jpg'}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      }
+    } catch (err) {
+      console.error('Error viewing document:', err);
+      showToast.error(err.message || 'Failed to view document');
+    }
   };
 
   const content = (
@@ -158,10 +209,44 @@ export default function VendorDocuments({ hideBackButton = false, backPath = '/A
                 <div style={{ paddingLeft: spacing.lg, color: colors.gray700 }}>
                   <p><b>ID:</b> {doc.vendor?.id || 'N/A'}</p>
                   <p><b>Email:</b> {doc.vendor?.email || 'N/A'}</p>
-                  <p><b>Tax Card:</b> {doc.vendor?.taxCardAvailable ? "Available" : "Not Provided"}</p>
-                  <p><b>Logo:</b> {doc.vendor?.logoAvailable ? "Available" : "Not Provided"}</p>
-                  <p><b>Tax Card URL:</b> {doc.vendor?.taxCardUrl ? <a href={doc.vendor.taxCardUrl} target="_blank" rel="noreferrer">View</a> : 'N/A'}</p>
-                  <p><b>Logo URL:</b> {doc.vendor?.logoUrl ? <a href={doc.vendor.logoUrl} target="_blank" rel="noreferrer">View</a> : 'N/A'}</p>
+                  <p><b>Tax Card:</b> {doc.vendor?.taxCardAvailable ? (
+                    <span>
+                      Available - <button
+                        onClick={() => handleViewDocument(doc.vendor.id, 'taxCard')}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: colors.primary,
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: 'inherit',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        View/Download
+                      </button>
+                    </span>
+                  ) : "Not Provided"}</p>
+                  <p><b>Logo:</b> {doc.vendor?.logoAvailable ? (
+                    <span>
+                      Available - <button
+                        onClick={() => handleViewDocument(doc.vendor.id, 'logo')}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: colors.primary,
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: 'inherit',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        View/Download
+                      </button>
+                    </span>
+                  ) : "Not Provided"}</p>
                 </div>
               </div>
 
