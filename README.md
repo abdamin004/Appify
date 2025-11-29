@@ -449,7 +449,9 @@ Here’s how you can contribute:
 
 - The project structure and some of the backend/frontend setup was inspired by the tutorial  
   **“MERN Stack Tutorial for Beginners with Deployment – 2025”** on YouTube. Special thanks to the creator for providing a clear, practical full-stack foundation.  
-  Link: https://youtu.be/F9gB5b4jgOI  
+  Link: https://youtu.be/F9gB5b4jgOI
+- We were introduced to and got familiar and comfortable with using Docker through the youtube tutorial titled **"The Only Docker Tutorial You Need To Get Started"**
+  Link: https://youtu.be/gAkwW2tuIqE?si=tjrBjKPWP08Xeqli  
 - Any resemblance to real university systems or workflows is coincidental; Appify is built for demonstration and academic purposes only.
 ---
 ## 📄 License
@@ -460,6 +462,7 @@ Appify was developed solely as part of a **university academic project**, and is
 You are free to view the code for learning purposes, but redistribution, sublicensing, or commercial use is not permitted unless explicitly approved by the project owners.
 
 If you wish to reuse any part of this project, please contact the team first.
+
 
 
 
