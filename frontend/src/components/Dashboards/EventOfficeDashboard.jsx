@@ -1902,6 +1902,9 @@ function EventOfficeDashboard() {
                               {notif.type === 'WorkshopSubmitted' && (
                                 <span style={{ fontSize: typography.fontSize['2xl'] }}>📝</span>
                               )}
+                              {notif.type === 'WorkshopEditSubmitted' && (
+                                <span style={{ fontSize: typography.fontSize['2xl'] }}>✏️</span>
+                              )}
                               {notif.type === 'NewEvent' && (
                                 <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
                               )}
@@ -1912,6 +1915,7 @@ function EventOfficeDashboard() {
                                 fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
                               }}>
                                 {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' :
+                                  notif.type === 'WorkshopEditSubmitted' ? 'Workshop Updated After Edit Request' :
                                   notif.type === 'NewEvent' ? 'New Event Available' :
                                     notif.type || 'Notification'}
                               </h3>
@@ -1934,12 +1938,17 @@ function EventOfficeDashboard() {
                             }}>
                               {notif.type === 'WorkshopSubmitted'
                                 ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
+                                : notif.type === 'WorkshopEditSubmitted'
+                                ? notif.message || `A professor has updated a workshop after receiving edit requests. Please review the changes.`
                                 : notif.message || 'No message'}
                             </p>
-                            {notif.eventId && (
+                            {(notif.eventId || (notif.event && (notif.event._id || notif.event))) && (
                               <button
                                 onClick={() => {
-                                  window.location.href = `/events/${notif.eventId}`;
+                                  const eventId = notif.eventId || (notif.event && (notif.event._id || notif.event));
+                                  if (eventId) {
+                                    window.location.href = `/events/${eventId}`;
+                                  }
                                 }}
                                 style={{
                                   marginTop: spacing.md,
@@ -1948,7 +1957,7 @@ function EventOfficeDashboard() {
                                   fontSize: typography.fontSize.sm,
                                 }}
                               >
-                                View Event
+                                {notif.type === 'WorkshopEditSubmitted' ? 'Review Workshop' : 'View Event'}
                               </button>
                             )}
                             <p style={{
