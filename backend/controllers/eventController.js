@@ -266,6 +266,7 @@ module.exports = {
             // Show all published events (past and future)
             const events = await Event.find({ status: 'published' })
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                 .sort({ startDate: 1 })
                 .exec();
             const enriched = await attachApprovedParticipants(events);
@@ -290,6 +291,7 @@ module.exports = {
             };
             const events = await Event.find(baseMatch)
                 .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                 .sort({ startDate: 1 })
                 .exec();
             const enriched = await attachApprovedParticipants(events);
@@ -312,12 +314,14 @@ module.exports = {
             if (startDate) {
                 events = await Event.find({ ...base, startDate: { $gte: new Date(startDate) } })
                     .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                     .sort({ startDate: 1 })
                     .exec();
             } else {
                 // No startDate filter provided: include all published events (past and future)
                 events = await Event.find(base)
                     .populate({ path: 'vendors', options: { strictPopulate: false } })
+                    .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
                     .sort({ startDate: 1 })
                     .exec();
             }
@@ -331,7 +335,10 @@ module.exports = {
 
     async sortEvents(req, res) {
         try {
-            const events = await Event.find().sort({ startDate: 1 }).populate({ path: 'vendors', options: { strictPopulate: false } });
+            const events = await Event.find()
+                .sort({ startDate: 1 })
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' });
             res.json(events);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -721,6 +728,46 @@ module.exports = {
 
             const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true })
                 .populate({ path: 'vendors', options: { strictPopulate: false } });
+
+            // Check if workshop was updated after edit requests were made
+            if (event.type === 'Workshop' && description !== undefined) {
+                const originalDescription = event.description || '';
+                const newDescription = description || '';
+                
+                // Check if original description had edit request markers
+                const editRequestRegex = /--- EDIT REQUEST FROM EVENTS OFFICE \([^)]+\) ---[\s\S]*?--- END EDIT REQUEST ---/g;
+                const originalHadEditRequests = editRequestRegex.test(originalDescription);
+                const newHasEditRequests = editRequestRegex.test(newDescription);
+                
+                // If original had edit requests but new one doesn't, professor addressed them
+                if (originalHadEditRequests && !newHasEditRequests) {
+                    try {
+                        // Get all EventOffice users
+                        const eventOfficeUsers = await User.find({ role: 'EventOffice' });
+                        
+                        // Create backend notification
+                        await Notification.create({
+                            type: 'WorkshopEditSubmitted',
+                            message: `Professor has updated workshop "${event.title}" after receiving edit requests. Please review the changes.`,
+                            event: event._id,
+                            recipientsRoles: ['EventOffice']
+                        });
+                        
+                        // Also add to each EventOffice user's notifications array (legacy support)
+                        for (const officeUser of eventOfficeUsers) {
+                            officeUser.notifications.push({
+                                message: `Professor has updated workshop "${event.title}" after receiving edit requests. Please review the changes.`,
+                                date: new Date(),
+                                read: false
+                            });
+                            await officeUser.save();
+                        }
+                    } catch (notifyErr) {
+                        // Don't fail the update if notification fails
+                        console.error('Failed to create workshop edit notification:', notifyErr);
+                    }
+                }
+            }
 
             // Send email notifications for gym sessions
             if (event.type === 'GymSession' && event.registeredUsers && event.registeredUsers.length > 0) {

@@ -19,7 +19,8 @@ const notificationSchema = new mongoose.Schema({
           'NewEventPublished',
           'EventReminder1Day',
           'EventReminder1Hour',
-          'LoyaltyPartnerAdded'
+          'LoyaltyPartnerAdded',
+          'WorkshopEditSubmitted'
         ],
     required: true
   },

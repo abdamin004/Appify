@@ -277,7 +277,17 @@ export default function EventDetails() {
     } catch(_) {}
   }, [id, currentUserId, tokenPresent]);
 
-  const isRegistered = !!(event && Array.isArray(event.registeredUsers) && currentUserId && event.registeredUsers.map(String).includes(String(currentUserId)));
+  // Check if user is registered - handle both populated objects and IDs
+  const isRegistered = (() => {
+    if (!event || !currentUserId) return false;
+    const registeredUsers = event.registeredUsers || [];
+    if (!Array.isArray(registeredUsers)) return false;
+    return registeredUsers.some(u => {
+      // Handle both populated objects and plain IDs
+      const userId = u?._id || u?.id || u;
+      return String(userId) === String(currentUserId);
+    });
+  })();
 
   async function handleRegister() {
     if (!tokenPresent) {
@@ -520,7 +530,7 @@ export default function EventDetails() {
                       fontWeight: typography.fontWeight.bold, 
                       color: colors.accent 
                     }}>
-                      ${event.price}
+                      {event.price} EGP
                     </span>
                   )}
                 </div>
