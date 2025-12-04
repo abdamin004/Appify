@@ -1,0 +1,172 @@
+{
+  "name": "Event Recommendation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "eventrecommendation",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        80
+      ],
+      "id": "98b005eb-9f2f-4854-99d3-12cf4eef5d00",
+      "name": "Webhook",
+      "webhookId": "40f0c40e-4c12-44d5-9b5c-a46c99c232e0"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Personalized Event Recommendations\n\nBased on the user’s past registered events and the events in their favorites list, suggest new upcoming events that the user is most likely to register for.\nPast registered events id:{{ $json.body.registeredEvents }}\nfavorite events id:{{ $json.body.favoriteEvents }}\nConsider:\n- Event categories and types\n- Event descriptions\n- Patterns in user preferences (e.g., weekends, type of activity, personality match)\n- Similarity between user activity history and new event offerings\n\nOutput a json array of list of recommended events id sorted by highest relevance just state the eventids.\n- The JSON MUST be a single array of event IDs\nMake sure that the recommended events user did not already register in and all evetns are upcoming events\n",
+        "options": {
+          "systemMessage": "You are an Event Recommendation Agent for a university event management system. \nYour goal is to analyze user behavior, interests, and past event participation to identify highly relevant upcoming events.\n\nYou receive two inputs:\n1. A list of events the user previously registered for.\n2. A list of events the user has marked as favorites.\n\nYou must:\n- Analyze patterns in the user’s interests, such as event categories, tags, timing preferences (e.g., weekends), type of activity, and textual descriptions.\n- Compare the user profile patterns with the list of available upcoming events (provided separately).\n- Rank the events based on similarity, predicted enjoyment, likelihood of registration, and user preference alignment.\n- Provide a short justification for each recommendation.\n-Output\n\nRESPONSE FORMAT RULES (CRITICAL):\n- You MUST output ONLY valid JSON.\n- The JSON MUST be a single array of event IDs.\n- Each element in the array MUST be a string representing an event ID.\n- No text, no explanations, no markdown, no object wrappers, no comments.\n\nVALID OUTPUT EXAMPLES:\n[\"68f52e03e289f95cbc5c16c5\", \"68f53000e289f95cbc5c170a\"]\n\nIf no recommendations are found, return an empty array:\n[]\n\nINVALID OUTPUT (DO NOT PRODUCE):\n- Objects: {\"eventid\":\"...\"}\n- Nested objects\n- Key-value maps\n- Trailing commas\n- Text before or after JSON\n\nYour response must ALWAYS be ONLY a JSON array of event IDs.\nDo NOT invent event ids. Only use the events provided in your input.\nIf no strong matches exist, still provide the closest recommendations with explanations.\n-tools\nfind events: to find events from the database \nmemory:to store recommended events for the user to be easier to find recommendation events by the user id"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        128,
+        80
+      ],
+      "id": "1d538ff8-ab7b-4db1-b826-05183061774e",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        304
+      ],
+      "id": "078d8d86-d2c7-4c1f-b12b-1b949796a2b3",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Ib6oJgU0RNKvB7AF",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.userId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        208,
+        304
+      ],
+      "id": "5c0dadd8-8434-4bd5-9305-e7cf19e7f597",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "collection": "events",
+        "options": {},
+        "query": "={}"
+      },
+      "type": "n8n-nodes-base.mongoDbTool",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        304
+      ],
+      "id": "d092f990-5749-45dc-ba42-16bbc6e8c395",
+      "name": "find events",
+      "credentials": {
+        "mongoDb": {
+          "id": "3zKXnfNZr3gbeRKP",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Configure nodes\n1)**find events**\n-credentials to connect with\n  **Configuration Type**: Connection String\n **Connection String**: mongodb://admin:admin123@mongodb:27017/university_events?authSource=admin\n**Database**: university_events\n2)**OpenAi chat Model**\n -credentials to connect with\n   Create and copy your api key from [api_key](https://platform.openai.com/api-keys)",
+        "height": 256,
+        "width": 464
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        -176
+      ],
+      "id": "c4185b88-be45-4d48-9e2e-9f91727e70b5",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find events": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6a5ab4ea-17e6-4dd6-8e28-40db9c8de5a8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "42fbff96df4586710e71165ca76a7def10c4878d8148e8d939cc75e51d41869c"
+  },
+  "id": "ZjOUFVPSVaA59sVb",
+  "tags": []
+}
