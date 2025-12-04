@@ -12,6 +12,10 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
+const Favorite = require('../models/Favorite');
+const Recommendation = require('../models/Recommendation');
+const axios = require('axios');
+
 const {
     sendGymSessionCancellationEmail,
     sendGymSessionUpdateEmail,
@@ -250,7 +254,6 @@ module.exports = {
                     // do NOT fail the request
                 }
             }
-
             res.status(201).json({
                 success: true,
                 message: `${type || 'Event'} created successfully.`,
@@ -1244,7 +1247,7 @@ module.exports = {
             const { eventId } = req.params;
             const userId = req.user._id;
 
-            // 1) Ensure event exists and is published (optional but makes sense)
+            // 1) Ensure event exists
             const event = await Event.findById(eventId);
             if (!event) {
                 return res.status(404).json({
@@ -1253,31 +1256,39 @@ module.exports = {
                 });
             }
 
-            // 2) Load user
-            const user = await User.findById(userId);
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
+            // 2) Check if already favorited (using Favorite model)
+            const existingFavorite = await Favorite.findOne({
+                user: userId,
+                event: eventId
+            });
 
-            user.favoriteEvents = user.favoriteEvents || [];
-
-            // 3) Prevent duplicates
-            const alreadyFav = user.favoriteEvents.some(
-                (id) => id.toString() === eventId.toString()
-            );
-            if (alreadyFav) {
+            if (existingFavorite) {
                 return res.status(400).json({
                     success: false,
                     message: 'Event is already in your favorites list'
                 });
             }
 
-            // 4) Add to favorites and save
-            user.favoriteEvents.push(eventId);
-            await user.save();
+            // 3) Create new favorite entry
+            await Favorite.create({
+                user: userId,
+                event: eventId
+            });
+
+            // 4) Also update User model for backward compatibility (optional)
+            try {
+                const user = await User.findById(userId);
+                if (user) {
+                    user.favoriteEvents = user.favoriteEvents || [];
+                    if (!user.favoriteEvents.some(id => id.toString() === eventId.toString())) {
+                        user.favoriteEvents.push(eventId);
+                        await user.save();
+                    }
+                }
+            } catch (userErr) {
+                // Don't fail if User update fails, Favorite model is the source of truth
+                console.log('Note: Could not update User.favoriteEvents array:', userErr.message);
+            }
 
             return res.status(200).json({
                 success: true,
@@ -1291,6 +1302,13 @@ module.exports = {
                 }
             });
         } catch (err) {
+            // Handle duplicate key error (unique index violation)
+            if (err.code === 11000) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
+            }
             return res.status(500).json({
                 success: false,
                 message: err.message
@@ -1302,12 +1320,18 @@ module.exports = {
         try {
             const userId = req.user._id;
 
-            const user = await User.findById(userId).populate({
-                path: 'favoriteEvents',
-                populate: { path: 'vendors', options: { strictPopulate: false } }
-            });
+            // Get favorites from Favorite model
+            const favorites = await Favorite.find({ user: userId })
+                .populate({
+                    path: 'event',
+                    populate: { path: 'vendors', options: { strictPopulate: false } }
+                })
+                .sort({ createdAt: -1 }); // Most recently favorited first
 
-            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+            // Extract events from favorites
+            const events = favorites
+                .map(fav => fav.event)
+                .filter(event => event !== null && event !== undefined); // Filter out any null/undefined events
 
             if (events.length === 0) {
                 return res.status(200).json({
@@ -1328,6 +1352,289 @@ module.exports = {
             return res.status(500).json({
                 success: false,
                 message: err.message
+            });
+        }
+    },
+
+    async removeEventFromFavorites(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // Find and delete favorite from Favorite model
+            const favorite = await Favorite.findOneAndDelete({
+                user: userId,
+                event: eventId
+            });
+
+            if (!favorite) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is not in your favorites list'
+                });
+            }
+
+            // Also update User model for backward compatibility (optional)
+            try {
+                const user = await User.findById(userId);
+                if (user && user.favoriteEvents) {
+                    user.favoriteEvents = user.favoriteEvents.filter(
+                        (id) => id.toString() !== eventId.toString()
+                    );
+                    await user.save();
+                }
+            } catch (userErr) {
+                // Don't fail if User update fails, Favorite model is the source of truth
+                console.log('Note: Could not update User.favoriteEvents array:', userErr.message);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event removed from favorites successfully'
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getEventRecommendations(req, res) {
+        try {
+            const userId = req.user._id;
+            
+            // Get user's registered events to filter them out from recommendations
+            const user = await User.findById(userId).select('registeredEvents').lean();
+            const registeredEventIds = Array.isArray(user?.registeredEvents) 
+                ? user.registeredEvents
+                    .filter(id => id != null)
+                    .map(id => String(id))
+                : [];
+            const registeredEventIdsSet = new Set(registeredEventIds);
+            
+            // Check if there's a recent recommendation (less than 1 day old)
+            const oneDayAgo = new Date();
+            oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+            
+            let existingRecommendation = await Recommendation.findOne({
+                user: userId,
+                createdAt: { $gte: oneDayAgo }
+            });
+            
+            // If we have a recent recommendation, filter out registered events and past events
+            if (existingRecommendation && existingRecommendation.eventIds && existingRecommendation.eventIds.length > 0) {
+                // Fetch event details to check start dates
+                const events = await Event.find({ 
+                    _id: { $in: existingRecommendation.eventIds } 
+                }).select('_id startDate').lean();
+                
+                const now = new Date();
+                // Filter out events user has already registered for AND past events
+                const filteredRecommendations = events
+                    .filter(event => {
+                        const eventIdStr = event._id.toString();
+                        // Exclude if user already registered
+                        if (registeredEventIdsSet.has(eventIdStr)) return false;
+                        // Exclude if event has already started
+                        if (event.startDate && new Date(event.startDate) <= now) return false;
+                        return true;
+                    })
+                    .map(event => event._id.toString());
+                
+                return res.status(200).json({
+                    success: true,
+                    recommendations: filteredRecommendations,
+                    cached: true
+                });
+            }
+            
+            // No recent recommendation, fetch new ones from n8n
+            // Get favorite event IDs from Favorite model (only IDs, no details)
+            const favorites = await Favorite.find({ user: userId }).select('event -_id').lean();
+            const favoriteEventIds = favorites
+                .map(fav => fav.event)
+                .filter(id => id != null) // Filter out null/undefined
+                .map(id => String(id)); // Convert ObjectId to string
+            
+            // Prepare payload for n8n webhook (userId + only event IDs, no event details)
+            const payload = {
+                userId: userId.toString(),
+                registeredEvents: registeredEventIds,
+                favoriteEvents: favoriteEventIds
+            };
+
+            // Call n8n webhook with timeout
+            const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://host.docker.internal:5678';
+            const response = await axios.post(
+                `${webhookUrl}/webhook/eventrecommendation`,
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000 // 30 second timeout
+                }
+            );
+
+            // Handle response from n8n's "Respond to Webhook" node
+            // n8n returns the data directly or wrapped in response.data
+            let recommendationsData = null;
+            
+            if (response.data) {
+                // If response.data is already an object/array, use it directly
+                if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+                    // Check if n8n wrapped it in a specific format
+                    if (response.data.output) {
+                        recommendationsData = response.data.output;
+                    } else if (response.data.data) {
+                        recommendationsData = response.data.data;
+                    } else if (response.data.recommendations) {
+                        recommendationsData = response.data.recommendations;
+                    } else {
+                        // Use the entire response.data as recommendations
+                        recommendationsData = response.data;
+                    }
+                } else {
+                    // If it's an array or other format, use it directly
+                    recommendationsData = response.data;
+                }
+            }
+
+            // Parse recommendations - might be a JSON string
+            let eventIds = [];
+            try {
+                if (typeof recommendationsData === 'string') {
+                    eventIds = JSON.parse(recommendationsData);
+                } else if (Array.isArray(recommendationsData)) {
+                    eventIds = recommendationsData;
+                } else if (recommendationsData && typeof recommendationsData === 'object') {
+                    // If it's an object, try to extract an array from it
+                    eventIds = Object.values(recommendationsData).find(val => Array.isArray(val)) || [];
+                }
+                
+                // Convert to ObjectIds and filter valid ones
+                eventIds = eventIds
+                    .filter(id => id != null)
+                    .map(id => {
+                        try {
+                            return ObjectId.isValid(id) ? new ObjectId(id) : null;
+                        } catch {
+                            return null;
+                        }
+                    })
+                    .filter(id => id != null);
+            } catch (parseErr) {
+                console.error('Error parsing recommendations from n8n:', parseErr);
+                eventIds = [];
+            }
+
+            // Fetch event details to check start dates and filter out past events
+            const events = await Event.find({ 
+                _id: { $in: eventIds } 
+            }).select('_id startDate').lean();
+            
+            const now = new Date();
+            // Filter out events user has already registered for AND past events
+            const filteredEventIds = events
+                .filter(event => {
+                    const eventIdStr = event._id.toString();
+                    // Exclude if user already registered
+                    if (registeredEventIdsSet.has(eventIdStr)) return false;
+                    // Exclude if event has already started
+                    if (event.startDate && new Date(event.startDate) <= now) return false;
+                    return true;
+                })
+                .map(event => event._id);
+
+            // Store filtered recommendations in database (upsert - update if exists, create if not)
+            await Recommendation.findOneAndUpdate(
+                { user: userId },
+                {
+                    user: userId,
+                    eventIds: filteredEventIds,
+                    rawResponse: response.data
+                },
+                { upsert: true, new: true }
+            );
+
+            // Return filtered event IDs as strings
+            return res.status(200).json({
+                success: true,
+                recommendations: filteredEventIds.map(id => id.toString()),
+                cached: false
+            });
+        } catch (err) {
+            // Handle different types of errors
+            if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+                console.error('Event recommendation webhook connection error:', err.message);
+                
+                // Try to return cached recommendation even if it's old
+                try {
+                    const userId = req.user._id;
+                    // Get user's registered events for filtering
+                    const user = await User.findById(userId).select('registeredEvents').lean();
+                    const registeredEventIds = Array.isArray(user?.registeredEvents) 
+                        ? user.registeredEvents
+                            .filter(id => id != null)
+                            .map(id => String(id))
+                        : [];
+                    const registeredEventIdsSet = new Set(registeredEventIds);
+                    
+                    const oldRecommendation = await Recommendation.findOne({ user: userId });
+                    if (oldRecommendation && oldRecommendation.eventIds && oldRecommendation.eventIds.length > 0) {
+                        // Fetch event details to check start dates
+                        const events = await Event.find({ 
+                            _id: { $in: oldRecommendation.eventIds } 
+                        }).select('_id startDate').lean();
+                        
+                        const now = new Date();
+                        // Filter out events user has already registered for AND past events
+                        const filteredRecommendations = events
+                            .filter(event => {
+                                const eventIdStr = event._id.toString();
+                                // Exclude if user already registered
+                                if (registeredEventIdsSet.has(eventIdStr)) return false;
+                                // Exclude if event has already started
+                                if (event.startDate && new Date(event.startDate) <= now) return false;
+                                return true;
+                            })
+                            .map(event => event._id.toString());
+                        
+                        return res.status(200).json({
+                            success: true,
+                            recommendations: filteredRecommendations,
+                            cached: true,
+                            message: 'Using cached recommendations (service unavailable)'
+                        });
+                    }
+                } catch (cacheErr) {
+                    console.error('Error fetching cached recommendations:', cacheErr);
+                }
+                
+                return res.status(503).json({
+                    success: false,
+                    message: 'Recommendation service is currently unavailable. Please try again later.',
+                    error: 'Service unavailable'
+                });
+            }
+            
+            if (err.response) {
+                // n8n returned an error response
+                console.error('Event recommendation webhook error response:', err.response.status, err.response.data);
+                return res.status(err.response.status || 500).json({
+                    success: false,
+                    message: err.response.data?.message || err.response.data || 'Failed to get recommendations from service',
+                    error: err.response.data
+                });
+            }
+            
+            // Other errors
+            console.error('Event recommendation webhook error:', err.message);
+            return res.status(500).json({
+                success: false,
+                message: err.message || 'Failed to get recommendations'
             });
         }
     },

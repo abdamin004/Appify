@@ -1,70 +1,122 @@
-// Frontend-only favourites storage per user using localStorage
+// Favorites service - now uses backend API instead of localStorage
 
-function keyForUser() {
+import { addEventToFavorites, removeEventFromFavorites, getMyFavoriteEvents } from './eventService';
+import { API_BASE } from './eventService';
+
+const API_BASE_URL = API_BASE || 'http://localhost:5001/api';
+
+// Helper function to get auth token
+function getAuthToken() {
   try {
-    if (typeof localStorage === 'undefined') return 'favourites:guest';
-    const raw = localStorage.getItem('user');
-    const user = raw ? JSON.parse(raw) : null;
-    const id = (user && (user._id || user.id)) || 'guest';
-    return `favourites:${id}`;
-  } catch (_) {
-    return 'favourites:guest';
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem('token') || null;
+  } catch {
+    return null;
   }
 }
 
-function loadIds() {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(keyForUser());
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter(Boolean).map(String) : [];
-  } catch (_) {
-    return [];
+// Helper function to make authenticated requests
+async function http(method, url, body) {
+  const token = getAuthToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const data = await res.json();
+      msg = data.message || data.error || msg;
+    } catch (_) { }
+    throw new Error(msg);
   }
+  return res.json();
 }
 
-function saveIds(ids) {
+// Cache for favorite IDs to avoid repeated API calls
+let cachedFavoriteIds = null;
+let cacheTimestamp = null;
+const CACHE_DURATION = 30000; // 30 seconds
+
+// Get favorite event IDs from backend
+export async function getFavouriteIds() {
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(keyForUser(), JSON.stringify(Array.from(new Set(ids.map(String)))));
+    // Check cache first
+    if (cachedFavoriteIds && cacheTimestamp && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+      return cachedFavoriteIds;
     }
-  } catch (_) {
-    // ignore
+
+    const res = await getMyFavoriteEvents();
+    const ids = Array.isArray(res) 
+      ? res.map(event => String(event._id || event.id)).filter(Boolean)
+      : [];
+    
+    cachedFavoriteIds = ids;
+    cacheTimestamp = Date.now();
+    return ids;
+  } catch (err) {
+    console.error('Error fetching favorite IDs:', err);
+    // Return cached data if available, otherwise empty array
+    return cachedFavoriteIds || [];
   }
 }
 
-export function getFavouriteIds() {
-  return loadIds();
-}
-
-export function isFavourite(eventId) {
-  const ids = loadIds();
+// Check if an event is in favorites
+export async function isFavourite(eventId) {
+  const ids = await getFavouriteIds();
   return ids.includes(String(eventId));
 }
 
-export function addFavourite(eventId) {
-  const ids = loadIds();
-  if (!ids.includes(String(eventId))) {
-    ids.push(String(eventId));
-    saveIds(ids);
+// Add event to favorites (backend API)
+export async function addFavourite(eventId) {
+  try {
+    await addEventToFavorites(eventId);
+    // Invalidate cache
+    cachedFavoriteIds = null;
+    cacheTimestamp = null;
+    // Return updated list
+    return await getFavouriteIds();
+  } catch (err) {
+    console.error('Error adding favorite:', err);
+    throw err;
   }
-  return ids;
 }
 
-export function removeFavourite(eventId) {
-  let ids = loadIds();
-  ids = ids.filter((id) => String(id) !== String(eventId));
-  saveIds(ids);
-  return ids;
+// Remove event from favorites (backend API)
+export async function removeFavourite(eventId) {
+  try {
+    await removeEventFromFavorites(eventId);
+    // Invalidate cache
+    cachedFavoriteIds = null;
+    cacheTimestamp = null;
+    // Return updated list
+    return await getFavouriteIds();
+  } catch (err) {
+    console.error('Error removing favorite:', err);
+    throw err;
+  }
 }
 
-export function toggleFavourite(eventId) {
+// Toggle favorite status
+export async function toggleFavourite(eventId) {
   const id = String(eventId);
-  const ids = loadIds();
-  if (ids.includes(id)) {
-    return removeFavourite(id);
+  const isFav = await isFavourite(id);
+  if (isFav) {
+    return await removeFavourite(id);
+  } else {
+    return await addFavourite(id);
   }
-  return addFavourite(id);
+}
+
+// Invalidate cache (call this after any favorite operation)
+export function invalidateCache() {
+  cachedFavoriteIds = null;
+  cacheTimestamp = null;
 }
 
 export default {
@@ -73,5 +125,6 @@ export default {
   addFavourite,
   removeFavourite,
   toggleFavourite,
+  invalidateCache,
 };
 

@@ -3,12 +3,13 @@ import EventsList from "../EventList";
 import Navbar from "../Navbar";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
-import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops, getEventRecommendations } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
 import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
-import { getFavouriteIds } from "../../services/favoritesService";
+import { getFavouriteIds, invalidateCache } from "../../services/favoritesService";
+import { getMyFavoriteEvents } from "../../services/eventService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
 import {
@@ -40,6 +41,8 @@ function StudentDashboard() {
   const [courts, setCourts] = useState([]);
   const [presetType, setPresetType] = useState("");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
@@ -469,6 +472,14 @@ function StudentDashboard() {
   const tabButtons = [
     { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
     {
+      key: "recommendations",
+      label: "✨ Recommendations",
+      onClick: () => {
+        setActiveTab("recommendations");
+        fetchRecommendations();
+      },
+    },
+    {
       key: "gym-sessions",
       label: "🏋️ Gym Sessions",
       onClick: () => {
@@ -672,51 +683,44 @@ function StudentDashboard() {
 
   const fetchFavourites = async () => {
     try {
-      const ids = getFavouriteIds().map(String);
-      if (!ids.length) { setFavouriteEvents([]); return; }
-
-      let list = [];
-
-      // Fetch published events
-      try {
-        const res = await fetch(`${API_BASE}/events`);
-        const data = await res.json();
-        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      } catch (e) {
-        console.error("Error fetching events for favorites:", e);
-      }
-
-      // Add frontend-approved workshops
-      try {
-        const approvedSet = getApprovedWorkshops();
-        if (approvedSet.size > 0) {
-          const sortRes = await fetch(`${API_BASE}/events/sort`);
-          const sortData = await sortRes.json();
-          if (Array.isArray(sortData)) {
-            const approvedWorkshops = sortData.filter(
-              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
-            );
-            // Mark as published for display
-            approvedWorkshops.forEach(w => { w.status = 'published'; });
-
-            // Merge avoiding duplicates
-            const existingIds = new Set(list.map(e => e._id));
-            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
-            list = [...list, ...newWorkshops];
-          }
-        }
-      } catch (e) {
-        console.log('Error adding approved workshops to favorites:', e);
-      }
-
-      const filtered = list.filter(ev => {
-        const eventId = ev._id || ev.id;
-        // Check if event is in favorites AND user has access
-        return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
-      });
+      // Fetch favorites directly from backend
+      const events = await getMyFavoriteEvents();
+      
+      // Filter events that user has access to
+      const filtered = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return canUserAccessEvent(eventId);
+          })
+        : [];
+      
       setFavouriteEvents(filtered);
     } catch (e) {
+      console.error("Error fetching favorites:", e);
       setFavouriteEvents([]);
+    }
+  };
+
+  const fetchRecommendations = async () => {
+    try {
+      setRecommendationsLoading(true);
+      const events = await getEventRecommendations();
+      
+      // Filter events that user has access to
+      const filtered = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return canUserAccessEvent(eventId);
+          })
+        : [];
+      
+      setRecommendedEvents(filtered);
+    } catch (e) {
+      console.error("Error fetching recommendations:", e);
+      setRecommendedEvents([]);
+      showToast.error('Failed to load recommendations');
+    } finally {
+      setRecommendationsLoading(false);
     }
   };
 
@@ -866,6 +870,33 @@ function StudentDashboard() {
             />
           )}
           {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
+          {activeTab === "recommendations" && (
+            recommendationsLoading ? (
+              <div style={{
+                textAlign: "center",
+                padding: `${spacing['6xl']} ${spacing.xl}`,
+              }}>
+                <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
+                <p style={{
+                  color: colors.gray500,
+                  fontSize: typography.fontSize.base,
+                }}>Loading recommendations...</p>
+              </div>
+            ) : recommendedEvents.length === 0 ? (
+              <div style={{
+                textAlign: "center",
+                padding: `${spacing['6xl']} ${spacing.xl}`,
+              }}>
+                <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>✨</div>
+                <p style={{
+                  color: colors.gray500,
+                  fontSize: typography.fontSize.base,
+                }}>No recommendations available at the moment. Check back later!</p>
+              </div>
+            ) : (
+              <EventsList events={recommendedEvents} enableFavorites={true} hideArchived={true} hideFilters={true} />
+            )
+          )}
           {activeTab === "courts" && <CourtsReserve courts={courts} onReserved={handleReserve} />}
 
           {activeTab === "gym-sessions" && (

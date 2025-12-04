@@ -68,7 +68,9 @@ router.post(
   roleCheck('Admin', 'EventOffice'),
   eventController.generateVendorAttendeePasses
 );
-// Get single event by ID (must be before /:id/comments and /:id/ratings)
+// Get event recommendations (must be before /:id route)
+router.get('/recommendations', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getEventRecommendations);
+// Get single event by ID (must be LAST, after all specific routes like /recommendations, /favorites/mine, etc.)
 router.get('/:id', eventController.getEventById);
 
 router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventComments);
@@ -80,6 +82,9 @@ router.post('/:id/ratings',auth,roleCheck('Student', 'Staff', 'TA', 'Professor',
 
 // Add event to favorites
 router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
+
+// Remove event from favorites
+router.delete('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.removeEventFromFavorites);
 
 // View my favorites list
 router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);

@@ -10,7 +10,7 @@ import { canUserAccessEvent } from "../services/eventRestrictionService";
 import { showToast, confirmDialog } from '../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, inputStyles, buttonStyles } from "../utils/designSystem";
 
-function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false, onDelete = null, onArchive = null, onUnarchive = null, headerAction = null, showArchivedOnly = false, hideArchived = false }) {
+function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false, onDelete = null, onArchive = null, onUnarchive = null, headerAction = null, showArchivedOnly = false, hideArchived = false, events: providedEvents = null, hideFilters = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [events, setEvents] = useState([]);
@@ -90,11 +90,35 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     upcomingOnly: false,
   });
 
-  // Favourites (per-user, frontend)
-  const [favIds, setFavIds] = useState(() => new Set(favourites.getFavouriteIds().map(String)));
+  // Favourites (per-user, backend)
+  const [favIds, setFavIds] = useState(new Set());
 
+  // Load favorites on mount
   useEffect(() => {
-    fetchEvents();
+    const loadFavorites = async () => {
+      try {
+        const ids = await favourites.getFavouriteIds();
+        setFavIds(new Set(ids.map(String)));
+      } catch (err) {
+        console.error('Error loading favorites:', err);
+      }
+    };
+    loadFavorites();
+  }, []);
+
+  // Update events when providedEvents prop changes
+  useEffect(() => {
+    if (providedEvents !== null) {
+      setEvents(Array.isArray(providedEvents) ? providedEvents : []);
+      setLoading(false);
+    }
+  }, [providedEvents]);
+
+  // Only fetch events if not using provided events
+  useEffect(() => {
+    if (providedEvents === null) {
+      fetchEvents();
+    }
   }, [filters]);
 
   // Apply a preset event type filter passed from parent (e.g., Student Dashboard)
@@ -319,9 +343,21 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     return new Date(eventEndDate) < new Date();
   };
 
-  const toggleFav = (id) => {
-    const next = new Set(favourites.toggleFavourite(id).map(String));
-    setFavIds(next);
+  const toggleFav = async (id) => {
+    try {
+      const updatedIds = await favourites.toggleFavourite(id);
+      setFavIds(new Set(updatedIds.map(String)));
+      // Show toast feedback
+      const isFav = favIds.has(String(id));
+      if (isFav) {
+        showToast.success('Removed from favorites');
+      } else {
+        showToast.success('Added to favorites');
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      showToast.error(err.message || 'Failed to update favorite');
+    }
   };
 
   return (
@@ -391,55 +427,58 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
           )}
 
           {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: spacing['5xl'], position: 'relative' }}>
-            {headerAction && (
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)'
+          {!hideFilters && (
+            <div style={{ textAlign: "center", marginBottom: spacing['5xl'], position: 'relative' }}>
+              {headerAction && (
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)'
+                }}>
+                  {headerAction}
+                </div>
+              )}
+              <h1
+                style={{
+                  fontSize: typography.fontSize['4xl'],
+                  fontWeight: typography.fontWeight.bold,
+                  color: colors.white,
+                  marginBottom: spacing.lg,
+                  textShadow: shadows.lg,
+                  letterSpacing: "-1px",
+                }}
+              >
+                {showArchivedOnly ? 'Archived Events' : 'Upcoming Events'}
+              </h1>
+              <p style={{
+                fontSize: typography.fontSize.xl,
+                color: colors.accent,
+                lineHeight: typography.lineHeight.relaxed,
+                opacity: 0.95
               }}>
-                {headerAction}
-              </div>
-            )}
-            <h1
-              style={{
-                fontSize: typography.fontSize['4xl'],
-                fontWeight: typography.fontWeight.bold,
-                color: colors.white,
-                marginBottom: spacing.lg,
-                textShadow: shadows.lg,
-                letterSpacing: "-1px",
-              }}
-            >
-              {showArchivedOnly ? 'Archived Events' : 'Upcoming Events'}
-            </h1>
-            <p style={{
-              fontSize: typography.fontSize.xl,
-              color: colors.accent,
-              lineHeight: typography.lineHeight.relaxed,
-              opacity: 0.95
-            }}>
-              {showArchivedOnly
-                ? 'View and manage archived events'
-                : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar", "Booth"].includes(t))
-                  ? 'Discover bazaars and booths'
-                  : effectiveFilterByTypes && effectiveFilterByTypes.some(t => ["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"].includes(t))
-                    ? 'Discover workshops, trips, conferences, gym sessions, bazaars, and booths'
-                    : 'Discover workshops, trips, conferences, bazaars, and more'}
-            </p>
-          </div>
+                {showArchivedOnly
+                  ? 'View and manage archived events'
+                  : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar", "Booth"].includes(t))
+                    ? 'Discover bazaars and booths'
+                    : effectiveFilterByTypes && effectiveFilterByTypes.some(t => ["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"].includes(t))
+                      ? 'Discover workshops, trips, conferences, gym sessions, bazaars, and booths'
+                      : 'Discover workshops, trips, conferences, bazaars, and more'}
+              </p>
+            </div>
+          )}
 
           {/* Filters */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: `${spacing['3xl']} ${spacing['3xl']}`,
-              borderRadius: borderRadius['3xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['4xl'],
-            }}
-          >
+          {!hideFilters && (
+            <div
+              style={{
+                background: colors.bgCard,
+                padding: `${spacing['3xl']} ${spacing['3xl']}`,
+                borderRadius: borderRadius['3xl'],
+                boxShadow: shadows.lg,
+                marginBottom: spacing['4xl'],
+              }}
+            >
             {/* Search Row */}
             <div
               style={{
@@ -733,6 +772,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               </div>
             </div>
           </div>
+          )}
 
           {/* Event Grid */}
           {loading ? (

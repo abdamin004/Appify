@@ -39,6 +39,7 @@ services:
       - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678}
 
 
   frontend:
@@ -61,8 +62,36 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:5001/api}
 
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: university_events_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-false}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-admin}
+      - N8N_HOST=${N8N_HOST:-n8n}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n:5678/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
+      - NODE_ENV=production
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - university-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   mongo-data:
+  n8n-data:
 
 networks:
   university-network:
