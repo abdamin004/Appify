@@ -108,145 +108,117 @@ function LoyaltyPartnersList() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 bg-white/95 rounded-2xl shadow-lg p-10 text-center">
-        <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Loading Partners...</h3>
-        <p className="text-slate-500">Please wait while we fetch GUC loyalty program partners.</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    const isAuthError = error.includes('log in') || error.includes('Session expired') || error.includes('authentication');
-
-    return (
-      <div className="flex flex-col items-center justify-center py-12 bg-white/95 rounded-2xl shadow-lg p-10 text-center">
-        <div className="text-4xl mb-4">⚠️</div>
-        <h3 className="text-xl font-bold text-error mb-2">Error Loading Partners</h3>
-        <p className="text-slate-500 mb-6">{error}</p>
-        {isAuthError ? (
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                window.location.href = '/Login';
-              }}
-              className="btn btn-primary"
-            >
-              Go to Login
-            </button>
-            <button
-              onClick={fetchPartners}
-              className="btn btn-outline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={fetchPartners}
-            className="btn btn-primary"
-          >
-            Retry
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  if (partners.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 bg-white/95 rounded-2xl shadow-lg p-10 text-center">
-        <div className="text-5xl mb-4">⭐</div>
-        <h3 className="text-2xl font-bold text-slate-800 mb-2">No Approved Partners Available</h3>
-        <p className="text-slate-500 mb-6">
-          There are currently no approved vendors in the GUC loyalty program.
-        </p>
-        <div className="bg-slate-50 p-4 rounded-lg text-left max-w-lg mx-auto text-sm text-slate-500">
-          <strong className="text-slate-800">Note:</strong> Only approved loyalty program applications are displayed here. Pending applications need to be approved by an admin first.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="py-6">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">
-          GUC Loyalty Program Partners
-        </h2>
-        <p className="text-slate-500">
-          View all vendors offering discounts through the GUC loyalty program. Use promo codes at checkout to get discounts!
-        </p>
-      </div>
+    <div className="max-w-6xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-slate-800">
+            GUC Loyalty Program Partners
+          </h2>
+          <p className="text-slate-500 mt-2">
+            View all vendors offering discounts through the GUC loyalty program. Use promo codes at checkout to get discounts!
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {partners.map((partner) => (
-          <div
-            key={partner.loyaltyApplicationId}
-            className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:border-amber-400 hover:shadow-md transition-all duration-300 group"
-          >
-            {/* Vendor Name */}
-            <div className="mb-5">
-              <h3 className="text-xl font-bold text-slate-800">
-                {partner.vendorName || 'Vendor'}
-              </h3>
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-500">Loading Partners...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6 max-w-2xl mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div className="flex flex-col">
+              <span className="font-semibold">Error Loading Partners</span>
+              <span className="text-sm">{error}</span>
             </div>
+            <button onClick={fetchPartners} className="btn btn-sm btn-ghost">Retry</button>
+          </div>
+        )}
 
-            {/* Discount Rate */}
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 rounded-xl mb-4 text-center text-white shadow-sm">
-              <div className="text-sm font-semibold opacity-90 mb-1">Discount Rate</div>
-              <div className="text-3xl font-bold">{partner.discountRate || 0}%</div>
-            </div>
+        {!loading && !error && partners.length === 0 && (
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+              <span>⭐</span> No Approved Partners Available
+            </h3>
+            <p className="text-slate-500 max-w-md mx-auto mb-6">
+              There are currently no approved vendors in the GUC loyalty program.
+            </p>
+            <p className="text-sm text-slate-400">Approved vendor applications will appear here.</p>
+          </div>
+        )}
 
-            {/* Promo Code */}
-            <div className="bg-slate-50 p-4 rounded-xl mb-4 border-2 border-dashed border-amber-400/50 group-hover:border-amber-400 transition-colors">
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Promo Code</div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-white px-3 py-2 rounded-lg text-lg font-bold text-slate-800 text-center tracking-widest border border-slate-200">
-                  {partner.promoCode || 'N/A'}
-                </code>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(partner.promoCode, 'Promo code');
-                  }}
-                  className="btn btn-square btn-sm btn-ghost text-amber-600 hover:bg-amber-50"
-                  title="Copy promo code"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                </button>
-              </div>
-            </div>
+        {!loading && partners.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {partners.map((partner) => (
+              <div
+                key={partner.loyaltyApplicationId}
+                className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all duration-300 group"
+              >
+                {/* Vendor Name */}
+                <div className="mb-5">
+                  <h3 className="text-xl font-bold text-slate-800">
+                    {partner.vendorName || 'Vendor'}
+                  </h3>
+                </div>
 
-            {/* Terms and Conditions */}
-            {partner.termsAndConditions && (
-              <div>
-                <button
-                  onClick={() => toggleExpand(partner.loyaltyApplicationId)}
-                  className={`w-full flex justify-between items-center px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${expandedPartner === partner.loyaltyApplicationId
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-transparent text-slate-600 hover:bg-slate-50 border border-transparent'
-                    }`}
-                >
-                  <span>📋 Terms & Conditions</span>
-                  <span>{expandedPartner === partner.loyaltyApplicationId ? '▼' : '▶'}</span>
-                </button>
-                {expandedPartner === partner.loyaltyApplicationId && (
-                  <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2 duration-200">
-                    {partner.termsAndConditions}
+                {/* Discount Rate */}
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 rounded-xl mb-4 text-center text-white shadow-sm">
+                  <div className="text-sm font-semibold opacity-90 mb-1">Discount Rate</div>
+                  <div className="text-3xl font-bold">{partner.discountRate || 0}%</div>
+                </div>
+
+                {/* Promo Code */}
+                <div className="bg-slate-50 p-4 rounded-xl mb-4 border-2 border-dashed border-emerald-400/50 group-hover:border-emerald-400 transition-colors">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Promo Code</div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white px-3 py-2 rounded-lg text-lg font-bold text-slate-800 text-center tracking-widest border border-slate-200">
+                      {partner.promoCode || 'N/A'}
+                    </code>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(partner.promoCode, 'Promo code');
+                      }}
+                      className="btn btn-square btn-sm btn-ghost text-emerald-600 hover:bg-emerald-50"
+                      title="Copy promo code"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Terms and Conditions */}
+                {partner.termsAndConditions && (
+                  <div>
+                    <button
+                      onClick={() => toggleExpand(partner.loyaltyApplicationId)}
+                      className={`w-full flex justify-between items-center px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${expandedPartner === partner.loyaltyApplicationId
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-transparent text-slate-600 hover:bg-slate-50 border border-transparent'
+                        }`}
+                    >
+                      <span>📋 Terms & Conditions</span>
+                      <span>{expandedPartner === partner.loyaltyApplicationId ? '▼' : '▶'}</span>
+                    </button>
+                    {expandedPartner === partner.loyaltyApplicationId && (
+                      <div className="mt-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2 duration-200">
+                        {partner.termsAndConditions}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Info Badge */}
-            <div className="mt-4 p-3 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium text-center">
-              💡 Use this promo code at checkout to get your discount!
-            </div>
+                {/* Info Badge */}
+                <div className="mt-4 p-3 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium text-center">
+                  💡 Use this promo code at checkout to get your discount!
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

@@ -73,7 +73,7 @@ export default function AdminNotifications() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col items-center mb-8 gap-4 text-center">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Admin Notifications</h2>
             <p className="text-slate-500 mt-1">Stay updated with system alerts</p>
@@ -81,7 +81,7 @@ export default function AdminNotifications() {
           {notifs.length > 0 && (
             <button
               onClick={markAll}
-              className="btn btn-primary btn-sm"
+              className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none btn-sm mt-2"
             >
               Mark all as read
             </button>
@@ -91,19 +91,19 @@ export default function AdminNotifications() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
-            <p className="text-lg font-medium text-slate-600">Loading notifications...</p>
+            <p className="text-lg font-medium text-slate-500">Loading notifications...</p>
           </div>
         )}
 
         {error && !loading && (
-          <div className="alert alert-error shadow-sm mb-6">
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{error}</span>
           </div>
         )}
 
         {!loading && !error && notifs.length === 0 && (
-          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200">
             <div className="text-6xl mb-4">🔔</div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No Notifications</h3>
             <p className="text-slate-500">You don't have any notifications at this time.</p>
@@ -116,15 +116,15 @@ export default function AdminNotifications() {
               <div
                 key={n._id}
                 className={`p-5 rounded-xl border transition-all ${n.isRead
-                    ? 'bg-slate-50 border-slate-200'
-                    : 'bg-white border-emerald-200 shadow-sm hover:shadow-md'
+                  ? 'bg-white border-slate-200'
+                  : 'bg-emerald-50 border-emerald-200 shadow-sm'
                   }`}
               >
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                      <h4 className={`font-bold ${n.isRead ? 'text-slate-600' : 'text-slate-800'}`}>
+                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></span>}
+                      <h4 className={`font-bold ${n.isRead ? 'text-slate-600' : 'text-slate-900'}`}>
                         {n.type}
                       </h4>
                     </div>
@@ -140,7 +140,7 @@ export default function AdminNotifications() {
                     {!n.isRead && (
                       <button
                         onClick={() => markRead(n._id)}
-                        className="btn btn-ghost btn-xs text-emerald-600 hover:bg-emerald-50"
+                        className="btn btn-ghost btn-xs text-emerald-600 hover:bg-emerald-100"
                       >
                         Mark read
                       </button>

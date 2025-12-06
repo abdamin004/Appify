@@ -45,7 +45,7 @@ export default function AdminDashboard() {
     { key: 'comments', label: 'Comment Moderation', icon: '💬' },
     { key: 'vendor-docs', label: 'Vendor Documents', icon: '📄' },
     { key: 'attendees', label: 'Attendees Report', icon: '📊' },
-    { key: 'sales', label: 'Sales Report', icon: '💰' },
+    { key: 'sales', label: 'Financial Reports', icon: '💰' },
     { key: 'loyalty', label: 'Loyalty Partners', icon: '🤝' },
   ];
 

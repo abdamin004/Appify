@@ -44,7 +44,7 @@ export default function CreateAdmin() {
                 value={firstName}
                 onChange={e => setFirstName(e.target.value)}
                 required
-                className="input input-bordered w-full focus:input-primary"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500/20"
                 placeholder="John"
               />
             </div>
@@ -57,7 +57,7 @@ export default function CreateAdmin() {
                 value={lastName}
                 onChange={e => setLastName(e.target.value)}
                 required
-                className="input input-bordered w-full focus:input-primary"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500/20"
                 placeholder="Doe"
               />
             </div>
@@ -72,7 +72,7 @@ export default function CreateAdmin() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="input input-bordered w-full focus:input-primary"
+              className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500/20"
               placeholder="john.doe@example.com"
             />
           </div>
@@ -86,7 +86,7 @@ export default function CreateAdmin() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="input input-bordered w-full focus:input-primary"
+              className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500/20"
               placeholder="••••••••"
             />
           </div>
@@ -98,7 +98,7 @@ export default function CreateAdmin() {
             <select
               value={role}
               onChange={e => setRole(e.target.value)}
-              className="select select-bordered w-full focus:select-primary"
+              className="select select-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500/20"
             >
               <option value="Admin">Admin</option>
               <option value="EventOffice">Event Office</option>
@@ -108,7 +108,7 @@ export default function CreateAdmin() {
           <button
             type="submit"
             disabled={loading}
-            className={`btn btn-primary w-full ${loading ? 'loading' : ''}`}
+            className={`btn bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border-none w-full shadow-lg shadow-emerald-500/20 ${loading ? 'loading' : ''}`}
           >
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>

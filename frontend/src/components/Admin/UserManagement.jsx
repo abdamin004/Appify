@@ -128,15 +128,13 @@ export default function UserManagement() {
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">User Management</h1>
-          <p className="text-slate-500 mt-1">Manage user roles, permissions, and account status.</p>
-        </div>
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
+        <p className="text-slate-500 mt-1">Manage user roles, permissions, and account status.</p>
       </div>
 
       {/* Content Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         {loading && (
           <div className="p-12 text-center text-slate-500">
             <span className="loading loading-spinner loading-md text-emerald-600 mb-2"></span>
@@ -146,7 +144,7 @@ export default function UserManagement() {
 
         {error && !loading && (
           <div className="p-6">
-            <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-100 flex items-center gap-2">
+            <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-100 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -168,19 +166,19 @@ export default function UserManagement() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Blocked</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Blocked</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {users.map(u => {
                   const isDefault = isDefaultAdmin(u);
                   return (
-                    <tr key={u._id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={u._id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 text-slate-900 font-medium">{u.firstName} {u.lastName}</td>
                       <td className="px-6 py-4 text-slate-600">{u.email}</td>
                       <td className="px-6 py-4">
@@ -192,7 +190,7 @@ export default function UserManagement() {
                               setSelectedRoles(prev => ({ ...prev, [u._id]: val }));
                             }}
                             disabled={isDefault}
-                            className={`select select-bordered select-sm w-full max-w-xs ${isDefault ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`select select-bordered select-sm w-full max-w-xs bg-white border-slate-300 text-slate-700 focus:border-emerald-500 focus:ring-emerald-500/20 ${isDefault ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             <option value="Student">Student</option>
                             <option value="Staff">Staff</option>
@@ -260,7 +258,7 @@ export default function UserManagement() {
                               <button
                                 onClick={() => handleAssign(u._id, (selectedRoles[u._id] || u.role))}
                                 disabled={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role}
-                                className="btn btn-xs btn-primary"
+                                className="btn btn-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                                 title={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role ? 'Verification email already sent.' : ''}
                               >
                                 Verify & Assign
