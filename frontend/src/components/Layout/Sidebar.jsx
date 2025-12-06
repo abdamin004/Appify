@@ -15,8 +15,8 @@ const Sidebar = ({ menuItems, isOpen, toggleSidebar, activeTab, onTabChange }) =
     };
 
     return (
-        <div className={`drawer-side z-50 ${isOpen ? 'block' : 'hidden'}`}>
-            <label htmlFor="my-drawer-2" aria-label="close sidebar" className="drawer-overlay" onClick={toggleSidebar}></label>
+        <div className="drawer-side z-50">
+            <label htmlFor="my-drawer-2" aria-label="close sidebar" className="drawer-overlay"></label>
             <ul className="menu p-4 w-80 min-h-full bg-slate-900 text-slate-200 border-r border-slate-800 shadow-2xl">
                 {/* Sidebar Header */}
                 {/* Sidebar Header */}

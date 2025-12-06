@@ -203,7 +203,12 @@ function CourtsReserve({ courts, onReserved }) {
   };
 
   return (
-    <div>
+    <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div className="text-center mb-8 relative">
+        <h2 className="text-2xl font-bold text-slate-900">Sports Courts</h2>
+        <p className="text-slate-500 mt-1">Reserve courts for your favorite sports</p>
+      </div>
+
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${selectedCourt ? 'mb-10' : ''}`}>
         {courts.map((court) => {
           const courtId = court._id || court.id;
@@ -233,8 +238,8 @@ function CourtsReserve({ courts, onReserved }) {
               key={courtId}
               onClick={() => handleCourtClick(court)}
               className={`bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 cursor-pointer group border ${isSelected
-                  ? 'border-amber-400 ring-2 ring-amber-400 ring-offset-2 shadow-lg -translate-y-1'
-                  : 'border-slate-100 hover:shadow-md hover:-translate-y-1 hover:border-slate-200'
+                ? 'border-amber-400 ring-2 ring-amber-400 ring-offset-2 shadow-lg -translate-y-1'
+                : 'border-slate-100 hover:shadow-md hover:-translate-y-1 hover:border-slate-200'
                 }`}
             >
               <div className={`h-48 bg-gradient-to-br ${getCourtColor(court.type)} flex items-center justify-center text-6xl shadow-inner`}>

@@ -19,12 +19,7 @@ function ViewEvents() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Events Directory</h1>
-          <p className="text-slate-500 mt-1">Browse and manage all events.</p>
-        </div>
-      </div>
+
 
       <EventList
         onDelete={handleDeleteEvent}

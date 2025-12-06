@@ -60,44 +60,38 @@ function StudentPollVoting() {
     }
   };
 
-  if (loading && polls.length === 0) {
+  const renderContent = () => {
+    if (loading && polls.length === 0) {
+      return (
+        <div className="p-20 text-center text-slate-500">
+          <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+          <p>Loading polls...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="p-6 bg-red-50 rounded-xl text-red-600 border border-red-200 flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          {error}
+        </div>
+      );
+    }
+
+    if (polls.length === 0) {
+      return (
+        <div className="py-20 text-center bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+          <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+            <span>📊</span> No Active Polls
+          </h3>
+          <p className="text-slate-500">There are currently no active vendor booth polls available for voting.</p>
+          <p className="text-sm text-slate-400 mt-2">Check back later or contact the Event Office for more information.</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="p-20 text-center text-slate-500">
-        <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-        <p>Loading polls...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 bg-red-50 rounded-xl text-red-600 border border-red-200 flex items-center gap-3">
-        <span className="text-2xl">⚠️</span>
-        {error}
-      </div>
-    );
-  }
-
-  if (polls.length === 0) {
-    return (
-      <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-200">
-        <div className="text-6xl mb-6 opacity-50">📊</div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">No Active Polls</h3>
-        <p className="text-slate-500">There are currently no active vendor booth polls available for voting.</p>
-        <p className="text-sm text-slate-400 mt-2">Check back later or contact the Event Office for more information.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-      <h2 className="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
-        <span>📊</span> Vendor Booth Polls
-      </h2>
-      <p className="text-slate-500 mb-8">
-        Vote for vendors you'd like to see set up booths at upcoming events. Your vote helps decide which vendors will be selected!
-      </p>
-
       <div className="flex flex-col gap-10">
         {polls.map(poll => (
           <PollCard
@@ -108,6 +102,18 @@ function StudentPollVoting() {
           />
         ))}
       </div>
+    );
+  };
+
+  return (
+    <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div className="text-center mb-8 relative">
+        <h2 className="text-2xl font-bold text-slate-900">Vendor Booth Polls</h2>
+        <p className="text-slate-500 mt-1">
+          Vote for vendors you'd like to see at upcoming events
+        </p>
+      </div>
+      {renderContent()}
     </div>
   );
 }

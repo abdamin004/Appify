@@ -13,6 +13,7 @@ const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
 const BlackoutDate = require('../models/BlackoutDate');
+const AccommodationRequest = require('../models/AccommodationRequest');
 const {
     sendGymSessionCancellationEmail,
     sendGymSessionUpdateEmail,
@@ -187,7 +188,7 @@ module.exports = {
                 durationMinutes,
                 prerequisites
             } = req.body;
-        
+
             // Check for duplicate events (same title, location, and startDate)
             if (title && location && startDate) {
                 const existingEvent = await Event.findOne({
@@ -196,10 +197,10 @@ module.exports = {
                     startDate: new Date(startDate),
                     status: { $ne: 'cancelled' } // Don't count cancelled events as duplicates
                 });
-                
+
                 if (existingEvent) {
-                    return res.status(409).json({ 
-                        error: 'An event with the same title, location, and start date already exists' 
+                    return res.status(409).json({
+                        error: 'An event with the same title, location, and start date already exists'
                     });
                 }
             }
@@ -583,6 +584,28 @@ module.exports = {
             user.registeredEvents.push(eventId);
             await user.save();
 
+            // Handle Disability Accommodations
+            const { needsWheelchairAccess, needsSpecialSeating, otherRequests } = req.body;
+
+            // Check if any accommodation fields are provided and true/non-empty
+            if (needsWheelchairAccess || needsSpecialSeating || (otherRequests && otherRequests.trim().length > 0)) {
+                try {
+                    await AccommodationRequest.create({
+                        user: userId,
+                        event: eventId,
+                        roleAtEvent: user.role, // Assuming user.role is available and valid enum match
+                        needsWheelchairAccess: !!needsWheelchairAccess,
+                        needsSpecialSeating: !!needsSpecialSeating,
+                        otherRequests: otherRequests
+                    });
+                } catch (accErr) {
+                    console.error('Failed to save accommodation request:', accErr);
+                    // Decide if we want to fail the registration or just log it. 
+                    // Usually better to warn, but for now we'll just log so registration succeeds.
+                    // Or we could append a warning to the response.
+                }
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Successfully registered for the event',
@@ -662,6 +685,14 @@ module.exports = {
                 id => id.toString() !== eventId.toString()
             );
             await user.save();
+
+            // Cleanup any accommodation requests
+            try {
+                await AccommodationRequest.deleteOne({ user: userId, event: eventId });
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup accommodation request:', cleanupErr);
+                // Non-critical, just log
+            }
 
             res.status(200).json({
                 success: true,
@@ -789,18 +820,18 @@ module.exports = {
             if (event.type === 'Workshop' && description !== undefined) {
                 const originalDescription = event.description || '';
                 const newDescription = description || '';
-                
+
                 // Check if original description had edit request markers
                 const editRequestRegex = /--- EDIT REQUEST FROM EVENTS OFFICE \([^)]+\) ---[\s\S]*?--- END EDIT REQUEST ---/g;
                 const originalHadEditRequests = editRequestRegex.test(originalDescription);
                 const newHasEditRequests = editRequestRegex.test(newDescription);
-                
+
                 // If original had edit requests but new one doesn't, professor addressed them
                 if (originalHadEditRequests && !newHasEditRequests) {
                     try {
                         // Get all EventOffice users
                         const eventOfficeUsers = await User.find({ role: 'EventOffice' });
-                        
+
                         // Create backend notification
                         await Notification.create({
                             type: 'WorkshopEditSubmitted',
@@ -808,7 +839,7 @@ module.exports = {
                             event: event._id,
                             recipientsRoles: ['EventOffice']
                         });
-                        
+
                         // Also add to each EventOffice user's notifications array (legacy support)
                         for (const officeUser of eventOfficeUsers) {
                             officeUser.notifications.push({
@@ -1109,19 +1140,19 @@ module.exports = {
             event.status = 'published';
             await event.save();
 
-        //  New Event Published notification
-        try {
-            await Notification.create({
-                type: 'NewEventPublished',
-                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
-                event: event._id,
-                recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
-            });
-        } catch (notifyErr) {
-            // don't fail the request because of a notification error
-        }
+            //  New Event Published notification
+            try {
+                await Notification.create({
+                    type: 'NewEventPublished',
+                    message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                    event: event._id,
+                    recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
+                });
+            } catch (notifyErr) {
+                // don't fail the request because of a notification error
+            }
 
-        res.status(200).json({ success: true, message: 'Event published successfully', event });
+            res.status(200).json({ success: true, message: 'Event published successfully', event });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
         }
@@ -1549,7 +1580,203 @@ module.exports = {
             console.error('generateVendorAttendeePasses error:', error);
             res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
         }
+    },
+    // POST /events/:id/accommodations
+    // Allows Student/Staff/TA/Professor to request disability accommodations for an event
+    async requestDisabilityAccommodation(req, res) {
+        try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+
+            const {
+                needsWheelchairAccess = false,
+                needsSpecialSeating = false,
+                otherRequests
+            } = req.body;
+
+            // Ensure the event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // Only these roles are allowed to make such a request
+            const allowedRoles = ['Student', 'Staff', 'TA', 'Professor'];
+            if (!allowedRoles.includes(req.user.role)) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'Only students, staff, TAs and professors can request disability accommodations for events'
+                });
+            }
+
+            // Optional: enforce that the user is registered for this event
+            if (
+                !event.registeredUsers ||
+                !event.registeredUsers.some(
+                    (u) => u.toString() === userId.toString()
+                )
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'You must be registered for this event to request disability accommodations'
+                });
+            }
+
+            // Upsert: update existing request if present, otherwise create a new one
+            let request = await AccommodationRequest.findOne({
+                event: eventId,
+                user: userId
+            });
+
+            if (!request) {
+                request = new AccommodationRequest({
+                    event: eventId,
+                    user: userId,
+                    roleAtEvent: req.user.role,
+                    needsWheelchairAccess: Boolean(needsWheelchairAccess),
+                    needsSpecialSeating: Boolean(needsSpecialSeating),
+                    otherRequests: otherRequests || '',
+                    status: 'pending'
+                });
+            } else {
+                request.needsWheelchairAccess = Boolean(needsWheelchairAccess);
+                request.needsSpecialSeating = Boolean(needsSpecialSeating);
+                request.otherRequests =
+                    typeof otherRequests === 'string'
+                        ? otherRequests
+                        : request.otherRequests;
+                request.status = 'pending'; // reset to pending if user changed it
+            }
+
+            await request.save();
+
+            return res.status(201).json({
+                success: true,
+                message:
+                    'Disability accommodation request saved successfully',
+                data: request
+            });
+        } catch (err) {
+            console.error(
+                'Error in requestDisabilityAccommodation:',
+                err
+            );
+            return res.status(500).json({
+                success: false,
+                message:
+                    'Failed to save disability accommodation request',
+                error: err.message
+            });
+        }
+    },
+
+    // POST /events/workshops/:id/resources
+    // Professor uploads resources (PDFs, slides, materials) for a workshop
+    async uploadWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+
+            const workshop = await Workshop.findById(workshopId);
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            // Role is already enforced via route-level roleCheck('Professor')
+
+            const files = req.files || [];
+            if (!files.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No files uploaded'
+                });
+            }
+
+            const newResources = files.map(file => ({
+                filename: file.filename,
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                url: `/uploads/workshop-resources/${file.filename}`,
+                uploadedAt: new Date()
+            }));
+
+            if (!Array.isArray(workshop.resources)) {
+                workshop.resources = [];
+            }
+            workshop.resources.push(...newResources);
+
+            await workshop.save();
+
+            return res.status(201).json({
+                success: true,
+                message: 'Workshop resources uploaded successfully',
+                data: workshop.resources
+            });
+        } catch (err) {
+            console.error('Error in uploadWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to upload workshop resources',
+                error: err.message
+            });
+        }
+    },
+
+    // GET /events/workshops/:id/resources
+    // Only participants who attended can access the list of resources
+    async getWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+            const userId = req.user._id;
+
+            const workshop = await Workshop.findById(workshopId).populate(
+                'attendedParticipants',
+                '_id firstName lastName email'
+            );
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            const attendedList = Array.isArray(workshop.attendedParticipants)
+                ? workshop.attendedParticipants
+                : [];
+
+            const hasAttended = attendedList.some(
+                (u) => u && u._id && u._id.toString() === userId.toString()
+            );
+
+            if (!hasAttended) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only participants who attended this workshop can access its resources'
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: workshop.resources || []
+            });
+        } catch (err) {
+            console.error('Error in getWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve workshop resources',
+                error: err.message
+            });
+        }
     }
+
 
 
 };

@@ -431,7 +431,7 @@ function VendorDashboard() {
       }
 
       const confirmed = await confirmDialog(
-        `Pay $${fee.toFixed(2)} USD for participation fee?`,
+        `Pay $${fee.toFixed(2)} EGP for participation fee?`,
         'Confirm Payment'
       );
       if (!confirmed) return;
@@ -474,7 +474,7 @@ function VendorDashboard() {
 
       {topUpOpen && (
         <TopUpDialog
-          isOpen={topUpOpen}
+          open={topUpOpen}
           onClose={() => setTopUpOpen(false)}
           onSuccess={(amount) => {
             setTopUpOpen(false);
@@ -491,7 +491,7 @@ function VendorDashboard() {
               {/* Left Side: Welcome Text */}
               <div className="flex-1 min-w-[300px]">
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
-                  Welcome back, {displayName}! 👋
+                  Welcome, {displayName}! 👋
                 </h1>
                 <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                   View and manage your bazaars and booths.
@@ -510,7 +510,7 @@ function VendorDashboard() {
                   </button>
                   <WalletBadge
                     balance={walletBalance}
-                    currency="USD"
+                    currency="EGP"
                     onTopUp={() => setTopUpOpen(true)}
                     className="w-full md:w-auto justify-between md:justify-start"
                   />
@@ -595,58 +595,78 @@ function VendorDashboard() {
       <div className="mt-8">
         {activeTab === "upcoming" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Upcoming Events</h2>
-              <p className="text-slate-500">View upcoming bazaars and booths</p>
-            </div>
-            <div className="flex gap-4 mb-8 border-b border-slate-200 pb-1">
-              <button
-                onClick={() => setActiveUpcomingTab("bazaars")}
-                className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "bazaars"
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-              >
-                🗓️ Bazaars
-              </button>
-              <button
-                onClick={() => setActiveUpcomingTab("booths")}
-                className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "booths"
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-              >
-                🛒 Booths
-              </button>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-900">Upcoming Events</h2>
+                <p className="text-slate-500 mt-1">View upcoming bazaars and booths</p>
+              </div>
+              <div className="flex gap-4 justify-center mb-8 border-b border-slate-200 pb-1">
+                <button
+                  onClick={() => setActiveUpcomingTab("bazaars")}
+                  className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "bazaars"
+                    ? "border-emerald-500 text-emerald-600"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                    }`}
+                >
+                  🗓️ Bazaars
+                </button>
+                <button
+                  onClick={() => setActiveUpcomingTab("booths")}
+                  className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "booths"
+                    ? "border-emerald-500 text-emerald-600"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                    }`}
+                >
+                  🛒 Booths
+                </button>
+              </div>
+              {/* Content will follow below outside this div or needs to be inside? The original code closed the div and then rendered list below. 
+                  MyEventsList normally has its own styling. 
+                  Wait, the original code had the tabs inside the "mb-2" div? No. 
+                  Original lines 597-601 was header. 602-621 was tabs. 622 closed space-y-6.
+                  Then lines 659+ rendered the list.
+                  If I wrap the header and tabs in a card, the list (MyEventsList) separates from it.
+                  MyEventsList usually has its own card? 
+                  Checking MyEventsList usage: it renders a list. 
+                  If I want the list INSIDE the card, I need to move the MyEventsList call inside.
+                  But activeTab === "upcoming" renders header (lines 596-623) AND list (lines 659-670).
+                  The list is rendered conditionally OUTSIDE the initial div block in original code.
+                  To wrap EVERYTHING in a card, I need to restructuring.
+                  However, MyEventsList might expect to be standalone.
+                  Let's just wrap the Header + Tabs in a card for now to act as a "Controller" card. 
+                  Actually, centering the header and tabs is good polish.
+              */}
             </div>
           </div>
         )}
 
         {activeTab === "my-applications" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">My Applications</h2>
-              <p className="text-slate-500">Track the status of your applications</p>
-            </div>
-            <div className="flex gap-2 mb-8 overflow-x-auto pb-2 border-b border-slate-200">
-              {[
-                { id: "all", label: "All Applications" },
-                { id: "approved", label: "Approved" },
-                { id: "pending", label: "Pending" },
-                { id: "rejected", label: "Rejected" },
-                { id: "cancelled", label: "Cancelled" }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveApplicationTab(tab.id)}
-                  className={`py-2 px-4 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeApplicationTab === tab.id
-                    ? "bg-slate-900 text-white shadow-md"
-                    : "text-slate-500 hover:bg-slate-100"
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-900">My Applications</h2>
+                <p className="text-slate-500 mt-1">Track the status of your applications</p>
+              </div>
+              <div className="flex gap-2 mb-2 overflow-x-auto pb-2 justify-center">
+                {[
+                  { id: "all", label: "All Applications" },
+                  { id: "approved", label: "Approved" },
+                  { id: "pending", label: "Pending" },
+                  { id: "rejected", label: "Rejected" },
+                  { id: "cancelled", label: "Cancelled" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveApplicationTab(tab.id)}
+                    className={`py-2 px-4 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeApplicationTab === tab.id
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "text-slate-500 hover:bg-slate-100"
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -659,13 +679,11 @@ function VendorDashboard() {
         {activeTab === "upcoming" && activeUpcomingTab === "bazaars" && (
           <MyEventsList
             events={(upcomingBazaars || []).map(e => ({ ...e, date: e.startDate }))}
-            title="Upcoming Bazaars"
           />
         )}
         {activeTab === "upcoming" && activeUpcomingTab === "booths" && (
           <MyEventsList
             events={(upcomingBooths || []).map(e => ({ ...e, date: e.startDate }))}
-            title="Upcoming Booths"
           />
         )}
         {activeTab === "my-applications" && (
@@ -797,28 +815,47 @@ function VendorDashboard() {
         {activeTab === "loyalty" && (
           <div className="space-y-6">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-xl font-bold text-slate-800">Your Programs</h3>
-                <button
-                  onClick={() => setShowLoyaltyForm(!showLoyaltyForm)}
-                  className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors"
-                >
-                  {showLoyaltyForm ? "Cancel" : "Create New Program"}
-                </button>
-              </div>
-
-              {showLoyaltyForm && (
-                <div className="mb-8 p-6 bg-slate-50 rounded-xl border border-slate-200">
-                  <LoyaltyProgramForm
-                    onSuccess={() => {
-                      setShowLoyaltyForm(false);
-                      setLoyaltyRefreshKey(prev => prev + 1);
-                    }}
-                  />
+              {showLoyaltyForm ? (
+                <div>
+                  <div className="flex items-center gap-4 mb-6">
+                    <button
+                      onClick={() => setShowLoyaltyForm(false)}
+                      className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                    </button>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800">Create New Program</h3>
+                      <p className="text-slate-500 text-sm">Define a new loyalty offer for students</p>
+                    </div>
+                  </div>
+                  <div className="p-6 bg-slate-50 rounded-xl border border-slate-200">
+                    <LoyaltyProgramForm
+                      onSuccess={() => {
+                        setShowLoyaltyForm(false);
+                        setLoyaltyRefreshKey(prev => prev + 1);
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  <div className="text-center mb-8 relative flex flex-col items-center">
+                    <h3 className="text-xl font-bold text-slate-800">Your Programs</h3>
+                    <p className="text-slate-500 mt-1">Manage your loyalty programs and track applications</p>
+                    <button
+                      onClick={() => setShowLoyaltyForm(true)}
+                      className="mt-4 md:mt-0 md:absolute md:right-0 md:top-0 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors"
+                    >
+                      Create New Program
+                    </button>
+                  </div>
 
-              <LoyaltyApplicationsList key={loyaltyRefreshKey} />
+                  <LoyaltyApplicationsList key={loyaltyRefreshKey} />
+                </>
+              )}
             </div>
           </div>
         )}

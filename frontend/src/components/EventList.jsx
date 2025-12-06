@@ -280,30 +280,29 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     <div className="w-full">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 relative text-center">
           {headerAction && (
-            <div className="absolute left-0 top-1/2 -translate-y-1/2">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
               {headerAction}
             </div>
           )}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                {showArchivedOnly ? 'Archived Events' : 'Upcoming Events'}
-              </h1>
-              <p className="text-slate-500 mt-1">
-                {showArchivedOnly
-                  ? 'View and manage archived events'
-                  : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar", "Booth"].includes(t))
-                    ? 'Discover bazaars and booths'
-                    : 'Discover workshops, trips, conferences, and more'}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              {showArchivedOnly ? 'Archived Events' : 'Upcoming Events'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {showArchivedOnly
+                ? 'View and manage archived events'
+                : effectiveFilterByTypes && effectiveFilterByTypes.every(t => ["Bazaar", "Booth"].includes(t))
+                  ? 'Discover bazaars and booths'
+                  : 'Discover workshops, trips, conferences, and more'}
+            </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-8">
+        {/* Filters */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
           <div className="flex flex-col gap-6">
             {/* Search Row */}
             <div className="relative">
@@ -313,18 +312,18 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                 placeholder="Search events by name or description..."
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="input input-bordered w-full pl-12 h-12 text-base bg-slate-50 focus:bg-white transition-colors"
+                className="input input-bordered w-full pl-12 h-12 text-base bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-emerald-500 transition-colors"
               />
             </div>
 
             {/* Filter Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="form-control">
-                <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">Type</label>
+                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Type</label>
                 <select
                   value={filters.type}
                   onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                  className="select select-bordered w-full bg-slate-50 focus:bg-white transition-colors"
+                  className="select select-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                 >
                   <option value="">All Events</option>
                   {effectiveFilterByTypes
@@ -348,7 +347,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               </div>
 
               <div className="form-control">
-                <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">Location</label>
+                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Location</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">📍</span>
                   <input
@@ -356,14 +355,14 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                     placeholder="Filter by location"
                     value={filters.location}
                     onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                    className="input input-bordered w-full pl-10 bg-slate-50 focus:bg-white transition-colors"
+                    className="input input-bordered w-full pl-10 bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                   />
                 </div>
               </div>
 
               {(filters.type === 'Workshop' || filters.type === 'Conference') && (
                 <div className="form-control">
-                  <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">Professor</label>
+                  <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Professor</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">👩‍🏫</span>
                     <input
@@ -371,18 +370,18 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                       placeholder="Professor name"
                       value={filters.professorName}
                       onChange={(e) => setFilters({ ...filters, professorName: e.target.value })}
-                      className="input input-bordered w-full pl-10 bg-slate-50 focus:bg-white transition-colors"
+                      className="input input-bordered w-full pl-10 bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                     />
                   </div>
                 </div>
               )}
 
               <div className="form-control">
-                <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">Sort By</label>
+                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Sort By</label>
                 <select
                   value={filters.sortBy}
                   onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                  className="select select-bordered w-full bg-slate-50 focus:bg-white transition-colors"
+                  className="select select-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                 >
                   <option value="date">Date (Earliest First)</option>
                   <option value="title">Title (A-Z)</option>
@@ -391,41 +390,41 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
             </div>
 
             {/* Date Range */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
               <div className="form-control">
-                <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">Start Date</label>
+                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Start Date</label>
                 <input
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                  className="input input-bordered w-full bg-slate-50 focus:bg-white transition-colors"
+                  className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                 />
               </div>
               <div className="form-control">
-                <label className="label text-xs font-bold text-slate-500 uppercase tracking-wider">End Date</label>
+                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">End Date</label>
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                  className="input input-bordered w-full bg-slate-50 focus:bg-white transition-colors"
+                  className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
                 />
               </div>
             </div>
 
             {/* Actions Row */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-200">
               <label className="flex items-center gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={filters.upcomingOnly}
                   onChange={(e) => setFilters({ ...filters, upcomingOnly: e.target.checked })}
-                  className="checkbox checkbox-sm checkbox-primary rounded-md"
+                  className="checkbox checkbox-sm checkbox-primary border-slate-300 rounded-md"
                 />
-                <span className="text-sm font-medium text-slate-700 group-hover:text-emerald-600 transition-colors">Show Upcoming Only</span>
+                <span className="text-sm font-medium text-slate-600 group-hover:text-emerald-600 transition-colors">Show Upcoming Only</span>
               </label>
 
               <div className="flex items-center gap-4 ml-auto">
-                <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100">
+                <span className="text-sm font-medium text-emerald-700 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200">
                   {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""} found
                 </span>
 
@@ -442,7 +441,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
                       upcomingOnly: false,
                     })
                   }
-                  className="btn btn-ghost btn-sm text-slate-500 hover:text-red-500 hover:bg-red-50"
+                  className="btn btn-ghost btn-sm text-slate-500 hover:text-red-600 hover:bg-red-50"
                 >
                   Clear Filters
                 </button>
@@ -455,10 +454,10 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32">
             <span className="loading loading-spinner loading-lg text-emerald-500 mb-6"></span>
-            <p className="text-lg font-medium text-slate-500">Loading events...</p>
+            <p className="text-lg font-medium text-slate-400">Loading events...</p>
           </div>
         ) : filteredEvents.length === 0 ? (
-          <div className="text-center py-32 bg-white rounded-2xl shadow-sm border border-slate-100">
+          <div className="text-center py-32 bg-white rounded-2xl shadow-sm border border-slate-200">
             <div className="text-6xl mb-6 opacity-50">📭</div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No events found</h3>
             <p className="text-slate-500">Try adjusting your filters or check back later</p>

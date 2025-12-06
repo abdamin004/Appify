@@ -538,7 +538,7 @@ function StaffDashboard() {
               {/* Left Side: Welcome Text */}
               <div className="flex-1 min-w-[300px]">
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
-                  Welcome back, {user.firstName}! 👋
+                  Welcome, {user.firstName}! 👋
                 </h1>
                 <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                   Discover and register for amazing events happening on campus.
@@ -643,9 +643,11 @@ function StaffDashboard() {
 
         {activeTab === "favourites" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">My Favourites</h2>
-              <p className="text-slate-500">Events you've saved for later</p>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
+                <p className="text-slate-500 mt-1">Events you've saved for later</p>
+              </div>
             </div>
             <MyEventsList events={favouriteEvents} />
           </div>
@@ -653,9 +655,11 @@ function StaffDashboard() {
 
         {activeTab === "registered" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
-              <p className="text-slate-500">Manage your upcoming activities</p>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
+                <p className="text-slate-500 mt-1">Manage your upcoming activities</p>
+              </div>
             </div>
             {loading ? (
               <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200">
@@ -679,27 +683,45 @@ function StaffDashboard() {
 
         {activeTab === "reminders" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">
-                Event Reminders
+            <div className="text-center mb-8 relative">
+              <h2 className="text-2xl font-bold text-slate-900">
+                Reminders
               </h2>
-              {reminders.filter(n => !n.isRead).length > 0 && (
-                <button
-                  onClick={() => {
-                    reminders.filter(n => !n.isRead).forEach(reminder => {
-                      markReminderRead(reminder.id);
-                    });
-                    fetchReminders();
-                  }}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
-                >
-                  Mark All as Read
-                </button>
-              )}
+              <p className="text-slate-500 mt-1">Don't miss your upcoming events</p>
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
+              <div className="md:hidden mt-4 flex justify-center">
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
             </div>
             {reminders.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <div className="text-4xl mb-4">⏰</div>
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">⏰</div>
                 <p>No reminders at this time.</p>
               </div>
             ) : (
@@ -797,11 +819,10 @@ function StaffDashboard() {
 
         {activeTab === "notifications" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">
-                Notifications
-              </h2>
-              <div className="flex gap-3">
+            <div className="text-center mb-8 relative">
+              <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+              <p className="text-slate-500 mt-2">Updates about events and activities</p>
+              <div className="flex gap-3 mt-4 md:mt-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 justify-center">
                 {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
                   <button
                     onClick={() => {
@@ -832,8 +853,8 @@ function StaffDashboard() {
               </div>
             </div>
             {notifications.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <div className="text-4xl mb-4">🔔</div>
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">🔔</div>
                 <p>No notifications at this time.</p>
               </div>
             ) : (
@@ -913,9 +934,10 @@ function StaffDashboard() {
 
         {activeTab === "gym-sessions" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <span>🏋️</span> Gym Sessions Schedule
-            </h2>
+            <div className="text-center mb-8 relative">
+              <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
+              <p className="text-slate-500 mt-2">View schedule and register for sessions</p>
+            </div>
             {gymSessionsLoading ? (
               <div className="text-center py-20 text-slate-500">
                 <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
@@ -927,7 +949,7 @@ function StaffDashboard() {
                 {gymSessionsError}
               </div>
             ) : gymSessions.length === 0 ? (
-              <div className="text-center py-20 text-slate-500">
+              <div className="text-center py-20 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                 <div className="text-6xl mb-6 opacity-50">🏋️</div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">No Sessions Scheduled</h3>
                 <p>There are no gym sessions scheduled at the moment.</p>
