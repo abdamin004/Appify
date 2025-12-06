@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
 import adminService from '../../services/adminService';
 import { showToast } from '../../utils/toast';
-import { 
-  createStudentNotification, 
-  createStaffNotification, 
+import {
+  createStudentNotification,
+  createStaffNotification,
   createTaNotification,
-  createProfessorNotification 
+  createProfessorNotification
 } from '../../services/notificationService';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../utils/designSystem';
 
@@ -66,11 +66,11 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
       };
 
       const result = await vendorService.applyToLoyaltyProgram(payload);
-      
+
       // Check if application was instantly approved (status: 'approved' in response)
       const app = result?.application || result;
       const isInstantlyApproved = app?.status === 'approved' || result?.message?.includes('live and visible');
-      
+
       if (isInstantlyApproved) {
         // Application was instantly approved - create frontend notifications
         const orgName = app?.organization || formData.organization || 'A vendor';
@@ -80,7 +80,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             ? `${formData.discountRate}%`
             : 'a special';
         const promoInfo = (app?.promoCode || formData.promoCode) ? ` Use code ${app?.promoCode || formData.promoCode}.` : '';
-        
+
         const notification = {
           type: 'LoyaltyPartnerAdded',
           message: `${orgName} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
@@ -89,18 +89,18 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
           promoCode: app?.promoCode || formData.promoCode,
           date: new Date().toISOString(),
         };
-        
+
         try {
           // Create notifications for all user roles
           createStudentNotification(notification);
           createStaffNotification(notification);
           createTaNotification(notification);
-          
+
           // Create notifications for all professors
           try {
             const professors = await adminService.listAllUsers('Professor');
             const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-            
+
             professorList.forEach(professor => {
               const professorId = String(professor._id || professor.id);
               if (professorId) {
@@ -123,10 +123,10 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
               console.error('Could not create professor notifications from localStorage:', localStorageErr);
             }
           }
-          
+
           // Dispatch event to refresh notifications in all dashboards
           window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
-          
+
           showToast.success('Loyalty program application approved instantly! Notifications sent to all users.');
         } catch (notifErr) {
           console.error('Error creating loyalty notifications:', notifErr);
@@ -135,11 +135,11 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
       } else {
         showToast.success('Loyalty program application submitted successfully!');
       }
-      
+
       if (onSuccess) {
         onSuccess();
       }
-      
+
       // Reset form (but keep organization if vendor info exists)
       setFormData({
         organization: vendorInfo?.companyName || '',
@@ -158,53 +158,26 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
   };
 
   return (
-    <div style={{
-      background: colors.bgCard,
-      padding: spacing['2xl'],
-      borderRadius: borderRadius['2xl'],
-      boxShadow: shadows.lg,
-      maxWidth: '600px',
-      margin: '0 auto',
-      border: `1px solid ${colors.gray200}`,
-    }}>
-      <h2 style={{ 
-        fontSize: typography.fontSize['2xl'], 
-        color: colors.primary, 
-        marginBottom: spacing.sm,
-        fontWeight: typography.fontWeight.bold,
-      }}>
-        Apply to GUC Loyalty Program
-      </h2>
-      <p style={{ 
-        color: colors.gray500, 
-        marginBottom: spacing['3xl'],
-        fontSize: typography.fontSize.base,
-      }}>
-        Fill out the form below to apply for the GUC loyalty program. Your application will be reviewed by administrators.
-      </p>
+    <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg max-w-2xl mx-auto border border-slate-700 backdrop-blur-sm">
+      <div className="mb-8 text-center">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Apply to GUC Loyalty Program
+        </h2>
+        <p className="text-slate-400">
+          Fill out the form below to apply for the GUC loyalty program. Your application will be reviewed by administrators.
+        </p>
+      </div>
 
       {vendorInfo?.companyName && (
-        <div style={{ 
-          padding: spacing.lg, 
-          background: 'rgba(212, 175, 55, 0.1)', 
-          borderRadius: borderRadius.lg, 
-          marginBottom: spacing.xl, 
-          fontSize: typography.fontSize.sm, 
-          color: colors.primary 
-        }}>
-          <strong>✓ Organization name auto-filled with your account info</strong>
+        <div className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-xl mb-6 text-sm text-emerald-300 flex items-center gap-2">
+          <span>✓</span>
+          <strong>Organization name auto-filled with your account info</strong>
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: spacing.xl }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm, 
-            color: colors.primary, 
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block mb-2 text-slate-300 font-bold">
             Organization Name *
           </label>
           <input
@@ -213,22 +186,13 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             value={formData.organization}
             onChange={handleChange}
             required
-            style={{
-              ...inputStyles.base,
-              width: '100%',
-            }}
+            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="Enter organization name"
           />
         </div>
 
-        <div style={{ marginBottom: spacing.xl }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm, 
-            color: colors.primary, 
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>
+        <div>
+          <label className="block mb-2 text-slate-300 font-bold">
             Discount Rate (%) *
           </label>
           <input
@@ -240,30 +204,16 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             min="0"
             max="100"
             step="0.1"
-            style={{
-              ...inputStyles.base,
-              width: '100%',
-            }}
+            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="e.g., 10, 15, 20"
           />
-          <small style={{ 
-            color: colors.gray500, 
-            fontSize: typography.fontSize.sm,
-            display: 'block',
-            marginTop: spacing.xs,
-          }}>
+          <small className="block mt-1 text-slate-500 text-sm">
             Enter a percentage between 0 and 100
           </small>
         </div>
 
-        <div style={{ marginBottom: spacing.xl }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm, 
-            color: colors.primary, 
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>
+        <div>
+          <label className="block mb-2 text-slate-300 font-bold">
             Promo Code *
           </label>
           <input
@@ -272,22 +222,13 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             value={formData.promoCode}
             onChange={handleChange}
             required
-            style={{
-              ...inputStyles.base,
-              width: '100%',
-            }}
+            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="e.g., GUC2024, STUDENT10"
           />
         </div>
 
-        <div style={{ marginBottom: spacing['3xl'] }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: spacing.sm, 
-            color: colors.primary, 
-            fontWeight: typography.fontWeight.semibold,
-            fontSize: typography.fontSize.base,
-          }}>
+        <div>
+          <label className="block mb-2 text-slate-300 font-bold">
             Terms and Conditions *
           </label>
           <textarea
@@ -296,27 +237,18 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             onChange={handleChange}
             required
             rows="6"
-            style={{
-              ...inputStyles.base,
-              width: '100%',
-              resize: 'vertical',
-              fontFamily: typography.fontFamily
-            }}
+            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-y font-sans"
             placeholder="Enter the terms and conditions for your loyalty program offer..."
           />
         </div>
 
-        <div style={{ display: 'flex', gap: spacing.lg, justifyContent: 'flex-end' }}>
+        <div className="flex gap-4 justify-end pt-4">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
               disabled={loading}
-              style={{
-                ...buttonStyles.outline,
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
+              className="px-6 py-3 bg-transparent border border-slate-600 text-slate-300 rounded-xl font-semibold hover:bg-slate-800 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -324,21 +256,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              ...buttonStyles.primary,
-              opacity: loading ? 0.6 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accentHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accent;
-              }
-            }}
+            className="px-6 py-3 bg-emerald-600 text-white border-none rounded-xl font-bold shadow-lg hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Submitting...' : 'Submit Application'}
           </button>

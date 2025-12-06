@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import userService from '../../services/userService';
 import { showToast, confirmDialog } from '../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../utils/designSystem';
+
 
 const DEFAULT_ADMIN_EMAIL = 'admin@guc.edu.eg';
 
@@ -31,7 +31,7 @@ export default function UserManagement() {
       'eventoffice': 'EventOffice',
       'event office': 'EventOffice'
     };
-    const key = s.replace(/\s+/g,'').toLowerCase();
+    const key = s.replace(/\s+/g, '').toLowerCase();
     return map[key] || s;
   };
 
@@ -43,8 +43,8 @@ export default function UserManagement() {
       setUsers(u);
       // initialize selectedRoles map
       const map = {};
-  // normalize roles to match backend expected casing
-  (u || []).forEach(user => { map[user._id] = normalizeRole(user.role); });
+      // normalize roles to match backend expected casing
+      (u || []).forEach(user => { map[user._id] = normalizeRole(user.role); });
       setSelectedRoles(map);
     } catch (err) {
       const errorMsg = err?.message || 'Failed to load users';
@@ -53,7 +53,7 @@ export default function UserManagement() {
     } finally { setLoading(false); }
   };
 
-  useEffect(()=>{ load(); }, []);
+  useEffect(() => { load(); }, []);
 
   const handleAssign = async (id, newRole) => {
     const user = users.find(u => u._id === id);
@@ -85,7 +85,7 @@ export default function UserManagement() {
       showToast.success(response.message || 'Role assigned successfully');
       // Reload to get latest data
       load();
-    } catch (err) { 
+    } catch (err) {
       const errorMsg = err?.message || 'Failed to assign role';
       showToast.error(errorMsg);
     }
@@ -101,7 +101,7 @@ export default function UserManagement() {
       await userService.blockUser(id, action);
       showToast.success(`User ${action === 'block' ? 'blocked' : 'unblocked'} successfully`);
       load();
-    } catch (err) { 
+    } catch (err) {
       const errorMsg = err?.message || 'Failed to update user status';
       showToast.error(errorMsg);
     }
@@ -119,132 +119,80 @@ export default function UserManagement() {
       await userService.deleteAdmin(id);
       showToast.success('Admin account deleted successfully');
       load();
-    } catch (err) { 
+    } catch (err) {
       const errorMsg = err?.message || 'Failed to delete admin account';
       showToast.error(errorMsg);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'] }}>
-          <div style={{ 
-            position: 'relative',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: spacing.xl
-          }}>
-            <button
-              onClick={() => navigate('/Admin')}
-              style={{
-                ...buttonStyles.back,
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: colors.bgCard,
-                color: colors.primary,
-                borderColor: colors.primary
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.accent;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = colors.bgCard;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.primary;
-              }}
-            >
-              ← Back
-            </button>
-            <h2 style={{ 
-              color: colors.primary, 
-              margin: 0,
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-              textAlign: 'center',
-              textDecoration: 'underline',
-              textDecorationColor: colors.primary,
-              textUnderlineOffset: '4px'
-            }}>User Management</h2>
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">User Management</h1>
+          <p className="text-slate-500 mt-1">Manage user roles, permissions, and account status.</p>
+        </div>
+      </div>
+
+      {/* Content Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {loading && (
+          <div className="p-12 text-center text-slate-500">
+            <span className="loading loading-spinner loading-md text-emerald-600 mb-2"></span>
+            <p>Loading users...</p>
           </div>
-          {loading && (
-            <div style={{ 
-              color: colors.gray500, 
-              fontSize: typography.fontSize.base,
-              textAlign: 'center',
-              padding: spacing['3xl']
-            }}>Loading users...</div>
-          )}
-          {error && !loading && (
-            <div style={{ 
-              color: colors.error, 
-              background: colors.errorLight,
-              padding: spacing.md,
-              borderRadius: borderRadius.md,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.sm
-            }}>{error}</div>
-          )}
-          {!loading && !error && users.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: spacing['5xl'],
-              color: colors.gray500
-            }}>
-              <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.lg }}>👥</div>
-              <h3 style={{
-                color: colors.primary,
-                fontSize: typography.fontSize.xl,
-                fontWeight: typography.fontWeight.bold,
-                marginBottom: spacing.sm
-              }}>No Users Found</h3>
-              <p style={{
-                fontSize: typography.fontSize.base,
-                color: colors.gray500,
-                margin: 0
-              }}>There are no users in the system yet.</p>
+        )}
+
+        {error && !loading && (
+          <div className="p-6">
+            <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-100 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
             </div>
-          )}
-          {!loading && users.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: colors.gray50 }}>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Name</th>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Email</th>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Role</th>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Verified</th>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Blocked</th>
-                    <th style={{ textAlign: 'left', padding: spacing.md, color: colors.primary, fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(u => {
-                    const isDefault = isDefaultAdmin(u);
-                    return (
-                      <tr key={u._id} style={{ borderTop: `1px solid ${colors.gray200}` }}>
-                        <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>{u.firstName} {u.lastName}</td>
-                        <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>{u.email}</td>
-                        <td style={{ padding: spacing.md }}>
-                          <select 
-                            value={selectedRoles[u._id] || u.role} 
-                            onChange={e=>{
+          </div>
+        )}
+
+        {!loading && !error && users.length === 0 && (
+          <div className="p-12 text-center text-slate-500">
+            <div className="text-4xl mb-4">👥</div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">No Users Found</h3>
+            <p>There are no users in the system yet.</p>
+          </div>
+        )}
+
+        {!loading && users.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Blocked</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.map(u => {
+                  const isDefault = isDefaultAdmin(u);
+                  return (
+                    <tr key={u._id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 text-slate-900 font-medium">{u.firstName} {u.lastName}</td>
+                      <td className="px-6 py-4 text-slate-600">{u.email}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <select
+                            value={selectedRoles[u._id] || u.role}
+                            onChange={e => {
                               const val = e.target.value;
                               setSelectedRoles(prev => ({ ...prev, [u._id]: val }));
-                            }} 
-                            disabled={isDefault}
-                            style={{ 
-                              ...inputStyles.base,
-                              padding: `${spacing.xs} ${spacing.sm}`,
-                              fontSize: typography.fontSize.sm,
-                              cursor: isDefault ? 'not-allowed' : 'pointer',
-                              opacity: isDefault ? 0.6 : 1
                             }}
+                            disabled={isDefault}
+                            className={`select select-bordered select-sm w-full max-w-xs ${isDefault ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             <option value="Student">Student</option>
                             <option value="Staff">Staff</option>
@@ -254,127 +202,79 @@ export default function UserManagement() {
                             <option value="EventOffice">EventOffice</option>
                           </select>
                           {isDefault && (
-                            <div style={{ fontSize: typography.fontSize.xs, color: colors.gray500, marginTop: spacing.xs }}>
-                              Default admin
-                            </div>
+                            <span className="text-xs text-slate-400">Default admin</span>
                           )}
-                        </td>
-                        <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>
-                          {u.isVerified ? (
-                            <span style={{
-                              padding: `${spacing.xs} ${spacing.sm}`,
-                              borderRadius: borderRadius.md,
-                              fontSize: typography.fontSize.xs,
-                              fontWeight: typography.fontWeight.semibold,
-                              background: colors.successLight,
-                              color: colors.success
-                            }}>
-                              Verified
-                            </span>
-                          ) : u.verificationTokenSent ? (
-                            <span style={{
-                              padding: `${spacing.xs} ${spacing.sm}`,
-                              borderRadius: borderRadius.md,
-                              fontSize: typography.fontSize.xs,
-                              fontWeight: typography.fontWeight.semibold,
-                              background: colors.warningLight || '#FEF3C7',
-                              color: colors.warning || '#D97706'
-                            }}>
-                              Email Sent, Not Verified
-                            </span>
-                          ) : (
-                            <span style={{
-                              padding: `${spacing.xs} ${spacing.sm}`,
-                              borderRadius: borderRadius.md,
-                              fontSize: typography.fontSize.xs,
-                              fontWeight: typography.fontWeight.semibold,
-                              background: colors.gray100,
-                              color: colors.gray600
-                            }}>
-                              Not Verified
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: spacing.md, fontSize: typography.fontSize.base }}>
-                          <span style={{
-                            padding: `${spacing.xs} ${spacing.sm}`,
-                            borderRadius: borderRadius.md,
-                            fontSize: typography.fontSize.xs,
-                            fontWeight: typography.fontWeight.semibold,
-                            background: u.isBlocked ? colors.errorLight : colors.successLight,
-                            color: u.isBlocked ? colors.error : colors.success
-                          }}>
-                            {u.isBlocked ? 'Yes' : 'No'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {u.isVerified ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                            Verified
                           </span>
-                        </td>
-                        <td style={{ padding: spacing.md }}>
-                          <div style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap' }}>
-                            {!isDefault && (
-                              <button 
-                                onClick={()=>handleBlock(u._id, u.isBlocked ? 'unblock' : 'block')} 
-                                style={{ 
-                                  ...buttonStyles.outline,
-                                  padding: `${spacing.xs} ${spacing.sm}`,
-                                  fontSize: typography.fontSize.xs,
-                                  background: u.isBlocked ? colors.success : colors.warning,
-                                  color: colors.white,
-                                  borderColor: u.isBlocked ? colors.success : colors.warning
-                                }}
-                              >
-                                {u.isBlocked ? 'Unblock' : 'Block'}
-                              </button>
-                            )}
-                            {['Admin','EventOffice'].includes(u.role) && !isDefault && (
-                              <button 
-                                onClick={()=>handleDeleteAdmin(u._id)} 
-                                style={{ 
-                                  ...buttonStyles.outline,
-                                  padding: `${spacing.xs} ${spacing.sm}`,
-                                  fontSize: typography.fontSize.xs,
-                                  background: colors.error,
-                                  color: colors.white,
-                                  borderColor: colors.error
-                                }}
-                              >
-                                {u.role === 'EventOffice' ? 'Delete Event Office' : 'Delete Admin'}
-                              </button>
-                            )}
-                            {/* Verify & Assign button: visible when user not verified OR selected role differs from current */}
-                            {/* Not shown if current role is Student AND no role change is selected (students get verification email on signup) */}
-                            {/* Shown if role is being changed FROM Student TO Staff/TA/Professor */}
-                            {!isDefault && (() => {
-                              const selectedRole = selectedRoles[u._id] || u.role;
-                              const roleChanged = selectedRoles[u._id] && selectedRoles[u._id] !== u.role;
-                              const isChangingFromStudent = u.role === 'Student' && selectedRole !== 'Student';
-                              const shouldShow = (selectedRole !== 'Student' || isChangingFromStudent) && 
-                                                (u.isVerified === false || roleChanged);
-                              return shouldShow;
-                            })() && (
-                              <button 
-                                onClick={()=>handleAssign(u._id, (selectedRoles[u._id] || u.role))} 
+                        ) : u.verificationTokenSent ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            Email Sent
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                            Not Verified
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${u.isBlocked
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                          {u.isBlocked ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {!isDefault && (
+                            <button
+                              onClick={() => handleBlock(u._id, u.isBlocked ? 'unblock' : 'block')}
+                              className={`btn btn-xs ${u.isBlocked ? 'btn-success text-white' : 'btn-warning text-white'}`}
+                            >
+                              {u.isBlocked ? 'Unblock' : 'Block'}
+                            </button>
+                          )}
+
+                          {['Admin', 'EventOffice'].includes(u.role) && !isDefault && (
+                            <button
+                              onClick={() => handleDeleteAdmin(u._id)}
+                              className="btn btn-xs btn-error text-white"
+                            >
+                              Delete
+                            </button>
+                          )}
+
+                          {!isDefault && (() => {
+                            const selectedRole = selectedRoles[u._id] || u.role;
+                            const roleChanged = selectedRoles[u._id] && selectedRoles[u._id] !== u.role;
+                            const isChangingFromStudent = u.role === 'Student' && selectedRole !== 'Student';
+                            const shouldShow = (selectedRole !== 'Student' || isChangingFromStudent) &&
+                              (u.isVerified === false || roleChanged);
+                            return shouldShow;
+                          })() && (
+                              <button
+                                onClick={() => handleAssign(u._id, (selectedRoles[u._id] || u.role))}
                                 disabled={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role}
-                                style={{ 
-                                  ...buttonStyles.primary,
-                                  padding: `${spacing.xs} ${spacing.sm}`,
-                                  fontSize: typography.fontSize.xs,
-                                  opacity: (u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role) ? 0.5 : 1,
-                                  cursor: (u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role) ? 'not-allowed' : 'pointer'
-                                }}
-                                title={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role ? 'Verification email already sent for this role. User must verify their email first.' : ''}
+                                className="btn btn-xs btn-primary"
+                                title={u.verificationTokenSent && !u.isVerified && (selectedRoles[u._id] || u.role) === u.role ? 'Verification email already sent.' : ''}
                               >
                                 Verify & Assign
                               </button>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

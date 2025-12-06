@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
 import { showToast, confirmDialog } from '../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
 
 export default function AdminNotifications() {
-  const navigate = useNavigate();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,11 +16,11 @@ export default function AdminNotifications() {
       setNotifs(notifications);
       // Clear any previous errors if we got a valid response
       setError(null);
-    } catch (err) { 
+    } catch (err) {
       // If backend route doesn't exist (404) or not implemented, show empty state gracefully
       const status = err?.status || (err?.response?.status);
       const errorMsg = err?.message || err?.error || 'Failed to load notifications';
-      
+
       if (status === 404 || errorMsg.includes('404') || errorMsg.includes('not found') || errorMsg.includes('No notifications')) {
         // Backend route not implemented yet - show empty state instead of error
         setError(null);
@@ -37,14 +34,14 @@ export default function AdminNotifications() {
     finally { setLoading(false); }
   };
 
-  useEffect(()=>{ load(); }, []);
+  useEffect(() => { load(); }, []);
 
   const markRead = async (id) => {
-    try { 
-      await adminService.markNotificationRead(id); 
-      load(); 
+    try {
+      await adminService.markNotificationRead(id);
+      load();
       showToast.success('Notification marked as read');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to mark notification as read');
     }
   };
@@ -52,11 +49,11 @@ export default function AdminNotifications() {
   const markAll = async () => {
     const confirmed = await confirmDialog('Mark ALL notifications as read?', 'Confirm');
     if (!confirmed) return;
-    try { 
-      await adminService.markAllNotificationsRead(); 
-      load(); 
+    try {
+      await adminService.markAllNotificationsRead();
+      load();
       showToast.success('All notifications marked as read');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to mark all notifications as read');
     }
   };
@@ -64,186 +61,102 @@ export default function AdminNotifications() {
   const deleteNotif = async (id) => {
     const confirmed = await confirmDialog('Delete this notification?', 'Confirm');
     if (!confirmed) return;
-    try { 
-      await adminService.deleteNotification(id); 
-      load(); 
+    try {
+      await adminService.deleteNotification(id);
+      load();
       showToast.success('Notification deleted');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to delete notification');
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'] }}>
-          <div style={{ 
-            position: 'relative',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: spacing.xl
-          }}>
-            <button
-              onClick={() => navigate('/Admin')}
-              style={{
-                ...buttonStyles.back,
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: colors.bgCard,
-                color: colors.primary,
-                borderColor: colors.primary
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.accent;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = colors.bgCard;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.primary;
-              }}
-            >
-              ← Back
-            </button>
-            <h2 style={{ 
-              color: colors.primary, 
-              margin: 0,
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-              textAlign: 'center',
-              textDecoration: 'underline',
-              textDecorationColor: colors.primary,
-              textUnderlineOffset: '4px'
-            }}>Admin Notifications</h2>
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Admin Notifications</h2>
+            <p className="text-slate-500 mt-1">Stay updated with system alerts</p>
           </div>
           {notifs.length > 0 && (
-            <div style={{ marginBottom: spacing.lg }}>
-              <button 
-                onClick={markAll} 
-                style={{ 
-                  ...buttonStyles.primary,
-                  padding: `${spacing.md} ${spacing.xl}`
-                }}
-              >Mark all as read</button>
-            </div>
-          )}
-          {loading && (
-            <div style={{ 
-              color: colors.gray500, 
-              fontSize: typography.fontSize.base,
-              textAlign: 'center',
-              padding: spacing['3xl']
-            }}>Loading notifications...</div>
-          )}
-          {error && !loading && (
-            <div style={{ 
-              color: colors.error, 
-              background: colors.errorLight,
-              padding: spacing.md,
-              borderRadius: borderRadius.md,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.sm
-            }}>{error}</div>
-          )}
-          {!loading && !error && notifs.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: spacing['5xl'],
-              color: colors.gray500
-            }}>
-              <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.lg }}>🔔</div>
-              <h3 style={{
-                color: colors.primary,
-                fontSize: typography.fontSize.xl,
-                fontWeight: typography.fontWeight.bold,
-                marginBottom: spacing.sm
-              }}>No Notifications</h3>
-              <p style={{
-                fontSize: typography.fontSize.base,
-                color: colors.gray500,
-                margin: 0
-              }}>You don't have any notifications at this time.</p>
-            </div>
-          )}
-          {!loading && notifs.length > 0 && (
-            <ul style={{ padding: 0, listStyle: 'none' }}>
-              {notifs.map(n => (
-              <li key={n._id} style={{ 
-                marginBottom: spacing.lg, 
-                padding: spacing.lg, 
-                background: n.isRead ? colors.gray50 : colors.white, 
-                borderRadius: borderRadius.xl, 
-                border: `1px solid ${colors.gray200}`,
-                transition: transitions.fast
-              }}
-              onMouseEnter={(e) => {
-                if (!n.isRead) {
-                  e.currentTarget.style.boxShadow = shadows.md;
-                  e.currentTarget.style.borderColor = colors.accent;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.borderColor = colors.gray200;
-              }}
-              >
-                <div style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold,
-                  fontSize: typography.fontSize.base,
-                  marginBottom: spacing.xs
-                }}>{n.type}</div>
-                <div style={{ 
-                  color: colors.gray800, 
-                  marginTop: spacing.xs,
-                  fontSize: typography.fontSize.base,
-                  lineHeight: typography.lineHeight.relaxed
-                }}>{n.message}</div>
-                <div style={{ 
-                  fontSize: typography.fontSize.xs, 
-                  color: colors.gray500, 
-                  marginTop: spacing.sm 
-                }}>{new Date(n.createdAt).toLocaleString()}</div>
-                <div style={{ marginTop: spacing.md, display: 'flex', gap: spacing.sm }}>
-                  {!n.isRead && (
-                    <button 
-                      onClick={()=>markRead(n._id)} 
-                      style={{ 
-                        ...buttonStyles.secondary,
-                        padding: `${spacing.sm} ${spacing.lg}`,
-                        fontSize: typography.fontSize.sm
-                      }}
-                    >Mark read</button>
-                  )}
-                  <button 
-                    onClick={()=>deleteNotif(n._id)} 
-                    style={{ 
-                      ...buttonStyles.secondary,
-                      padding: `${spacing.sm} ${spacing.lg}`,
-                      fontSize: typography.fontSize.sm,
-                      background: colors.errorLight,
-                      color: colors.error,
-                      borderColor: colors.error
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.error;
-                      e.target.style.color = colors.white;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = colors.errorLight;
-                      e.target.style.color = colors.error;
-                    }}
-                  >Delete</button>
-                </div>
-              </li>
-              ))}
-            </ul>
+            <button
+              onClick={markAll}
+              className="btn btn-primary btn-sm"
+            >
+              Mark all as read
+            </button>
           )}
         </div>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-600">Loading notifications...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="alert alert-error shadow-sm mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {!loading && !error && notifs.length === 0 && (
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="text-6xl mb-4">🔔</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No Notifications</h3>
+            <p className="text-slate-500">You don't have any notifications at this time.</p>
+          </div>
+        )}
+
+        {!loading && notifs.length > 0 && (
+          <div className="space-y-4">
+            {notifs.map(n => (
+              <div
+                key={n._id}
+                className={`p-5 rounded-xl border transition-all ${n.isRead
+                    ? 'bg-slate-50 border-slate-200'
+                    : 'bg-white border-emerald-200 shadow-sm hover:shadow-md'
+                  }`}
+              >
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
+                      <h4 className={`font-bold ${n.isRead ? 'text-slate-600' : 'text-slate-800'}`}>
+                        {n.type}
+                      </h4>
+                    </div>
+                    <p className={`text-sm ${n.isRead ? 'text-slate-500' : 'text-slate-700'} leading-relaxed`}>
+                      {n.message}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      {new Date(n.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    {!n.isRead && (
+                      <button
+                        onClick={() => markRead(n._id)}
+                        className="btn btn-ghost btn-xs text-emerald-600 hover:bg-emerald-50"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteNotif(n._id)}
+                      className="btn btn-ghost btn-xs text-red-500 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

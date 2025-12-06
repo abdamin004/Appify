@@ -1,26 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
+import DashboardLayout from '../Layout/DashboardLayout';
 import LoyaltyPartnersList from '../Loyalty/LoyaltyPartnersList';
-
-const adminLinks = [
-  { to: '/admin/users', label: 'User Management', icon: '👥', description: 'Manage users, roles, and permissions' },
-  { to: '/admin/create', label: 'Create Account', icon: '➕', description: 'Create new admin or event office accounts' },
-  { to: '/admin/vendor-applications', label: 'Vendor Applications', icon: '🏪', description: 'Review and approve vendor applications' },
-  { to: '/admin/loyalty-applications', label: 'Loyalty Applications', icon: '⭐', description: 'Review and approve loyalty partner applications' },
-  { to: '/admin/notifications', label: 'Notifications', icon: '🔔', description: 'View and manage admin notifications' },
-  { to: '/admin/comments', label: 'Comment Moderation', icon: '💬', description: 'Moderate user comments on events' },
-  { to: '/admin/view-events', label: 'View Events', icon: '📅', description: 'Browse and manage all events' },
-  { to: '/admin/vendor-documents', label: 'Vendor Documents', icon: '📄', description: 'View and manage vendor documents' },
-  { to: '/admin/attendees-report', label: 'Attendees Report', icon: '📊', description: 'View attendees reports and statistics' },
-  { to: '/admin/sales-report', label: 'Sales Report', icon: '💰', description: 'View sales reports and analytics' },
-];
+import UserManagement from './UserManagement';
+import CreateAdmin from './CreateAdmin';
+import VendorApplications from './VendorApplications';
+import LoyaltyApplications from './LoyaltyApplications';
+import AdminNotifications from './AdminNotifications';
+import CommentModeration from './CommentModeration';
+import ViewEvents from './ViewEvents';
+import VendorDocuments from './VendorDocuments';
+import AttendeesReport from './AttendeesReport';
+import SalesReport from './SalesReport';
 
 export default function AdminDashboard() {
-  const [showLoyalty, setShowLoyalty] = useState(false);
+  // Default to 'events' as requested by user ("show the first tab (browse events for example)")
+  const [activeTab, setActiveTab] = useState('events');
   const [pendingCount, setPendingCount] = useState(0);
-  
+  const navigate = useNavigate();
+
   useEffect(() => {
     const fetchPendingCount = async () => {
       try {
@@ -32,173 +31,58 @@ export default function AdminDashboard() {
     };
 
     fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 30000); // optional refresh every 30s
+    const interval = setInterval(fetchPendingCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  if (showLoyalty) {
-    return (
-      <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-          <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-            <button
-              onClick={() => setShowLoyalty(false)}
-              style={{
-                ...buttonStyles.back,
-                marginBottom: spacing['2xl'],
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.primary;
-                e.target.style.color = colors.white;
-                e.target.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = colors.bgCard;
-                e.target.style.color = colors.primary;
-                e.target.style.transform = 'translateY(0)';
-              }}
-            >
-              ← Back to Admin Dashboard
-            </button>
-            <LoyaltyPartnersList />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const menuItems = [
+    { key: 'events', label: 'View Events', icon: '📅' },
+    { key: 'users', label: 'User Management', icon: '👥' },
+    { key: 'create', label: 'Create Account', icon: '➕' },
+    { key: 'vendor-apps', label: 'Vendor Applications', icon: '🏪', badge: pendingCount },
+    { key: 'loyalty-apps', label: 'Loyalty Applications', icon: '⭐' },
+    { key: 'notifications', label: 'Notifications', icon: '🔔' },
+    { key: 'comments', label: 'Comment Moderation', icon: '💬' },
+    { key: 'vendor-docs', label: 'Vendor Documents', icon: '📄' },
+    { key: 'attendees', label: 'Attendees Report', icon: '📊' },
+    { key: 'sales', label: 'Sales Report', icon: '💰' },
+    { key: 'loyalty', label: 'Loyalty Partners', icon: '🤝' },
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'events':
+        return <ViewEvents />;
+      case 'users':
+        return <UserManagement />;
+      case 'create':
+        return <CreateAdmin />;
+      case 'vendor-apps':
+        return <VendorApplications />;
+      case 'loyalty-apps':
+        return <LoyaltyApplications />;
+      case 'notifications':
+        return <AdminNotifications />;
+      case 'comments':
+        return <CommentModeration />;
+      case 'vendor-docs':
+        return <VendorDocuments />;
+      case 'attendees':
+        return <AttendeesReport />;
+      case 'sales':
+        return <SalesReport />;
+      case 'loyalty':
+        return <LoyaltyPartnersList />;
+      default:
+        return <ViewEvents />;
+    }
+  };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-          <div style={{
-            background: colors.bgCard,
-            borderRadius: borderRadius['2xl'],
-            boxShadow: shadows.lg,
-            border: `1px solid ${colors.gray200}`,
-            padding: `${spacing['4xl']} ${spacing['3xl']}`,
-            marginBottom: spacing['3xl']
-          }}>
-            <h1 style={{ 
-              color: colors.primary, 
-              marginTop: 0, 
-              marginBottom: spacing.sm,
-              fontSize: typography.fontSize['4xl'],
-              fontWeight: typography.fontWeight.bold
-            }}>Admin Dashboard</h1>
-            <p style={{ 
-              color: colors.gray500, 
-              marginTop: 0,
-              fontSize: typography.fontSize.lg,
-              marginBottom: spacing['3xl']
-            }}>Manage your platform and oversee all activities</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: spacing.xl }}>
-              {adminLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  style={{
-                    display: 'block',
-                    textDecoration: 'none',
-                    background: colors.white,
-                    borderRadius: borderRadius.xl,
-                    padding: spacing['2xl'],
-                    border: `2px solid ${colors.gray200}`,
-                    transition: transitions.normal,
-                    boxShadow: shadows.sm,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-5px)';
-                    e.currentTarget.style.boxShadow = shadows.lg;
-                    e.currentTarget.style.borderColor = colors.accent;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = shadows.sm;
-                    e.currentTarget.style.borderColor = colors.gray200;
-                  }}
-                >
-                  <div style={{ 
-                    fontSize: typography.fontSize['3xl'], 
-                    marginBottom: spacing.md,
-                    textAlign: 'center'
-                  }}>{link.icon}</div>
-                  <h3 style={{ 
-                    color: colors.primary, 
-                    marginTop: 0,
-                    marginBottom: spacing.sm,
-                    fontSize: typography.fontSize.xl,
-                    fontWeight: typography.fontWeight.bold,
-                    textAlign: 'center'
-                  }}>
-                    {link.label}
-                    {link.to === '/admin/vendor-applications' && pendingCount > 0 && (
-                      <span style={{ 
-                        marginLeft: spacing.xs,
-                        color: colors.error,
-                        fontSize: typography.fontSize.base
-                      }}>({pendingCount})</span>
-                    )}
-                  </h3>
-                  <p style={{ 
-                    color: colors.gray500, 
-                    margin: 0,
-                    fontSize: typography.fontSize.sm,
-                    textAlign: 'center',
-                    lineHeight: typography.lineHeight.relaxed
-                  }}>{link.description}</p>
-                </Link>
-              ))}
-              <button
-                onClick={() => setShowLoyalty(true)}
-                style={{
-                  display: 'block',
-                  textDecoration: 'none',
-                  background: colors.white,
-                  borderRadius: borderRadius.xl,
-                  padding: spacing['2xl'],
-                  border: `2px solid ${colors.gray200}`,
-                  transition: transitions.normal,
-                  boxShadow: shadows.sm,
-                  width: '100%',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-5px)';
-                  e.currentTarget.style.boxShadow = shadows.lg;
-                  e.currentTarget.style.borderColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = shadows.sm;
-                  e.currentTarget.style.borderColor = colors.gray200;
-                }}
-              >
-                <div style={{ 
-                  fontSize: typography.fontSize['3xl'], 
-                  marginBottom: spacing.md,
-                  textAlign: 'center'
-                }}>⭐</div>
-                <h3 style={{ 
-                  color: colors.primary, 
-                  marginTop: 0,
-                  marginBottom: spacing.sm,
-                  fontSize: typography.fontSize.xl,
-                  fontWeight: typography.fontWeight.bold,
-                  textAlign: 'center'
-                }}>Loyalty Partners</h3>
-                <p style={{ 
-                  color: colors.gray500, 
-                  margin: 0,
-                  fontSize: typography.fontSize.sm,
-                  textAlign: 'center',
-                  lineHeight: typography.lineHeight.relaxed
-                }}>Manage loyalty partner applications and partnerships</p>
-              </button>
-            </div>
-          </div>
-        </div>
+    <DashboardLayout menuItems={menuItems} activeTab={activeTab} setActiveTab={setActiveTab}>
+      <div className="p-6">
+        {renderContent()}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

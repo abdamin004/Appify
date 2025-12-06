@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import DashboardLayout from "../Layout/DashboardLayout";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
-import Navbar from "../Navbar";
 import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import { getFavouriteIds } from "../../services/favoritesService";
 import { showToast, confirmDialog } from "../../utils/toast";
-import userService from "../../services/userService";
 import {
   getTaNotifications,
   createTaNotification,
@@ -27,14 +27,14 @@ import {
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
-import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 import WalletBadge from "../Wallet/WalletBadge";
 
 function TADashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("browse");
+  const [activeTab, setActiveTab] = useState("home");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -472,33 +472,6 @@ function TADashboard() {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "TBA";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const formatTime = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const isUpcoming = (event) => {
-    if (!event.startDate) return false;
-    return new Date(event.startDate) > new Date();
-  };
-
-  // Removed filteredEvents - using activeTab instead
-
   const fetchFavourites = async () => {
     try {
       const ids = getFavouriteIds().map(String);
@@ -549,613 +522,299 @@ function TADashboard() {
     }
   };
 
-  const EventCard = ({ event }) => {
-    const upcoming = isUpcoming(event);
-
-    return (
-      <div
-        style={{
-          background: colors.white,
-          borderRadius: borderRadius.xl,
-          padding: spacing['3xl'],
-          boxShadow: shadows.md,
-          transition: transitions.normal,
-          cursor: "pointer",
-          border: upcoming ? `2px solid ${colors.accent}` : `2px solid ${colors.gray200}`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = shadows.lg;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = shadows.md;
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: spacing.lg }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={{
-              fontSize: typography.fontSize.xl,
-              fontWeight: typography.fontWeight.bold,
-              color: colors.primary,
-              marginBottom: spacing.sm
-            }}>
-              {event.title}
-            </h3>
-            <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap" }}>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: `${spacing.xs} ${spacing.lg}`,
-                  background: upcoming ? colors.successLight : colors.gray100,
-                  color: upcoming ? colors.success : colors.gray500,
-                  borderRadius: borderRadius.md,
-                  fontSize: typography.fontSize.xs,
-                  fontWeight: typography.fontWeight.semibold,
-                }}
-              >
-                {upcoming ? "UPCOMING" : "PAST"}
-              </span>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: `${spacing.xs} ${spacing.lg}`,
-                  background: 'rgba(212, 175, 55, 0.15)',
-                  color: colors.accent,
-                  borderRadius: borderRadius.md,
-                  fontSize: typography.fontSize.xs,
-                  fontWeight: typography.fontWeight.semibold,
-                }}
-              >
-                {event.type || "Event"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <p style={{
-          color: colors.gray500,
-          fontSize: typography.fontSize.sm,
-          marginBottom: spacing.xl,
-          lineHeight: typography.lineHeight.relaxed
-        }}>
-          {event.shortDescription || event.description?.substring(0, 120) + "..."}
-        </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: spacing.md, marginBottom: spacing.lg }}>
-          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
-            <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>📅</span>
-            <span style={{ fontWeight: typography.fontWeight.medium }}>{formatDate(event.startDate)}</span>
-          </div>
-
-          {event.startDate && (
-            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
-              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>🕐</span>
-              <span style={{ fontWeight: typography.fontWeight.medium }}>{formatTime(event.startDate)}</span>
-            </div>
-          )}
-
-          {event.location && (
-            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
-              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>📍</span>
-              <span style={{ fontWeight: typography.fontWeight.medium }}>{event.location}</span>
-            </div>
-          )}
-
-          {event.capacity && (
-            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, color: colors.gray700, fontSize: typography.fontSize.sm }}>
-              <span style={{ color: colors.accent, fontWeight: typography.fontWeight.bold }}>👥</span>
-              <span style={{ fontWeight: typography.fontWeight.medium }}>Capacity: {event.capacity}</span>
-            </div>
-          )}
-        </div>
-
-        <button
-          style={{
-            width: "100%",
-            padding: spacing.lg,
-            background: upcoming ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)` : colors.gray100,
-            color: upcoming ? colors.primary : colors.gray500,
-            border: "none",
-            borderRadius: borderRadius.lg,
-            fontSize: typography.fontSize.sm,
-            fontWeight: typography.fontWeight.semibold,
-            cursor: "pointer",
-            transition: transitions.normal,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: spacing.sm,
-          }}
-        >
-          View Details →
-        </button>
-      </div>
-    );
-  };
+  const menuItems = [
+    { label: "Home", icon: "🏠", onClick: () => setActiveTab("home") },
+    { label: "Browse Events", icon: "🎯", onClick: () => setActiveTab("browse") },
+    {
+      label: "Gym Sessions",
+      icon: "🏋️",
+      onClick: () => {
+        setActiveTab("gym-sessions");
+        setGymSessionsLoading(true);
+        fetchGymSessions();
+      }
+    },
+    { label: "My Events", icon: "✓", onClick: () => setActiveTab("registered") },
+    { label: "Favourites", icon: "❤️", onClick: () => setActiveTab("favourites") },
+    {
+      label: "Notifications",
+      icon: "🔔",
+      onClick: () => {
+        setActiveTab("notifications");
+        fetchNotifications();
+      }
+    },
+    {
+      label: "Reminders",
+      icon: "⏰",
+      onClick: () => {
+        setActiveTab("reminders");
+        fetchReminders();
+      }
+    },
+    { label: "Loyalty Partners", icon: "⭐", onClick: () => setActiveTab("loyalty") },
+    { label: "Vote for Vendors", icon: "📊", onClick: () => setActiveTab("polls") },
+  ];
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <Navbar />
+    <DashboardLayout menuItems={menuItems}>
+      {Boolean(bannerMsg) && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-emerald-500 text-white rounded-lg px-6 py-3 shadow-xl z-[9999] font-bold text-sm tracking-wide">
+          {bannerMsg}
+        </div>
+      )}
 
-      <div
-        style={{
-          paddingTop: "120px",
-          padding: "120px 40px 80px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        {Boolean(bannerMsg) && (
-          <div style={{
-            position: 'fixed',
-            top: 80,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: colors.success,
-            color: colors.white,
-            borderRadius: borderRadius.lg,
-            padding: `${spacing.md} ${spacing.lg}`,
-            boxShadow: shadows.xl,
-            zIndex: 9999,
-            fontWeight: typography.fontWeight.extrabold,
-            letterSpacing: 0.3,
-            fontSize: typography.fontSize.sm,
-          }}>
-            {bannerMsg}
-          </div>
-        )}
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header + Stats */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: `${spacing['3xl']} ${spacing['2xl']}`,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              flexDirection: "column",
-              gap: spacing.lg,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                flexWrap: "wrap",
-                gap: spacing.lg,
-              }}
-            >
-              <div>
-                <h1
-                  style={{
-                    fontSize: typography.fontSize['3xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
+      {activeTab === "home" && (
+        <div className="space-y-8">
+          <div className="bg-slate-100 p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+              {/* Left Side: Welcome Text */}
+              <div className="flex-1 min-w-[300px]">
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
                   Welcome back, {user.firstName}! 👋
                 </h1>
-                <p
-                  style={{
-                    fontSize: typography.fontSize.lg,
-                    color: colors.gray500,
-                    margin: 0,
-                  }}
-                >
-                  Discover and register for amazing events
+                <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
+                  Discover and register for amazing events happening on campus.
                 </p>
-                <div style={{ height: spacing.md }} />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.md,
-                  alignItems: "center",
-                  flexShrink: 0,
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: spacing.md,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      ...statCardBase,
-                      position: "relative",
-                    }}
-                  >
-                    <div style={statValueStyle}>
-                      {registeredEvents.length}
-                    </div>
-                    <div style={statLabelStyle}>
-                      Registered Events
-                    </div>
-                  </div>
 
-                  <div
-                    style={{
-                      ...statCardBase,
-                      position: "relative",
-                    }}
-                  >
-                    <div style={statValueStyle}>
-                      {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
-                    </div>
-                    <div style={statLabelStyle}>
-                      Notifications
-                    </div>
-                  </div>
+              {/* Right Side: Stats & Wallet */}
+              <div className="flex flex-col gap-4 items-end flex-shrink-0 w-full md:w-auto">
+                {/* Wallet Badge - Top Right */}
+                <div className="w-full md:w-auto flex justify-end">
+                  <WalletBadge
+                    balance={walletBalance}
+                    currency="EGP"
+                    onTopUp={() => setTopUpOpen(true)}
+                    className="w-full md:w-auto justify-between md:justify-start"
+                  />
                 </div>
 
-                <WalletBadge
-                  balance={walletBalance}
-                  currency="EGP"
-                  onTopUp={() => setTopUpOpen(true)}
-                  style={{ width: "auto" }}
-                />
+                {/* Stats Cards */}
+                <div className="flex gap-3 flex-wrap justify-end w-full md:w-auto">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300">
+                    <div className="text-2xl font-bold text-slate-900 mb-1">{registeredEvents.length}</div>
+                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Registered</div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300">
+                    <div className="text-2xl font-bold text-slate-900 mb-1">
+                      {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
+                    </div>
+                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Notifications</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          {(() => {
-            const tabButtons = [
-              { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
-              {
-                key: "gym-sessions",
-                label: "🏋️ Gym Sessions",
-                onClick: () => {
-                  setActiveTab("gym-sessions");
-                  setGymSessionsLoading(true);
-                  fetchGymSessions();
-                },
-              },
-              { key: "registered", label: "✓ My Registered Events", onClick: () => setActiveTab("registered") },
-              { key: "favourites", label: "❤️ Favourites", onClick: () => setActiveTab("favourites") },
-              {
-                key: "notifications",
-                label: "🔔 Notifications",
-                onClick: () => {
-                  setActiveTab("notifications");
-                  fetchNotifications();
-                },
-                badgeCount: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length,
-              },
-              {
-                key: "reminders",
-                label: "⏰ Reminders",
-                onClick: () => {
-                  setActiveTab("reminders");
-                  fetchReminders();
-                },
-                badgeCount: reminders.filter(n => !n.isRead).length,
-              },
-              { key: "loyalty", label: "⭐ Loyalty Partners", onClick: () => setActiveTab("loyalty") },
-              { key: "polls", label: "📊 Vote for Vendors", onClick: () => setActiveTab("polls") },
-            ];
-
-            const firstRowCount = Math.ceil(tabButtons.length / 2);
-            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
-
-            const renderTabButton = (tab) => {
-              const isActive = activeTab === tab.key;
-              const style = getTabButtonStyle(isActive, tab.variant);
-              return (
-                <button key={tab.key} onClick={tab.onClick} style={style}>
-                  {tab.label}
-                  {tab.badgeCount > 0 && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: spacing.sm,
-                        right: spacing.sm,
-                        background: colors.error,
-                        color: colors.white,
-                        borderRadius: borderRadius.full,
-                        width: "20px",
-                        height: "20px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: typography.fontSize.xs,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      {tab.badgeCount}
-                    </span>
-                  )}
+          {/* Bottom Section: Quick Access & Chatbot */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Quick Access */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span>⚡</span> Quick Access
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setActiveTab('browse')}
+                  className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🎯</div>
+                  <div className="font-bold text-slate-700 group-hover:text-emerald-700">Browse Events</div>
+                  <div className="text-xs text-slate-500">Find new activities</div>
                 </button>
-              );
-            };
-
-            return (
-              <div
-                style={{
-                  background: colors.bgCard,
-                  padding: spacing.md,
-                  borderRadius: borderRadius['2xl'],
-                  boxShadow: shadows.lg,
-                  marginBottom: spacing['2xl'],
-                  border: `1px solid ${colors.gray200}`,
-                }}
-              >
-                {tabRows.map((row, idx) => (
-                  <div key={idx} style={tabRowStyle}>
-                    {row.map(renderTabButton)}
-                  </div>
-                ))}
+                <button
+                  onClick={() => { setActiveTab('gym-sessions'); fetchGymSessions(); }}
+                  className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🏋️</div>
+                  <div className="font-bold text-slate-700 group-hover:text-amber-700">Gym Sessions</div>
+                  <div className="text-xs text-slate-500">View schedule</div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('registered')}
+                  className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">✓</div>
+                  <div className="font-bold text-slate-700 group-hover:text-blue-700">My Registered</div>
+                  <div className="text-xs text-slate-500">Check your events</div>
+                </button>
+                <button
+                  onClick={() => setTopUpOpen(true)}
+                  className="p-4 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">💳</div>
+                  <div className="font-bold text-slate-700 group-hover:text-purple-700">Top Up Wallet</div>
+                  <div className="text-xs text-slate-500">Add funds</div>
+                </button>
               </div>
-            );
-          })()}
+            </div>
 
-          {/* Content */}
-          {activeTab === "browse" && <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />}
-          {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
-          {activeTab === "registered" && (
-            loading ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                  background: colors.bgCard,
-                  borderRadius: borderRadius.xl,
-                  boxShadow: shadows.md,
-                }}
-              >
-                <div style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  fontWeight: typography.fontWeight.medium
-                }}>
+            {/* Chatbot Placeholder */}
+            <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center min-h-[200px] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-3xl mb-4 mx-auto">
+                  🤖
+                </div>
+                <h3 className="text-lg font-bold text-slate-700 mb-1">AI Assistant</h3>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                  Coming soon! A smart chatbot to help you navigate events and answer your questions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6">
+        {activeTab === "browse" && (
+          <div className="space-y-6">
+            <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />
+          </div>
+        )}
+
+        {activeTab === "favourites" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">My Favourites</h2>
+              <p className="text-slate-500">Events you've saved for later</p>
+            </div>
+            <MyEventsList events={favouriteEvents} />
+          </div>
+        )}
+
+        {activeTab === "registered" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
+              <p className="text-slate-500">Manage your upcoming activities</p>
+            </div>
+            {loading ? (
+              <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200">
+                <div className="text-lg text-slate-500 font-medium">
                   Loading your registered events...
                 </div>
               </div>
             ) : (
               <MyEventsList events={registeredEvents} showRefundButton onRefresh={fetchRegisteredEvents} />
-            )
-          )}
+            )}
+          </div>
+        )}
 
-          {activeTab === "reminders" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold
-                }}>
-                  Event Reminders
-                </h2>
-                {reminders.filter(n => !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markReminderRead(reminder.id);
-                      });
-                      fetchReminders();
-                    }}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.md} ${spacing.lg}`,
-                      fontSize: typography.fontSize.sm
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
-              </div>
-              {reminders.length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {reminders.map((reminder) => (
-                    <div
-                      key={reminder.id}
-                      style={{
-                        padding: spacing.xl,
-                        background: reminder.isRead ? colors.gray50 : colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: reminder.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.warning}`,
-                        position: "relative",
-                        boxShadow: reminder.isRead ? shadows.sm : shadows.md,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                            <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                            <h3 style={{
-                              color: colors.primary,
-                              margin: 0,
-                              fontSize: typography.fontSize.lg,
-                              fontWeight: reminder.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
-                            }}>
-                              Event Reminder
-                            </h3>
-                            {!reminder.isRead && (
-                              <span style={{
-                                background: colors.error,
-                                color: colors.white,
-                                borderRadius: borderRadius.full,
-                                width: "10px",
-                                height: "10px",
-                                display: "inline-block",
-                              }} />
-                            )}
-                          </div>
-                          <p style={{
-                            color: colors.gray500,
-                            margin: `${spacing.sm} 0`,
-                            fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                            fontSize: typography.fontSize.base
-                          }}>
-                            {reminder.message}
-                          </p>
-                          {reminder.eventStartDate && (
-                            <p style={{
-                              color: colors.gray400,
-                              fontSize: typography.fontSize.sm,
-                              margin: `${spacing.xs} 0`,
-                            }}>
-                              Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
-                            </p>
-                          )}
-                          {reminder.eventId && (
-                            <button
-                              onClick={() => {
-                                window.location.href = `/events/${reminder.eventId}`;
-                              }}
-                              style={{
-                                marginTop: spacing.md,
-                                ...buttonStyles.primary,
-                                padding: `${spacing.sm} ${spacing.lg}`,
-                                fontSize: typography.fontSize.sm
-                              }}
-                            >
-                              View Event
-                            </button>
-                          )}
-                          <p style={{
-                            color: colors.gray400,
-                            fontSize: typography.fontSize.sm,
-                            margin: `${spacing.sm} 0 0 0`,
-                          }}>
-                            {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                          {!reminder.isRead && (
-                            <button
-                              onClick={() => {
-                                markReminderRead(reminder.id);
-                                fetchReminders();
-                              }}
-                              style={{
-                                padding: `${spacing.sm} ${spacing.lg}`,
-                                background: colors.success,
-                                color: colors.white,
-                                border: "none",
-                                borderRadius: borderRadius.md,
-                                fontSize: typography.fontSize.sm,
-                                fontWeight: typography.fontWeight.semibold,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Mark Read
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              deleteReminder(reminder.id);
-                              fetchReminders();
-                            }}
-                            style={{
-                              padding: `${spacing.xs} ${spacing.md}`,
-                              background: colors.error,
-                              color: colors.white,
-                              border: 'none',
-                              borderRadius: borderRadius.lg,
-                              fontSize: typography.fontSize.sm,
-                              fontWeight: typography.fontWeight.semibold,
-                              cursor: 'pointer',
-                              transition: transitions.fast,
-                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.transform = 'translateY(-1px)';
-                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                              e.target.style.background = '#b91c1c';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.transform = 'translateY(0)';
-                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                              e.target.style.background = colors.error;
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {activeTab === "reminders" && (
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800 m-0">Event Reminders</h2>
+              {reminders.filter(n => !n.isRead).length > 0 && (
+                <button
+                  onClick={() => {
+                    reminders.filter(n => !n.isRead).forEach(reminder => {
+                      markReminderRead(reminder.id);
+                    });
+                    fetchReminders();
+                  }}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                >
+                  Mark All as Read
+                </button>
               )}
             </div>
-          )}
+            {reminders.length === 0 ? (
+              <p className="text-slate-500 text-base">No reminders at this time.</p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {reminders.map((reminder) => (
+                  <div
+                    key={reminder.id}
+                    className={`p-6 rounded-xl border relative shadow-sm ${reminder.isRead
+                      ? 'bg-slate-50 border-slate-200'
+                      : 'bg-white border-amber-500 border-2 shadow-md'
+                      }`}
+                  >
+                    <div className="flex justify-between items-start gap-6">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl">⏰</span>
+                          <h3 className={`text-lg m-0 ${reminder.isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                            Event Reminder
+                          </h3>
+                          {!reminder.isRead && (
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                          )}
+                        </div>
+                        <p className={`my-2 text-base ${reminder.isRead ? 'font-normal text-slate-500' : 'font-medium text-slate-600'}`}>
+                          {reminder.message}
+                        </p>
+                        {reminder.eventStartDate && (
+                          <p className="text-slate-400 text-sm my-1">
+                            Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
+                          </p>
+                        )}
+                        {reminder.eventId && (
+                          <button
+                            onClick={() => window.location.href = `/events/${reminder.eventId}`}
+                            className="mt-4 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            View Event
+                          </button>
+                        )}
+                        <p className="text-slate-400 text-sm mt-2 m-0">
+                          {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {!reminder.isRead && (
+                          <button
+                            onClick={() => {
+                              markReminderRead(reminder.id);
+                              fetchReminders();
+                            }}
+                            className="bg-emerald-500 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-600 transition-colors cursor-pointer border-none"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            deleteReminder(reminder.id);
+                            fetchReminders();
+                          }}
+                          className="bg-red-500 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-red-600 transition-colors cursor-pointer border-none"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-          {activeTab === 'gym-sessions' && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <h2 style={{
-                color: colors.primary,
-                marginBottom: spacing.xl,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-              }}>
-                Gym Sessions
-              </h2>
+        {activeTab === 'gym-sessions' && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
+              <p className="text-slate-500">View schedule and register for sessions</p>
+            </div>
+            <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
               {gymSessionsLoading ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>Loading sessions...</p>
+                <div className="text-center py-20">
+                  <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                  <p className="text-slate-500 text-base">Loading sessions...</p>
                 </div>
               ) : gymSessionsError ? (
-                <div style={{
-                  color: colors.error,
-                  background: colors.errorLight,
-                  padding: spacing.lg,
-                  borderRadius: borderRadius.xl,
-                  marginBottom: spacing.lg,
-                }}>{gymSessionsError}</div>
+                <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 flex items-center gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <span className="font-medium">{gymSessionsError}</span>
+                </div>
               ) : (!gymSessions || gymSessions.length === 0) ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>No gym sessions scheduled</p>
+                <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-6xl mb-6 opacity-50">🏋️</div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">No Sessions Found</h3>
+                  <p className="text-slate-500">There are no gym sessions scheduled at the moment.</p>
                 </div>
               ) : (() => {
                 const typeMap = {
@@ -1202,7 +861,7 @@ function TADashboard() {
                 };
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing['2xl'] }}>
+                  <div className="flex flex-col gap-8">
                     {monthKeys.map((month) => {
                       const items = byMonth[month] || [];
                       const byType = items.reduce((acc, s) => {
@@ -1213,123 +872,77 @@ function TADashboard() {
                       const typeKeys = Object.keys(byType).sort();
                       return (
                         <div key={month}>
-                          <div style={{
-                            background: colors.bgCard,
-                            padding: `${spacing.lg} ${spacing.xl}`,
-                            borderRadius: borderRadius.xl,
-                            boxShadow: shadows.md,
-                            border: `1px solid ${colors.gray200}`,
-                          }}>
-                            <h3 style={{
-                              margin: 0,
-                              color: colors.primary,
-                              fontSize: typography.fontSize.xl,
-                              fontWeight: typography.fontWeight.bold,
-                            }}>{month}</h3>
-                            <div style={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                              gap: spacing.lg,
-                              marginTop: spacing.lg
-                            }}>
-                              {typeKeys.map((tk) => (
-                                <div key={tk} style={{
-                                  background: colors.white,
-                                  border: `1px solid ${colors.gray200}`,
-                                  borderRadius: borderRadius.xl,
-                                  padding: spacing.lg
-                                }}>
-                                  <div style={{
-                                    fontWeight: typography.fontWeight.extrabold,
-                                    color: colors.primary,
-                                    marginBottom: spacing.sm,
-                                    fontSize: typography.fontSize.base,
-                                  }}>{tk}</div>
-                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: colors.gray700 }}>
-                                    {byType[tk]
-                                      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-                                      .map((s) => {
-                                        const id = s._id || s.id;
-                                        const started = isStarted(s);
-                                        const full = isFull(s);
-                                        const mine = alreadyRegistered(s);
-                                        const disabled = started || full || mine || gymBusyId === id;
-                                        const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (gymBusyId === id ? 'Registering...' : 'Register');
-                                        const fmtDateTime = (date) => {
-                                          if (!date) return 'TBA';
-                                          const d = new Date(date);
-                                          return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                          <div className="flex items-center gap-4 mb-6">
+                            <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">{month}</h3>
+                            <div className="h-px bg-slate-200 flex-1"></div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {typeKeys.map((tk) => (
+                              <div key={tk} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
+                                <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
+                                  <div className="font-bold text-slate-900 text-lg">{tk}</div>
+                                  <div className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">
+                                    {byType[tk].length} Session{byType[tk].length !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                                <ul className="divide-y divide-slate-100">
+                                  {byType[tk]
+                                    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                                    .map((s) => {
+                                      const id = s._id || s.id;
+                                      const started = isStarted(s);
+                                      const full = isFull(s);
+                                      const mine = alreadyRegistered(s);
+                                      const disabled = started || full || mine || gymBusyId === id;
+                                      const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (gymBusyId === id ? '...' : 'Register');
+                                      const fmtDateTime = (date) => {
+                                        if (!date) return 'TBA';
+                                        const d = new Date(date);
+                                        return {
+                                          date: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+                                          time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                         };
-                                        return (
-                                          <li key={id} style={{
-                                            padding: `${spacing.sm} 0`,
-                                            borderTop: `1px solid ${colors.gray100}`
-                                          }}>
-                                            <div style={{
-                                              display: 'flex',
-                                              justifyContent: 'space-between',
-                                              alignItems: 'center',
-                                              gap: spacing.lg
-                                            }}>
-                                              <div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.sm,
-                                                  fontWeight: typography.fontWeight.medium,
-                                                  color: colors.gray700,
-                                                }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.xs,
-                                                  color: colors.gray500,
-                                                  marginTop: spacing.xs,
-                                                }}>
-                                                  Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
-                                                </div>
+                                      };
+                                      const dt = fmtDateTime(s.startDate);
+                                      return (
+                                        <li key={id} className="p-4 hover:bg-slate-50 transition-colors">
+                                          <div className="flex justify-between items-center gap-4">
+                                            <div>
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-bold text-slate-700 text-sm bg-slate-100 px-2 py-0.5 rounded">{dt.date}</span>
+                                                <span className="text-sm font-medium text-slate-600">{dt.time}</span>
                                               </div>
-                                              <div>
-                                                <button
-                                                  disabled={disabled}
-                                                  onClick={() => !disabled && handleGymRegister(id)}
-                                                  style={{
-                                                    ...(disabled ? {} : buttonStyles.primary),
-                                                    padding: `${spacing.sm} ${spacing.lg}`,
-                                                    background: disabled ? colors.gray200 : undefined,
-                                                    color: disabled ? colors.gray500 : colors.primary,
-                                                    border: 'none',
-                                                    borderRadius: borderRadius.lg,
-                                                    fontWeight: typography.fontWeight.bold,
-                                                    fontSize: typography.fontSize.sm,
-                                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                                    opacity: disabled ? 0.7 : 1,
-                                                  }}
-                                                  onMouseEnter={(e) => {
-                                                    if (!disabled) {
-                                                      e.target.style.boxShadow = shadows.accentHover;
-                                                    }
-                                                  }}
-                                                  onMouseLeave={(e) => {
-                                                    if (!disabled) {
-                                                      e.target.style.boxShadow = shadows.accent;
-                                                    }
-                                                  }}
-                                                >{label}</button>
+                                              <div className="text-xs text-slate-500 flex items-center gap-1">
+                                                <span>👤 {s.instructor || "TBA"}</span>
+                                                {s.capacity && <span>• 👥 {s.capacity} cap</span>}
                                               </div>
                                             </div>
-                                            {gymStatus[id] && gymStatus[id].msg && (
-                                              <div style={{
-                                                marginTop: spacing.sm,
-                                                fontSize: typography.fontSize.xs,
-                                                color: gymStatus[id].ok ? colors.success : colors.error
-                                              }}>
-                                                {gymStatus[id].msg}
-                                              </div>
-                                            )}
-                                          </li>
-                                        );
-                                      })}
-                                  </ul>
-                                </div>
-                              ))}
-                            </div>
+                                            <div>
+                                              <button
+                                                disabled={disabled}
+                                                onClick={() => !disabled && handleGymRegister(id)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${disabled
+                                                  ? mine
+                                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                                  : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-md hover:-translate-y-0.5'
+                                                  }`}
+                                              >
+                                                {label}
+                                              </button>
+                                            </div>
+                                          </div>
+                                          {gymStatus[id] && gymStatus[id].msg && (
+                                            <div className={`mt-2 text-xs font-medium px-2 py-1 rounded ${gymStatus[id].ok ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                              {gymStatus[id].msg}
+                                            </div>
+                                          )}
+                                        </li>
+                                      );
+                                    })}
+                                </ul>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       );
@@ -1338,260 +951,143 @@ function TADashboard() {
                 );
               })()}
             </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === 'notifications' && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold
-                }}>
-                  Notifications
-                </h2>
-                <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                    <button
-                      onClick={() => {
-                        markAllTaNotificationsRead();
+        {activeTab === 'notifications' && (
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800 m-0">Notifications</h2>
+              <div className="flex gap-4">
+                {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
+                  <button
+                    onClick={() => {
+                      markAllTaNotificationsRead();
+                      fetchNotifications();
+                      showToast.success('All notifications marked as read');
+                    }}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+                {notifications.filter(n => n.type !== 'EventReminder').length > 0 && (
+                  <button
+                    onClick={async () => {
+                      const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                      if (confirmed) {
+                        deleteAllTaNotifications();
                         fetchNotifications();
-                        showToast.success('All notifications marked as read');
-                      }}
-                      style={{
-                        ...buttonStyles.primary,
-                        padding: `${spacing.md} ${spacing.lg}`,
-                        fontSize: typography.fontSize.sm
-                      }}
-                    >
-                      Mark All as Read
-                    </button>
-                  )}
-                  {notifications.filter(n => n.type !== 'EventReminder').length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                        if (confirmed) {
-                          deleteAllTaNotifications();
-                          fetchNotifications();
-                          showToast.success('All notifications deleted');
-                        }
-                      }}
-                      style={{
-                        padding: `${spacing.md} ${spacing.lg}`,
-                        background: colors.error,
-                        color: colors.white,
-                        border: 'none',
-                        borderRadius: borderRadius.lg,
-                        fontSize: typography.fontSize.sm,
-                        fontWeight: typography.fontWeight.semibold,
-                        cursor: 'pointer',
-                        transition: transitions.fast,
-                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-1px)';
-                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                        e.target.style.background = '#b91c1c';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                        e.target.style.background = colors.error;
-                      }}
-                    >
-                      Delete All
-                    </button>
-                  )}
-                </div>
+                        showToast.success('All notifications deleted');
+                      }
+                    }}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm"
+                  >
+                    Delete All
+                  </button>
+                )}
               </div>
-              {notifications.filter(n => n.type !== 'EventReminder').length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {notifications.filter(n => n.type !== 'EventReminder').map((notif) => {
-                    const isRead = notif.read || notif.isRead;
+            </div>
+            {notifications.filter(n => n.type !== 'EventReminder').length === 0 ? (
+              <p className="text-slate-500 text-base">No notifications at this time.</p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {notifications.filter(n => n.type !== 'EventReminder').map((notif) => {
+                  const isRead = notif.read || notif.isRead;
 
-                    return (
-                      <div
-                        key={notif.id || notif._id}
-                        style={{
-                          padding: spacing.xl,
-                          background: isRead ? colors.gray50 : colors.white,
-                          borderRadius: borderRadius.xl,
-                          border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
-                          position: "relative",
-                          boxShadow: isRead ? shadows.sm : shadows.md,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                              {notif.type === 'NewEvent' && (
-                                <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
-                              )}
-                              {notif.type === 'LoyaltyPartnerAdded' && (
-                                <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
-                              )}
-                              <h3 style={{
-                                color: colors.primary,
-                                margin: 0,
-                                fontSize: typography.fontSize.lg,
-                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
-                              }}>
-                                {notif.type === 'NewEvent' ? 'New Event Available' :
-                                  notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
-                                    'Notification'}
-                              </h3>
-                              {!isRead && (
-                                <span style={{
-                                  background: colors.error,
-                                  color: colors.white,
-                                  borderRadius: borderRadius.full,
-                                  width: "10px",
-                                  height: "10px",
-                                  display: "inline-block",
-                                }} />
-                              )}
-                            </div>
-                            <p style={{
-                              color: colors.gray500,
-                              margin: `${spacing.sm} 0`,
-                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                              fontSize: typography.fontSize.base
-                            }}>
-                              {notif.message}
-                            </p>
-                            {notif.eventId && (
-                              <button
-                                onClick={() => {
-                                  window.location.href = `/events/${notif.eventId}`;
-                                }}
-                                style={{
-                                  marginTop: spacing.md,
-                                  ...buttonStyles.primary,
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  fontSize: typography.fontSize.sm
-                                }}
-                              >
-                                View Event
-                              </button>
+                  return (
+                    <div
+                      key={notif.id || notif._id}
+                      className={`p-6 rounded-xl border relative shadow-sm ${isRead
+                        ? 'bg-slate-50 border-slate-200'
+                        : 'bg-white border-emerald-500 border-2 shadow-md'
+                        }`}
+                    >
+                      <div className="flex justify-between items-start gap-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {notif.type === 'NewEvent' && (
+                              <span className="text-2xl">🎉</span>
                             )}
-                            <p style={{
-                              color: colors.gray400,
-                              fontSize: typography.fontSize.sm,
-                              margin: `${spacing.sm} 0 0 0`,
-                            }}>
-                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                            </p>
-                          </div>
-                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
+                            {notif.type === 'LoyaltyPartnerAdded' && (
+                              <span className="text-2xl">⭐</span>
+                            )}
+                            <h3 className={`text-lg m-0 ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                              {notif.type === 'NewEvent' ? 'New Event Available' :
+                                notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
+                                  'Notification'}
+                            </h3>
                             {!isRead && (
-                              <button
-                                onClick={() => {
-                                  markTaNotificationRead(notif.id);
-                                  fetchNotifications();
-                                }}
-                                style={{
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  background: colors.success,
-                                  color: colors.white,
-                                  border: "none",
-                                  borderRadius: borderRadius.md,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Mark Read
-                              </button>
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
                             )}
+                          </div>
+                          <p className={`my-2 text-base ${isRead ? 'font-normal text-slate-500' : 'font-medium text-slate-600'}`}>
+                            {notif.message}
+                          </p>
+                          {notif.eventId && (
+                            <button
+                              onClick={() => window.location.href = `/events/${notif.eventId}`}
+                              className="mt-4 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                            >
+                              View Event
+                            </button>
+                          )}
+                          <p className="text-slate-400 text-sm mt-2 m-0">
+                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          {!isRead && (
                             <button
                               onClick={() => {
-                                deleteTaNotification(notif.id);
+                                markTaNotificationRead(notif.id);
                                 fetchNotifications();
-                                showToast.success('Notification deleted');
                               }}
-                              style={{
-                                padding: `${spacing.xs} ${spacing.md}`,
-                                background: colors.error,
-                                color: colors.white,
-                                border: 'none',
-                                borderRadius: borderRadius.lg,
-                                fontSize: typography.fontSize.sm,
-                                fontWeight: typography.fontWeight.semibold,
-                                cursor: 'pointer',
-                                transition: transitions.fast,
-                                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.transform = 'translateY(-1px)';
-                                e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                                e.target.style.background = '#b91c1c';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.transform = 'translateY(0)';
-                                e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                                e.target.style.background = colors.error;
-                              }}
+                              className="bg-emerald-500 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-emerald-600 transition-colors cursor-pointer border-none"
                             >
-                              🗑️ Delete
+                              Mark Read
                             </button>
-                          </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              deleteTaNotification(notif.id);
+                              fetchNotifications();
+                              showToast.success('Notification deleted');
+                            }}
+                            className="bg-red-500 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-red-600 transition-colors cursor-pointer border-none"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-          {activeTab === "loyalty" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <LoyaltyPartnersList />
-            </div>
-          )}
+        {activeTab === "loyalty" && (
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <LoyaltyPartnersList />
+          </div>
+        )}
 
-          {activeTab === "polls" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <StudentPollVoting />
-            </div>
-          )}
-        </div>
+        {activeTab === "polls" && (
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <StudentPollVoting />
+          </div>
+        )}
       </div>
+
       {topUpOpen && (
         <TopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onSuccess={(res) => {
           const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
           if (typeof next === 'number') setWalletBalance(next);
         }} />
       )}
-    </div>
+    </DashboardLayout>
   );
 }
 

@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import '../../Form.css';
-import '../../managerForm.css';
 import { createTrip, listTrips, updateEvent, getEventById } from '../../../services/eventService';
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles, transitions } from '../../../utils/designSystem';
+import Input from '../../UI/Input';
+import Button from '../../UI/Button';
+import FormLayout from '../../UI/FormLayout';
 
 function TripsManager({ editOnly = false }) {
   const navigate = useNavigate();
@@ -35,22 +35,22 @@ function TripsManager({ editOnly = false }) {
       const url = new URL(window.location.href);
       url.searchParams.delete('edit');
       window.history.replaceState({}, '', url.toString());
-    } catch (_) {}
+    } catch (_) { }
   };
 
-  async function refresh() { 
+  async function refresh() {
     if (!editOnly) {
       try {
-        const rows = await listTrips(); 
-        setTrips(Array.isArray(rows) ? rows : []); 
+        const rows = await listTrips();
+        setTrips(Array.isArray(rows) ? rows : []);
       } catch (err) {
         console.error('Error refreshing trips:', err);
         setTrips([]);
       }
     }
   }
-  useEffect(() => { 
-    refresh(); 
+  useEffect(() => {
+    refresh();
   }, [editOnly]);
 
   // Load event for editing when in edit-only mode
@@ -71,9 +71,9 @@ function TripsManager({ editOnly = false }) {
           location: trip.location || '',
           price: trip.price || 0,
           capacity: trip.capacity || 0,
-          startDate: trip.startDate ? trip.startDate.slice(0,16) : '',
-          endDate: trip.endDate ? trip.endDate.slice(0,16) : '',
-          registrationDeadline: trip.registrationDeadline ? trip.registrationDeadline.slice(0,16) : '',
+          startDate: trip.startDate ? trip.startDate.slice(0, 16) : '',
+          endDate: trip.endDate ? trip.endDate.slice(0, 16) : '',
+          registrationDeadline: trip.registrationDeadline ? trip.registrationDeadline.slice(0, 16) : '',
           status: trip.status || 'published'
         });
         setAllowedRoles(Array.isArray(trip.allowedRoles) ? trip.allowedRoles : []);
@@ -115,48 +115,48 @@ function TripsManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { 
-        ...form, 
-        price: Number(form.price || 0), 
+      const payload = {
+        ...form,
+        price: Number(form.price || 0),
         capacity: Number(form.capacity || 0),
         allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
       };
       const createdTrip = await createTrip(payload);
       showToast.success('Trip created successfully');
-      
+
       // Save user restrictions if any
       const tripEvent = createdTrip?.event || createdTrip;
-      
+
       setForm({ title: '', shortDescription: '', location: '', price: '', capacity: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
       setAllowedRoles([]);
-      
+
       // Create notifications for all users if event is published
       if (tripEvent && (tripEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
         notifyAllUsersAboutNewEvent(tripEvent);
       }
-      
+
       await refresh();
       // Redirect to Event Office dashboard
       navigate('/EventOfficeDashboard');
     } catch (err) {
       showToast.error(err.message || 'Failed to create trip');
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
-  const startEdit = (row) => { 
-    setEditing(row._id); 
+  const startEdit = (row) => {
+    setEditing(row._id);
     setEditData({
-      title: row.title || '', 
-      shortDescription: row.shortDescription || '', 
-      location: row.location || '', 
-      price: row.price || 0, 
+      title: row.title || '',
+      shortDescription: row.shortDescription || '',
+      location: row.location || '',
+      price: row.price || 0,
       capacity: row.capacity || 0,
-      startDate: row.startDate ? row.startDate.slice(0,16) : '', 
-      endDate: row.endDate ? row.endDate.slice(0,16) : '',
-      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', 
+      startDate: row.startDate ? row.startDate.slice(0, 16) : '',
+      endDate: row.endDate ? row.endDate.slice(0, 16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0, 16) : '',
       status: row.status || 'published'
     });
     setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
@@ -164,463 +164,275 @@ function TripsManager({ editOnly = false }) {
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { 
-        ...editData, 
-        price: Number(editData.price || 0), 
+      const payload = {
+        ...editData,
+        price: Number(editData.price || 0),
         capacity: Number(editData.capacity || 0),
         allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
       };
       await updateEvent(id, payload);
       showToast.success('Trip updated successfully');
-      setEditing(null); 
+      setEditing(null);
       setEditData({});
       setAllowedRoles([]);
       clearEditParam();
       // Redirect to EventOfficeDashboard after saving
       navigate('/EventOfficeDashboard');
-    } catch (err) { 
+    } catch (err) {
       showToast.error(err.message || 'Failed to update trip');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: colors.bgPrimary,
-      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
-    }}>
-      <div style={{
-        maxWidth: 1100,
-        margin: '0 auto',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
-        borderRadius: borderRadius['2xl'],
-        padding: spacing['3xl'],
-        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
-        border: `1px solid rgba(0,51,102,0.1)`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: spacing.md }}>
-          <button
-            onClick={() => navigate('/EventOfficeDashboard')}
-            style={{
-              ...buttonStyles.back,
-              background: colors.bgCard,
-              color: colors.primary,
-              borderColor: colors.primary
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = colors.accent;
-              e.target.style.color = colors.primary;
-              e.target.style.borderColor = colors.accent;
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = colors.bgCard;
-              e.target.style.color = colors.primary;
-              e.target.style.borderColor = colors.primary;
-            }}
-          >
-            ← Back
-          </button>
-        </div>
-        <h1 style={{
-          margin: 0,
-          color: colors.primary,
-          fontWeight: typography.fontWeight.extrabold,
-          fontSize: typography.fontSize['2xl'],
-          textAlign: 'center',
-          marginBottom: spacing['2xl']
-        }}>{editOnly ? 'Edit Trip' : 'Events Office — Trips'}</h1>
+  if (editing || (editOnly && editId)) {
+    return (
+      <FormLayout
+        title="Edit Trip"
+        subtitle="Update trip details"
+        backLink="/EventOfficeDashboard"
+      >
+        <div className="space-y-6">
+          <Input
+            label="Title *"
+            value={editData.title}
+            onChange={e => setEditData({ ...editData, title: e.target.value })}
+            required
+          />
 
-        {!editOnly && (
-          <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
-              marginTop: spacing.xl,
-              marginBottom: spacing.lg,
-            }}>Create Trip</h2>
-            {!editing && (
-          <form className="form managerForm" onSubmit={onCreate}>
-          <label>
-            <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
-            <span>Title</span>
-          </label>
-          <label>
-            <input className="input" value={form.shortDescription} onChange={e=>setForm({ ...form, shortDescription: e.target.value })} />
-            <span>Short Description</span>
-          </label>
-          {/* Row 1: Start / End */}
-          <div className="flex grid-2">
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e=>setForm({ ...form, startDate: e.target.value })} />
-              <span>Start Date/Time</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e=>setForm({ ...form, endDate: e.target.value })} />
-              <span>End Date/Time</span>
-            </label>
+          <Input
+            label="Short Description"
+            value={editData.shortDescription}
+            onChange={e => setEditData({ ...editData, shortDescription: e.target.value })}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Start Date/Time *"
+              type="datetime-local"
+              value={editData.startDate}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              required
+            />
+            <Input
+              label="End Date/Time *"
+              type="datetime-local"
+              value={editData.endDate}
+              onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              required
+            />
           </div>
-          {/* Row 2: Location / Deadline */}
-          <div className="flex grid-2">
-            <label>
-              <input className="input" required value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })} />
-              <span>Location</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
-              <span>Registration Deadline</span>
-            </label>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Location *"
+              value={editData.location}
+              onChange={e => setEditData({ ...editData, location: e.target.value })}
+              required
+            />
+            <Input
+              label="Registration Deadline"
+              type="datetime-local"
+              value={editData.registrationDeadline}
+              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+            />
           </div>
-          <label>
-            <input className="input" type="number" required value={form.price} onChange={e=>setForm({ ...form, price: e.target.value })} />
-            <span>Price</span>
-          </label>
-          <label>
-            <input className="input" type="number" required value={form.capacity} onChange={e=>setForm({ ...form, capacity: e.target.value })} />
-            <span>Capacity</span>
-          </label>
-          <RoleSelector 
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Price *"
+              type="number"
+              value={editData.price}
+              onChange={e => setEditData({ ...editData, price: e.target.value })}
+              required
+            />
+            <Input
+              label="Capacity *"
+              type="number"
+              value={editData.capacity}
+              onChange={e => setEditData({ ...editData, capacity: e.target.value })}
+              required
+            />
+          </div>
+
+          <RoleSelector
             selectedRoles={allowedRoles}
             onChange={setAllowedRoles}
             label="Restrict Event to Specific Roles"
           />
-          <button 
-            className="submit" 
-            type="submit" 
-            disabled={loading} 
-            style={{ 
-              ...buttonStyles.primary,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accentHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accent;
-              }
-            }}
-          >
-            {loading ? 'Creating...' : 'Create Trip'}
-          </button>
-        </form>
-            )}
-          </>
-        )}
 
-        {editing && (() => {
-          const trip = trips.find(t => t._id === editing);
-          if (!trip) return null;
-          return (
-            <div style={{
-              background: colors.white,
-              borderRadius: borderRadius.xl,
-              padding: spacing['2xl'],
-              marginTop: spacing.xl,
-              marginBottom: spacing['2xl'],
-              boxShadow: shadows.lg,
-              border: `1px solid ${colors.gray200}`,
-            }}>
-              <div style={{
-                marginBottom: spacing.xl,
-                paddingBottom: spacing.lg,
-                borderBottom: `2px solid ${colors.gray200}`,
-              }}>
-                <h2 style={{ 
-                  color: colors.primary, 
-                  fontWeight: typography.fontWeight.bold, 
-                  fontSize: typography.fontSize.xl,
-                  margin: 0,
-                }}>✏️ Edit Trip</h2>
-              </div>
-              <div style={{ display: 'grid', gap: spacing.lg }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Title *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.title} 
-                      onChange={e=>setEditData({ ...editData, title: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Short Description</span>
-                    <input 
-                      className="input" 
-                      value={editData.shortDescription} 
-                      onChange={e=>setEditData({ ...editData, shortDescription: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Start Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.startDate} 
-                      onChange={e=>setEditData({ ...editData, startDate: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>End Date/Time *</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      required 
-                      value={editData.endDate} 
-                      onChange={e=>setEditData({ ...editData, endDate: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Location *</span>
-                    <input 
-                      className="input" 
-                      required 
-                      value={editData.location} 
-                      onChange={e=>setEditData({ ...editData, location: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Registration Deadline</span>
-                    <input 
-                      className="input" 
-                      type="datetime-local" 
-                      value={editData.registrationDeadline} 
-                      onChange={e=>setEditData({ ...editData, registrationDeadline: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Price *</span>
-                    <input 
-                      className="input" 
-                      type="number" 
-                      required 
-                      value={editData.price} 
-                      onChange={e=>setEditData({ ...editData, price: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{ 
-                      display: 'block', 
-                      color: colors.primary, 
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Capacity *</span>
-                    <input 
-                      className="input" 
-                      type="number" 
-                      required 
-                      value={editData.capacity} 
-                      onChange={e=>setEditData({ ...editData, capacity: e.target.value })} 
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <RoleSelector 
-                  selectedRoles={allowedRoles}
-                  onChange={setAllowedRoles}
-                  label="Restrict Event to Specific Roles"
-                />
-                <div style={{ 
-                  display: 'flex', 
-                  gap: spacing.md, 
-                  marginTop: spacing.lg,
-                  paddingTop: spacing.lg,
-                  borderTop: `1px solid ${colors.gray200}`,
-                }}>
-                  <button 
-                    type="button" 
-                    onClick={() => onSave(editing)} 
-                    disabled={loading}
-                    style={{ 
-                      ...buttonStyles.primary,
-                      flex: 1,
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      fontSize: typography.fontSize.base,
-                      opacity: loading ? 0.7 : 1,
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!loading) {
-                        e.target.style.boxShadow = shadows.accentHover;
-                        e.target.style.transform = 'translateY(-2px)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!loading) {
-                        e.target.style.boxShadow = shadows.accent;
-                        e.target.style.transform = 'translateY(0)';
-                      }
-                    }}
-                  >
-                    {loading ? '💾 Saving...' : '💾 Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {!editOnly && (
-          <>
-            <h2 style={{ 
-              color: colors.primary, 
-              fontWeight: typography.fontWeight.bold, 
-              fontSize: typography.fontSize.lg, 
-              marginTop: spacing['3xl'],
-              marginBottom: spacing.lg,
-            }}>Existing Trips</h2>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-              gap: spacing.lg 
-            }}>
-              {trips.map((t) => (
-            <div key={t._id} style={{ 
-              border: `1px solid ${colors.gray200}`, 
-              borderRadius: borderRadius.xl, 
-              padding: spacing.lg, 
-              background: colors.white,
-              boxShadow: shadows.md,
-              transition: transitions.normal,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = shadows.lg;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = shadows.md;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
+          <div className="pt-6 border-t border-slate-100 flex gap-4">
+            <Button
+              onClick={() => onSave(editOnly ? editId : editing)}
+              loading={loading}
+              className="flex-1"
             >
-              {editing !== t._id && (
-                <div>
-                  <div style={{ 
-                    fontWeight: typography.fontWeight.extrabold, 
-                    color: colors.primary,
-                    fontSize: typography.fontSize.lg,
-                    marginBottom: spacing.sm,
-                  }}>
-                    {t.title}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray700, 
-                    fontSize: typography.fontSize.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    {t.shortDescription || '—'}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs, 
-                    marginTop: spacing.sm,
-                    marginBottom: spacing.xs,
-                  }}>
-                    📍 {t.location} • {t.price} EGP
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.xs,
-                  }}>
-                    👥 Capacity: {t.capacity ?? '-'}
-                  </div>
-                  <div style={{ 
-                    color: colors.gray500, 
-                    fontSize: typography.fontSize.xs,
-                    marginBottom: spacing.md,
-                  }}>
-                    From {new Date(t.startDate).toLocaleString()} to {t.endDate ? new Date(t.endDate).toLocaleString() : '—'}
-                  </div>
-                  <button 
-                    className="submit" 
-                    onClick={() => navigate(`/events-office/trips/edit/${t._id}`)} 
-                    style={{ 
-                      ...buttonStyles.primary,
-                      width: '100%',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
+              Save Changes
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditing(null);
+                if (editOnly) navigate('/EventOfficeDashboard');
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </FormLayout>
+    );
+  }
+
+  return (
+    <FormLayout
+      title="Create Trip"
+      subtitle="Organize new trips and excursions"
+      backLink="/EventOfficeDashboard"
+    >
+      <form onSubmit={onCreate} className="space-y-6">
+        <Input
+          label="Title *"
+          value={form.title}
+          onChange={e => setForm({ ...form, title: e.target.value })}
+          required
+        />
+
+        <Input
+          label="Short Description"
+          value={form.shortDescription}
+          onChange={e => setForm({ ...form, shortDescription: e.target.value })}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Start Date/Time *"
+            type="datetime-local"
+            value={form.startDate}
+            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            required
+          />
+          <Input
+            label="End Date/Time *"
+            type="datetime-local"
+            value={form.endDate}
+            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Location *"
+            value={form.location}
+            onChange={e => setForm({ ...form, location: e.target.value })}
+            required
+          />
+          <Input
+            label="Registration Deadline"
+            type="datetime-local"
+            value={form.registrationDeadline}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Price *"
+            type="number"
+            value={form.price}
+            onChange={e => setForm({ ...form, price: e.target.value })}
+            required
+          />
+          <Input
+            label="Capacity *"
+            type="number"
+            value={form.capacity}
+            onChange={e => setForm({ ...form, capacity: e.target.value })}
+            required
+          />
+        </div>
+
+        <RoleSelector
+          selectedRoles={allowedRoles}
+          onChange={setAllowedRoles}
+          label="Restrict Event to Specific Roles"
+        />
+
+        <div className="pt-6">
+          <Button
+            type="submit"
+            loading={loading}
+            className="w-full text-lg"
+          >
+            Create Trip
+          </Button>
+        </div>
+      </form>
+
+      {!editOnly && (
+        <div className="mt-16 pt-10 border-t border-slate-700">
+          <h2 className="text-2xl font-bold text-white mb-6">Existing Trips</h2>
+
+          {trips.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 bg-slate-800/30 rounded-xl border border-slate-700">
+              No trips created yet.
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {trips.map((t) => (
+                <div
+                  key={t._id}
+                  className="bg-slate-800/40 border border-slate-700 rounded-xl p-6 shadow-lg hover:border-emerald-500/50 transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition-colors">
+                      {t.title}
+                    </h3>
+                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${t.status === 'published' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300 border border-slate-600'
+                      }`}>
+                      {t.status || 'published'}
+                    </span>
+                  </div>
+
+                  <p className="text-slate-400 text-sm mb-4 line-clamp-2">
+                    {t.shortDescription || 'No description provided.'}
+                  </p>
+
+                  <div className="space-y-2 text-sm text-slate-400 mb-6">
+                    <div className="flex items-center gap-2">
+                      <span>📍</span>
+                      {t.location}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>💰</span>
+                      {t.price} EGP
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>👥</span>
+                      Capacity: {t.capacity ?? '-'}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>📅</span>
+                      {new Date(t.startDate).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/events-office/trips/edit/${t._id}`)}
+                  >
+                    Edit Trip
+                  </Button>
+                </div>
               ))}
             </div>
-          </>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      )}
+    </FormLayout>
   );
 }
 

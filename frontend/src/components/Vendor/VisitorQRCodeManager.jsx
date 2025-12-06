@@ -38,22 +38,22 @@ function VisitorQRCodeManager() {
     try {
       const event = await getEventById(eventId);
       const registeredUsers = event?.registeredUsers || [];
-      
+
       // Load email status from localStorage
       const storedStatus = localStorage.getItem(`emailStatus_${eventId}`);
       const emailStatusData = storedStatus ? JSON.parse(storedStatus) : {};
-      
+
       // Process registered users
       const visitorsList = registeredUsers.map((user, index) => {
         const userId = user._id || user.id || user;
-        const userName = user.firstName && user.lastName 
+        const userName = user.firstName && user.lastName
           ? `${user.firstName} ${user.lastName}`.trim()
           : user.name || user.email || `Visitor ${index + 1}`;
         const userEmail = user.email || 'No email provided';
-        
+
         // Check if QR code was already sent via email
         const emailSent = emailStatusData[userId] || false;
-        
+
         return {
           id: userId,
           name: userName,
@@ -65,7 +65,7 @@ function VisitorQRCodeManager() {
           emailSentAt: emailStatusData[`${userId}_sentAt`] || null,
         };
       });
-      
+
       setVisitors(visitorsList);
       setEmailStatus(emailStatusData);
     } catch (err) {
@@ -87,7 +87,7 @@ function VisitorQRCodeManager() {
       try {
         const token = localStorage.getItem("token");
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-        
+
         // Prepare email data for unsent visitors
         const emailData = {
           eventId: selectedEvent,
@@ -121,11 +121,11 @@ function VisitorQRCodeManager() {
             updatedStatus[visitor.id] = true;
             updatedStatus[`${visitor.id}_sentAt`] = now;
           });
-          
+
           // Save to localStorage
           localStorage.setItem(`emailStatus_${selectedEvent}`, JSON.stringify(updatedStatus));
           setEmailStatus(updatedStatus);
-          
+
           // Update visitors list
           setVisitors(prev => prev.map(v => ({
             ...v,
@@ -146,7 +146,7 @@ function VisitorQRCodeManager() {
 
   return (
     <div>
-      <div style={{ 
+      <div style={{
         marginBottom: '30px'
       }}>
         <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Visitor QR Codes</h2>
@@ -183,6 +183,7 @@ function VisitorQRCodeManager() {
             borderRadius: '8px',
             fontSize: '0.95rem',
             color: '#003366',
+            backgroundColor: '#ffffff',
           }}
         >
           <option value="">-- Select an approved event --</option>

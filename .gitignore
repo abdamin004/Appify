@@ -12,6 +12,7 @@ yarn-error.log*
 # Build outputs
 backend/dist/
 frontend/build/
+frontend/dist/
 
 # OS files
 .DS_Store

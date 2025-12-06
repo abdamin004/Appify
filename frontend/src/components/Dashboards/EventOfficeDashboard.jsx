@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "../Navbar";
+import DashboardLayout from "../Layout/DashboardLayout";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import QRCodeGenerator from "../QRCode/QRCodeGenerator";
@@ -13,12 +13,10 @@ import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
 import VendorDocuments from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
-import { statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("browse");
+  const [activeTab, setActiveTab] = useState("home");
   const [vendorRequests, setVendorRequests] = useState([]);
   const [vendorRequestsLoading, setVendorRequestsLoading] = useState(false);
   const [vendorRequestsError, setVendorRequestsError] = useState("");
@@ -204,9 +202,6 @@ function EventOfficeDashboard() {
         adminService.listApprovedVendorApplications(),
       ]);
 
-      console.log('Pending response:', pendingRes);
-      console.log('Approved response:', approvedRes);
-
       const pendingList = Array.isArray(pendingRes?.applications)
         ? pendingRes.applications
         : Array.isArray(pendingRes)
@@ -218,9 +213,6 @@ function EventOfficeDashboard() {
         : Array.isArray(approvedRes)
           ? approvedRes
           : [];
-
-      console.log('Pending list:', pendingList);
-      console.log('Approved list:', approvedList);
 
       setVendorRequests(pendingList.map(normalizePendingApplication));
       setApprovedVendorRequests(approvedList.map(normalizeApprovedApplication));
@@ -268,7 +260,7 @@ function EventOfficeDashboard() {
 
       // Call backend to approve the workshop
       const result = await approveWorkshop(workshopId);
-      
+
       if (!result || !result.success) {
         throw new Error(result?.message || result?.error || 'Failed to approve workshop');
       }
@@ -329,7 +321,7 @@ function EventOfficeDashboard() {
 
       // Call backend to reject the workshop
       const result = await rejectWorkshop(workshopId);
-      
+
       if (!result || !result.success) {
         throw new Error(result?.message || 'Failed to reject workshop');
       }
@@ -381,7 +373,7 @@ function EventOfficeDashboard() {
       const updatedDescription = currentDescription + editRequestNote;
 
       await updateEvent(editRequestModal.workshopId, { description: updatedDescription });
-      
+
       // Fetch the workshop again to get the createdBy field (it might not be populated in pendingWorkshops)
       let professorId = null;
       try {
@@ -408,7 +400,7 @@ function EventOfficeDashboard() {
           }
         }
       }
-      
+
       if (professorId) {
         const { createProfessorNotification } = await import('../../services/notificationService');
         createProfessorNotification(String(professorId), {
@@ -422,7 +414,7 @@ function EventOfficeDashboard() {
       } else {
         console.warn('Could not find professor ID for workshop:', editRequestModal.workshopId);
       }
-      
+
       showToast.success("Edit request sent successfully! The professor will see your request in the workshop details and notifications.");
       setEditRequestModal({ open: false, workshopId: null, editRequest: "" });
       fetchPendingWorkshops();
@@ -460,7 +452,7 @@ function EventOfficeDashboard() {
       // notification for the same event, only keep the frontend one (the one with the icon)
       const deduplicated = [];
       const seenEventIds = new Set();
-      
+
       // First pass: Add all frontend notifications (they have icons)
       formattedFrontend.forEach(notif => {
         if (notif.eventId) {
@@ -468,16 +460,16 @@ function EventOfficeDashboard() {
         }
         deduplicated.push(notif);
       });
-      
+
       // Second pass: Add backend notifications, but skip "NewEventPublished" if we already have a "NewEvent" for the same event
       backendNotifications.forEach(notif => {
         // Skip backend NewEventPublished if we already have a frontend NewEvent for the same event
         if (notif.type === 'NewEventPublished') {
           // Get event ID from backend notification (event can be populated object or just ID)
-          const eventId = notif.event 
+          const eventId = notif.event
             ? String(notif.event._id || notif.event.id || notif.event)
             : null;
-          
+
           if (eventId && seenEventIds.has(eventId)) {
             return; // Skip this duplicate - we already have the frontend one with icon
           }
@@ -745,780 +737,231 @@ function EventOfficeDashboard() {
       conference: "/events-office/conferences",
       gym: "/events-office/gym-sessions",
     };
-    const dropdown = document.getElementById("create-dropdown");
-    if (dropdown) dropdown.style.display = "none";
     navigate(routes[type] || "/events");
   };
 
   const unreadNotifications = notifications.filter(n => !n.read || !n.isRead).length;
 
+  const menuItems = [
+    { key: "home", label: "Home", icon: "🏠" },
+    { key: "browse", label: "Browse Events", icon: "🎯" },
+    {
+      key: "create-event",
+      label: "Create Event",
+      icon: "➕",
+      children: [
+        { key: "create-bazaar", label: "Bazaar", icon: "🏪", onClick: () => handleCreateEvent('bazaar') },
+        { key: "create-booth", label: "Booth", icon: "🎪", onClick: () => handleCreateEvent('booth') },
+        { key: "create-conference", label: "Conference", icon: "🎤", onClick: () => handleCreateEvent('conference') },
+        { key: "create-gym", label: "Gym Session", icon: "💪", onClick: () => handleCreateEvent('gym') },
+        { key: "create-trip", label: "Trip", icon: "🚌", onClick: () => handleCreateEvent('trip') },
+      ]
+    },
+    { key: "vendor-requests", label: "Vendor Requests", icon: "📝", badge: vendorRequests.length },
+    { key: "vendor-documents", label: "Vendor Documents", icon: "📄" },
+    { key: "attendees-report", label: "Attendees Report", icon: "📊" },
+    { key: "sales-report", label: "Sales Report", icon: "💰" },
+    { key: "gym-sessions", label: "Gym Sessions", icon: "💪" },
+    { key: "workshop-approvals", label: "Workshop Approvals", icon: "🎓", badge: pendingWorkshops.length },
+    { key: "polls", label: "Booth Polls", icon: "📊" },
+    { key: "loyalty", label: "Loyalty Partners", icon: "⭐" },
+    { key: "archived", label: "Archived Events", icon: "📦" },
+    { key: "notifications", label: "Notifications", icon: "🔔", badge: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length },
+    { key: "reminders", label: "Reminders", icon: "⏰", badge: reminders.filter(n => !n.isRead).length },
+  ];
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <Navbar />
-      <div
-        style={{
-          paddingTop: "120px",
-          padding: "120px 40px 80px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header + Stats + Create Button */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: `${spacing['3xl']} ${spacing['2xl']}`,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: spacing.xl,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  fontSize: typography.fontSize['3xl'],
-                  fontWeight: typography.fontWeight.bold,
-                  color: colors.primary,
-                  marginBottom: spacing.sm,
-                }}
+    <DashboardLayout menuItems={menuItems} activeTab={activeTab} setActiveTab={setActiveTab}>
+      {/* Edit Request Modal */}
+      {editRequestModal.open && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-slate-800 mb-4">Request Edits for Workshop</h3>
+            <textarea
+              value={editRequestModal.editRequest}
+              onChange={(e) => setEditRequestModal({ ...editRequestModal, editRequest: e.target.value })}
+              placeholder="Enter details about what needs to be changed..."
+              className="w-full h-32 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none mb-6"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setEditRequestModal({ open: false, workshopId: null, editRequest: "" })}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
               >
-                Welcome, Event Office {user.firstName}! 👋
-              </h1>
-              <p
-                style={{
-                  fontSize: typography.fontSize.lg,
-                  color: colors.gray500,
-                  margin: 0,
-                }}
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitEditRequest}
+                className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
               >
-                Manage university events and coordinate activities
-              </p>
+                Send Request
+              </button>
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: spacing.lg,
-                alignItems: "flex-start",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-              }}
-            >
-              <div style={{ position: "relative" }}>
-                <button
-                  style={{
-                    ...buttonStyles.primary,
-                    padding: `${spacing.md} ${spacing['2xl']}`,
-                  }}
-                  onClick={() => {
-                    const dropdown = document.getElementById("create-dropdown");
-                    dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.boxShadow = shadows.accentHover;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.boxShadow = shadows.accent;
-                  }}
-                >
-                  + Create Event ▼
-                </button>
-                <div
-                  id="create-dropdown"
-                  style={{
-                    display: "none",
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    marginTop: spacing.sm,
-                    background: colors.white,
-                    borderRadius: borderRadius.xl,
-                    boxShadow: shadows.lg,
-                    minWidth: "200px",
-                    zIndex: 1000,
-                    border: `1px solid ${colors.gray200}`,
-                  }}
-                >
-                  <button
-                    onClick={() => handleCreateEvent("bazaar")}
-                    style={{
-                      width: "100%",
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: typography.fontSize.base,
-                      color: colors.primary,
-                      borderRadius: `${borderRadius.xl} ${borderRadius.xl} 0 0`,
-                      transition: transitions.fast,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.gray100;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                    }}
-                  >
-                    🏪 Create Bazaar
-                  </button>
-                  <button
-                    onClick={() => handleCreateEvent("booth")}
-                    style={{
-                      width: "100%",
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: typography.fontSize.base,
-                      color: colors.primary,
-                      transition: transitions.fast,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.gray100;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                    }}
-                  >
-                    🏬 Create Booth
-                  </button>
-                  <button
-                    onClick={() => handleCreateEvent("trip")}
-                    style={{
-                      width: "100%",
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: typography.fontSize.base,
-                      color: colors.primary,
-                      transition: transitions.fast,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.gray100;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                    }}
-                  >
-                    🚌 Create Trip
-                  </button>
-                  <button
-                    onClick={() => handleCreateEvent("conference")}
-                    style={{
-                      width: "100%",
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: typography.fontSize.base,
-                      color: colors.primary,
-                      transition: transitions.fast,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.gray100;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                    }}
-                  >
-                    🎤 Create Conference
-                  </button>
-                  <button
-                    onClick={() => handleCreateEvent("gym")}
-                    style={{
-                      width: "100%",
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      background: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontSize: typography.fontSize.base,
-                      color: colors.primary,
-                      borderRadius: `0 0 ${borderRadius.xl} ${borderRadius.xl}`,
-                      transition: transitions.fast,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = colors.gray100;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "transparent";
-                    }}
-                  >
-                    💪 Create Gym Session
-                  </button>
-                </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "home" && (
+        <div className="space-y-8">
+          <div className="bg-slate-100 p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+              {/* Left Side: Welcome Text */}
+              <div className="flex-1 min-w-[300px]">
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
+                  Welcome, Event Office {user.firstName}! 👋
+                </h1>
+                <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
+                  Manage university events, coordinate activities, and oversee vendor applications.
+                </p>
               </div>
-              <div
-                style={{
-                  ...statCardBase,
-                  position: "relative",
-                }}
-              >
-                <div style={statValueStyle}>
-                  {notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length}
-                </div>
-                <div style={statLabelStyle}>
-                  Notifications
+
+              {/* Right Side: Stats */}
+              <div className="flex flex-col gap-4 items-end flex-shrink-0 w-full md:w-auto">
+                <div className="flex gap-3 flex-wrap justify-end w-full md:w-auto">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300">
+                    <div className="text-2xl font-bold text-slate-900 mb-1">{vendorRequests.length}</div>
+                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Vendor Requests</div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300">
+                    <div className="text-2xl font-bold text-slate-900 mb-1">{pendingWorkshops.length}</div>
+                    <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Pending Workshops</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          {(() => {
-            const tabButtons = [
-              { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
-              {
-                key: "vendor-requests",
-                label: "📝 Vendor Requests",
-                onClick: () => setActiveTab("vendor-requests"),
-                badgeCount: vendorRequests.length,
-              },
-              { key: "vendor-documents", label: "📄 Vendor Documents", onClick: () => setActiveTab("vendor-documents") },
-              { key: "attendees-report", label: "📊 Attendees Report", onClick: () => setActiveTab("attendees-report") },
-              { key: "sales-report", label: "💰 Sales Report", onClick: () => setActiveTab("sales-report") },
-              { key: "gym-sessions", label: "💪 Gym Sessions", onClick: () => setActiveTab("gym-sessions") },
-              {
-                key: "workshop-approvals",
-                label: "🎓 Workshop Approvals",
-                onClick: () => setActiveTab("workshop-approvals"),
-                badgeCount: pendingWorkshops.length,
-              },
-              { key: "polls", label: "📊 Booth Polls", onClick: () => setActiveTab("polls") },
-              { key: "loyalty", label: "⭐ Loyalty Partners", onClick: () => setActiveTab("loyalty") },
-              { key: "archived", label: "📦 Archived Events", onClick: () => setActiveTab("archived") },
-              {
-                key: "notifications",
-                label: "🔔 Notifications",
-                onClick: () => {
-                  setActiveTab("notifications");
-                  fetchNotifications();
-                },
-                badgeCount: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length,
-              },
-              {
-                key: "reminders",
-                label: "⏰ Reminders",
-                onClick: () => {
-                  setActiveTab("reminders");
-                  fetchReminders();
-                },
-                badgeCount: reminders.filter(n => !n.isRead).length,
-              },
-            ];
-
-            const firstRowCount = Math.ceil(tabButtons.length / 2);
-            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
-
-            const renderTabButton = (tab) => {
-              const isActive = activeTab === tab.key;
-              const style = getTabButtonStyle(isActive, tab.variant);
-              return (
-                <button key={tab.key} onClick={tab.onClick} style={style}>
-                  {tab.label}
-                  {tab.badgeCount > 0 && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: spacing.sm,
-                        right: spacing.sm,
-                        background: colors.error,
-                        color: colors.white,
-                        borderRadius: borderRadius.full,
-                        width: "20px",
-                        height: "20px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: typography.fontSize.xs,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      {tab.badgeCount}
-                    </span>
-                  )}
+          {/* Bottom Section: Quick Access & Chatbot */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Quick Access */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span>⚡</span> Quick Access
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setActiveTab('vendor-requests')}
+                  className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📝</div>
+                  <div className="font-bold text-slate-700 group-hover:text-emerald-700">Vendor Requests</div>
+                  <div className="text-xs text-slate-500">Review applications</div>
                 </button>
-              );
-            };
-
-            return (
-              <div
-                style={{
-                  background: colors.bgCard,
-                  padding: spacing.md,
-                  borderRadius: borderRadius['2xl'],
-                  boxShadow: shadows.lg,
-                  marginBottom: spacing['2xl'],
-                  border: `1px solid ${colors.gray200}`,
-                }}
-              >
-                {tabRows.map((row, idx) => (
-                  <div key={idx} style={tabRowStyle}>
-                    {row.map(renderTabButton)}
-                  </div>
-                ))}
+                <button
+                  onClick={() => setActiveTab('workshop-approvals')}
+                  className="p-4 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🎓</div>
+                  <div className="font-bold text-slate-700 group-hover:text-purple-700">Approvals</div>
+                  <div className="text-xs text-slate-500">Workshops pending</div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('attendees-report')}
+                  className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📊</div>
+                  <div className="font-bold text-slate-700 group-hover:text-blue-700">Attendees Report</div>
+                  <div className="text-xs text-slate-500">View statistics</div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('sales-report')}
+                  className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">💰</div>
+                  <div className="font-bold text-slate-700 group-hover:text-amber-700">Sales Report</div>
+                  <div className="text-xs text-slate-500">View revenue</div>
+                </button>
               </div>
-            );
-          })()}
+            </div>
 
-          {/* Content */}
-          {activeTab === "browse" && (
+            {/* Chatbot Placeholder */}
+            <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center min-h-[200px] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-3xl mb-4 mx-auto">
+                  🤖
+                </div>
+                <h3 className="text-lg font-bold text-slate-700 mb-1">AI Assistant</h3>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                  Coming soon! A smart chatbot to help you navigate events and answer your questions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6">
+        {activeTab === "browse" && (
+          <div className="space-y-6">
             <EventList
               enableFavorites={false}
               hideArchived={true}
             />
-          )}
-          {activeTab === "archived" && (
+          </div>
+        )}
+        {activeTab === "archived" && (
+          <div className="space-y-6">
             <EventList
               enableFavorites={false}
               showArchivedOnly={true}
             />
-          )}
+          </div>
+        )}
 
-          {activeTab === "vendor-requests" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <h2 style={{
-                color: colors.primary,
-                marginBottom: spacing.xl,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-              }}>
-                Pending Vendor Requests
-              </h2>
-              <div style={{ marginBottom: "30px" }}>
-                <h3 style={{ color: "#003366", marginBottom: "10px" }}>Pending Vendor Requests</h3>
-                {vendorRequestsError && (
-                  <div
-                    style={{
-                      background: "#fee2e2",
-                      color: "#991b1b",
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: "1px solid #fecaca",
-                      marginBottom: "16px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {vendorRequestsError}
-                  </div>
-                )}
-                {vendorRequestsLoading ? (
-                  <p style={{ color: "#6b7280" }}>Loading vendor requests…</p>
-                ) : vendorRequests.length === 0 ? (
-                  <p style={{ color: "#6b7280" }}>No pending vendor requests</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                    {vendorRequests.map((request) => (
-                      <div
-                        key={request._id}
-                        style={{
-                          padding: "20px",
-                          background: "rgba(212, 175, 55, 0.1)",
-                          borderRadius: "12px",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div>
-                          <h3 style={{ color: "#003366", marginBottom: "8px" }}>
-                            {request.organizationName || "Vendor"}
-                          </h3>
-                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                            Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
-                          </p>
-                          {request.eventStart && (
-                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                              Date: {new Date(request.eventStart).toLocaleString()}
-                            </p>
-                          )}
-                          {request.eventLocation && (
-                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                              Location: {request.eventLocation}
-                            </p>
-                          )}
-                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                            Booth Size: {request.boothSize || "—"}
-                          </p>
-                          <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                            Status: {request.status}
-                          </p>
-                          {request.vendorEmail && (
-                            <p style={{ color: "#6b7280", margin: "4px 0" }}>
-                              Vendor Email: {request.vendorEmail}
-                            </p>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", gap: "10px" }}>
-                          <button
-                            onClick={() => handleVendorRequestAction(request._id, "approve")}
-                            style={{
-                              padding: "10px 20px",
-                              background: "#10b981",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleVendorRequestAction(request._id, "reject")}
-                            style={{
-                              padding: "10px 20px",
-                              background: "#ef4444",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "8px",
-                              cursor: "pointer",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 style={{ color: "#003366", marginBottom: "10px" }}>
-                  Approved Vendors (Ready for Polls)
-                </h3>
-                {approvedVendorsError && (
-                  <div
-                    style={{
-                      background: "#fef9c3",
-                      color: "#854d0e",
-                      padding: "12px 16px",
-                      borderRadius: "12px",
-                      border: "1px solid #fde68a",
-                      marginBottom: "16px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {approvedVendorsError}
-                  </div>
-                )}
-                {approvedVendorsLoading ? (
-                  <p style={{ color: "#6b7280" }}>Loading approved vendors…</p>
-                ) : approvedVendorRequests.length === 0 ? (
-                  <p style={{ color: "#6b7280" }}>
-                    No approved vendors yet. Approve requests to enable poll creation.
-                  </p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-                    {approvedVendorRequests.map((request) => {
-                      const isGenerating = generatePassesLoadingId === request._id;
-                      const visitorCount = Array.isArray(request.attendees) ? request.attendees.length : 0;
-                      const eventType = (request.eventType || '').toLowerCase();
-                      const canGenerateVisitorQR = eventType === 'bazaar';
-                      return (
-                        <div
-                          key={request._id}
-                          style={{
-                            padding: "20px",
-                            background: "rgba(16, 185, 129, 0.1)",
-                            borderRadius: "12px",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: spacing.lg,
-                            alignItems: "stretch",
-                            border: "1px solid rgba(16, 185, 129, 0.3)",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 260 }}>
-                            <h3 style={{ color: "#065f46", marginBottom: "8px" }}>
-                              {request.organizationName || "Vendor"}
-                            </h3>
-                            <p style={{ color: "#047857", margin: "4px 0", fontWeight: 600 }}>
-                              ✅ Approved & ready for polls
-                            </p>
-                            <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})
-                            </p>
-                            {request.eventStart && (
-                              <p style={{ color: "#065f46", margin: "4px 0" }}>
-                                Date: {new Date(request.eventStart).toLocaleString()}
-                              </p>
-                            )}
-                            {request.eventLocation && (
-                              <p style={{ color: "#065f46", margin: "4px 0" }}>
-                                Location: {request.eventLocation}
-                              </p>
-                            )}
-                            <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Booth Size: {request.boothSize || "—"}
-                            </p>
-                            <p style={{ color: "#065f46", margin: "4px 0" }}>
-                              Listed Visitors: {visitorCount || "No visitors added yet"}
-                            </p>
-                            {request.vendorEmail && (
-                              <p style={{ color: "#065f46", margin: "4px 0" }}>
-                                Vendor Email: {request.vendorEmail}
-                              </p>
-                            )}
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "space-between",
-                              gap: spacing.md,
-                              minWidth: 220,
-                              textAlign: "right",
-                            }}
-                          >
-                            {canGenerateVisitorQR && (
-                              <button
-                                onClick={() => handleGenerateVisitorPasses(request)}
-                                disabled={isGenerating}
-                                style={{
-                                  padding: "10px 20px",
-                                  background: isGenerating ? "#9ca3af" : "#2563eb",
-                                  color: "white",
-                                  border: "none",
-                                  borderRadius: "8px",
-                                  cursor: isGenerating ? "not-allowed" : "pointer",
-                                  fontWeight: "600",
-                                  boxShadow: isGenerating ? "none" : "0 8px 20px rgba(37, 99, 235, 0.25)",
-                                  transition: "background 0.2s ease",
-                                }}
-                              >
-                                {isGenerating ? "Generating…" : "Generate Visitor QR Codes"}
-                              </button>
-                            )}
-                            <div>
-                              <p style={{ color: "#047857", fontWeight: 600, marginBottom: "8px" }}>
-                                Use in Booth Polls tab ➜
-                              </p>
-                              <button
-                                onClick={() => {
-                                  setActiveTab("polls");
-                                  setTimeout(() => {
-                                    const el = document.getElementById("booth-polls-section");
-                                    if (el) {
-                                      el.scrollIntoView({ behavior: "smooth" });
-                                    }
-                                  }, 200);
-                                }}
-                                style={{
-                                  padding: "10px 20px",
-                                  background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                                  color: "white",
-                                  border: "none",
-                                  borderRadius: "8px",
-                                  cursor: "pointer",
-                                  fontWeight: "600",
-                                }}
-                              >
-                                Go to Polls
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "workshop-approvals" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <h2 style={{
-                color: colors.primary,
-                marginBottom: spacing.xl,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-              }}>
-                Pending Workshop Approvals
-              </h2>
-              {pendingWorkshops.length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No pending workshops for approval</p>
+        {activeTab === "vendor-requests" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">
+              Pending Vendor Requests
+            </h2>
+            <div className="mb-8">
+              {vendorRequestsError && (
+                <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 mb-4 font-medium">
+                  {vendorRequestsError}
+                </div>
+              )}
+              {vendorRequestsLoading ? (
+                <div className="text-center py-20 text-slate-500">
+                  <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                  <p>Loading vendor requests...</p>
+                </div>
+              ) : vendorRequests.length === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-4xl mb-4 opacity-50">📝</div>
+                  <p className="text-slate-500">No pending vendor requests</p>
+                </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.xl }}>
-                  {pendingWorkshops.map((workshop) => (
+                <div className="flex flex-col gap-4">
+                  {vendorRequests.map((request) => (
                     <div
-                      key={workshop._id}
-                      style={{
-                        padding: spacing['2xl'],
-                        background: colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: `1px solid ${colors.gray200}`,
-                        boxShadow: shadows.sm,
-                      }}
+                      key={request._id}
+                      className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-shadow"
                     >
-                      <div style={{ marginBottom: spacing.lg }}>
-                        <h3 style={{
-                          color: colors.primary,
-                          marginBottom: spacing.md,
-                          fontSize: typography.fontSize.xl,
-                          fontWeight: typography.fontWeight.bold,
-                        }}>
-                          {workshop.title}
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">
+                          {request.organizationName || "Vendor"}
                         </h3>
-                        {workshop.shortDescription && (
-                          <p style={{
-                            color: colors.gray500,
-                            marginBottom: spacing.sm,
-                            fontSize: typography.fontSize.base,
-                          }}>
-                            {workshop.shortDescription}
-                          </p>
-                        )}
-                        <div style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                          gap: spacing.md,
-                          marginTop: spacing.md
-                        }}>
-                          <div>
-                            <strong style={{ color: colors.primary }}>Location:</strong>{" "}
-                            <span style={{ color: colors.gray500 }}>{workshop.location}</span>
-                          </div>
-                          <div>
-                            <strong style={{ color: colors.primary }}>Faculty:</strong>{" "}
-                            <span style={{ color: colors.gray500 }}>{workshop.facultyName || "N/A"}</span>
-                          </div>
-                          <div>
-                            <strong style={{ color: colors.primary }}>Start Date:</strong>{" "}
-                            <span style={{ color: colors.gray500 }}>
-                              {workshop.startDate
-                                ? new Date(workshop.startDate).toLocaleString()
-                                : "N/A"}
-                            </span>
-                          </div>
-                          <div>
-                            <strong style={{ color: colors.primary }}>End Date:</strong>{" "}
-                            <span style={{ color: colors.gray500 }}>
-                              {workshop.endDate
-                                ? new Date(workshop.endDate).toLocaleString()
-                                : "N/A"}
-                            </span>
-                          </div>
-                          {workshop.requiredBudget && (
-                            <div>
-                              <strong style={{ color: colors.primary }}>Budget:</strong>{" "}
-                              <span style={{ color: colors.gray500 }}>
-                                {workshop.requiredBudget} ({workshop.fundingSource || "N/A"})
-                              </span>
-                            </div>
-                          )}
-                          {workshop.capacity && (
-                            <div>
-                              <strong style={{ color: colors.primary }}>Capacity:</strong>{" "}
-                              <span style={{ color: colors.gray500 }}>{workshop.capacity}</span>
-                            </div>
-                          )}
+                        <div className="space-y-1 text-sm text-slate-600">
+                          <p>Event: <span className="font-medium">{request.eventTitle || "N/A"}</span> ({request.eventType || "Event"})</p>
+                          {request.eventStart && <p>Date: {new Date(request.eventStart).toLocaleString()}</p>}
+                          {request.eventLocation && <p>Location: {request.eventLocation}</p>}
+                          <p>Booth Size: {request.boothSize || "—"}</p>
+                          <p>Status: <span className="capitalize">{request.status}</span></p>
+                          {request.vendorEmail && <p>Email: {request.vendorEmail}</p>}
                         </div>
-                        {workshop.professors && workshop.professors.length > 0 && (
-                          <div style={{ marginTop: spacing.md }}>
-                            <strong style={{ color: colors.primary }}>Professors:</strong>
-                            <ul style={{ color: colors.gray500, margin: `${spacing.xs} 0 0 ${spacing.xl}` }}>
-                              {workshop.professors.map((prof, idx) => (
-                                <li key={idx}>
-                                  {prof.name}
-                                  {prof.department && ` - ${prof.department}`}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {workshop.description && (
-                          <div style={{ marginTop: spacing.md }}>
-                            <strong style={{ color: colors.primary }}>Agenda:</strong>
-                            <p style={{ color: colors.gray500, margin: `${spacing.xs} 0 0 0` }}>
-                              {workshop.description}
-                            </p>
-                          </div>
-                        )}
                       </div>
-                      <div style={{ display: "flex", gap: spacing.md, marginTop: spacing.lg, flexWrap: "wrap" }}>
+                      <div className="flex gap-3 w-full md:w-auto">
                         <button
-                          onClick={() => handleApproveWorkshop(workshop._id)}
-                          style={{
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            background: colors.success,
-                            color: colors.white,
-                            border: "none",
-                            borderRadius: borderRadius.md,
-                            cursor: "pointer",
-                            fontWeight: typography.fontWeight.semibold,
-                            fontSize: typography.fontSize.sm,
-                          }}
+                          onClick={() => handleVendorRequestAction(request._id, "approve")}
+                          className="flex-1 md:flex-none px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
                         >
-                          ✓ Approve & Publish
+                          Approve
                         </button>
                         <button
-                          onClick={() => handleRequestEdits(workshop._id)}
-                          style={{
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            background: colors.warning,
-                            color: colors.white,
-                            border: "none",
-                            borderRadius: borderRadius.md,
-                            cursor: "pointer",
-                            fontWeight: typography.fontWeight.semibold,
-                            fontSize: typography.fontSize.sm,
-                          }}
+                          onClick={() => handleVendorRequestAction(request._id, "reject")}
+                          className="flex-1 md:flex-none px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm"
                         >
-                          ✏️ Request Edits
-                        </button>
-                        <button
-                          onClick={() => handleRejectWorkshop(workshop._id)}
-                          style={{
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            background: colors.error,
-                            color: colors.white,
-                            border: "none",
-                            borderRadius: borderRadius.md,
-                            cursor: "pointer",
-                            fontWeight: typography.fontWeight.semibold,
-                            fontSize: typography.fontSize.sm,
-                          }}
-                        >
-                          ✗ Reject
+                          Reject
                         </button>
                       </div>
                     </div>
@@ -1526,920 +969,520 @@ function EventOfficeDashboard() {
                 </div>
               )}
             </div>
-          )}
 
-          {activeTab === "reminders" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-                maxHeight: "80vh",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold,
-                }}>
-                  Event Reminders
-                </h2>
-                {reminders.filter(n => !n.isRead).length > 0 && (
+            <h3 className="text-xl font-bold text-slate-800 mb-4 pt-4 border-t border-slate-100">
+              Approved Vendors (Ready for Polls)
+            </h3>
+            {approvedVendorsError && (
+              <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 mb-4 font-medium">
+                {approvedVendorsError}
+              </div>
+            )}
+            {approvedVendorsLoading ? (
+              <div className="text-center py-12 text-slate-500">
+                <span className="loading loading-spinner loading-md text-emerald-500 mb-2"></span>
+                <p>Loading approved vendors...</p>
+              </div>
+            ) : approvedVendorRequests.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <p className="text-slate-500">No approved vendors yet. Approve requests to enable poll creation.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {approvedVendorRequests.map((request) => {
+                  const isGenerating = generatePassesLoadingId === request._id;
+                  const visitorCount = Array.isArray(request.attendees) ? request.attendees.length : 0;
+                  const eventType = (request.eventType || '').toLowerCase();
+                  const canGenerateVisitorQR = eventType === 'bazaar';
+                  return (
+                    <div
+                      key={request._id}
+                      className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex-1 min-w-[260px]">
+                        <h3 className="text-lg font-bold text-slate-800 mb-2">
+                          {request.organizationName || "Vendor"}
+                        </h3>
+                        <p className="text-emerald-600 font-medium mb-2 text-sm">
+                          ✅ Approved & ready for polls
+                        </p>
+                        <div className="space-y-1 text-sm text-slate-600">
+                          <p>Event: {request.eventTitle || "N/A"} ({request.eventType || "Event"})</p>
+                          {request.eventStart && <p>Date: {new Date(request.eventStart).toLocaleString()}</p>}
+                          {request.eventLocation && <p>Location: {request.eventLocation}</p>}
+                          <p>Booth Size: {request.boothSize || "—"}</p>
+                          <p>Listed Visitors: {visitorCount || "No visitors added yet"}</p>
+                          {request.vendorEmail && <p>Email: {request.vendorEmail}</p>}
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-between gap-4 min-w-[220px] text-right">
+                        {canGenerateVisitorQR && (
+                          <button
+                            onClick={() => handleGenerateVisitorPasses(request)}
+                            disabled={isGenerating}
+                            className={`px-4 py-2.5 rounded-lg font-medium text-white shadow-sm transition-all ${isGenerating
+                              ? 'bg-slate-400 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
+                              }`}
+                          >
+                            {isGenerating ? "Generating..." : "Generate Visitor QR Codes"}
+                          </button>
+                        )}
+                        <div>
+                          <p className="text-emerald-700 font-medium mb-2 text-sm">
+                            Use in Booth Polls tab ➜
+                          </p>
+                          <button
+                            onClick={() => {
+                              setActiveTab("polls");
+                              setTimeout(() => {
+                                const el = document.getElementById("booth-polls-section");
+                                if (el) el.scrollIntoView({ behavior: "smooth" });
+                              }, 200);
+                            }}
+                            className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-emerald-600 transition-all"
+                          >
+                            Go to Polls
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "workshop-approvals" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">
+              Pending Workshop Approvals
+            </h2>
+            {pendingWorkshops.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">🎓</div>
+                <p className="text-slate-500">No pending workshops for approval</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                {pendingWorkshops.map((workshop) => (
+                  <div
+                    key={workshop._id}
+                    className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-slate-800 mb-2">
+                        {workshop.title}
+                      </h3>
+                      {workshop.shortDescription && (
+                        <p className="text-slate-600 mb-4">
+                          {workshop.shortDescription}
+                        </p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <strong className="text-slate-700 block mb-1">Location:</strong>
+                          <span className="text-slate-500">{workshop.location}</span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700 block mb-1">Faculty:</strong>
+                          <span className="text-slate-500">{workshop.facultyName || "N/A"}</span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700 block mb-1">Start Date:</strong>
+                          <span className="text-slate-500">
+                            {workshop.startDate ? new Date(workshop.startDate).toLocaleString() : "N/A"}
+                          </span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700 block mb-1">End Date:</strong>
+                          <span className="text-slate-500">
+                            {workshop.endDate ? new Date(workshop.endDate).toLocaleString() : "N/A"}
+                          </span>
+                        </div>
+                        {workshop.requiredBudget && (
+                          <div>
+                            <strong className="text-slate-700 block mb-1">Budget:</strong>
+                            <span className="text-slate-500">
+                              {workshop.requiredBudget} ({workshop.fundingSource || "N/A"})
+                            </span>
+                          </div>
+                        )}
+                        {workshop.capacity && (
+                          <div>
+                            <strong className="text-slate-700 block mb-1">Capacity:</strong>
+                            <span className="text-slate-500">{workshop.capacity}</span>
+                          </div>
+                        )}
+                      </div>
+                      {workshop.professors && workshop.professors.length > 0 && (
+                        <div className="mt-4">
+                          <strong className="text-slate-700 block mb-2">Professors:</strong>
+                          <ul className="list-disc list-inside text-slate-500 text-sm pl-2">
+                            {workshop.professors.map((prof, idx) => (
+                              <li key={idx}>
+                                {prof.name}
+                                {prof.department && ` - ${prof.department}`}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {workshop.description && (
+                        <div className="mt-4">
+                          <strong className="text-slate-700 block mb-2">Agenda:</strong>
+                          <p className="text-slate-500 text-sm whitespace-pre-wrap">
+                            {workshop.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
+                      <button
+                        onClick={() => handleApproveWorkshop(workshop._id)}
+                        className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                      >
+                        ✓ Approve & Publish
+                      </button>
+                      <button
+                        onClick={() => handleRequestEdits(workshop._id)}
+                        className="px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+                      >
+                        ✏️ Request Edits
+                      </button>
+                      <button
+                        onClick={() => handleRejectWorkshop(workshop._id)}
+                        className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+                      >
+                        ✗ Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "reminders" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h2 className="text-2xl font-bold text-slate-800">
+                Event Reminders
+              </h2>
+              {reminders.filter(n => !n.isRead).length > 0 && (
+                <button
+                  onClick={() => {
+                    reminders.filter(n => !n.isRead).forEach(reminder => {
+                      markReminderRead(reminder.id);
+                    });
+                    fetchReminders();
+                  }}
+                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                >
+                  Mark All as Read
+                </button>
+              )}
+            </div>
+            {reminders.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <div className="text-4xl mb-4">⏰</div>
+                <p>No reminders at this time.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 overflow-y-auto flex-1 pr-2">
+                {reminders.map((reminder) => (
+                  <div
+                    key={reminder.id}
+                    className={`p-6 rounded-xl border transition-all ${reminder.isRead
+                      ? 'bg-slate-50 border-slate-200'
+                      : 'bg-white border-amber-200 shadow-md'
+                      }`}
+                  >
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl">⏰</span>
+                          <h3 className={`text-lg ${reminder.isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                            Event Reminder
+                          </h3>
+                          {!reminder.isRead && (
+                            <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                          )}
+                        </div>
+                        <p className={`text-base mb-2 ${reminder.isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                          {reminder.message}
+                        </p>
+                        {reminder.eventStartDate && (
+                          <p className="text-sm text-slate-400 mb-1">
+                            Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
+                          </p>
+                        )}
+                        {reminder.eventId && (
+                          <button
+                            onClick={() => {
+                              window.location.href = `/events/${reminder.eventId}`;
+                            }}
+                            className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
+                          >
+                            View Event
+                          </button>
+                        )}
+                        <p className="text-xs text-slate-400 mt-3">
+                          {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {!reminder.isRead && (
+                          <button
+                            onClick={() => {
+                              markReminderRead(reminder.id);
+                              fetchReminders();
+                            }}
+                            className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            deleteReminder(reminder.id);
+                            fetchReminders();
+                          }}
+                          className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "notifications" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800">
+                Notifications
+              </h2>
+              <div className="flex gap-3">
+                {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
                   <button
                     onClick={() => {
-                      reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markReminderRead(reminder.id);
-                      });
-                      fetchReminders();
+                      markAllEventOfficeNotificationsRead();
+                      fetchNotifications();
+                      showToast.success('All notifications marked as read');
                     }}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      fontSize: typography.fontSize.sm,
-                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
                   >
                     Mark All as Read
                   </button>
                 )}
+                {notifications.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                      if (confirmed) {
+                        deleteAllEventOfficeNotifications();
+                        fetchNotifications();
+                        showToast.success('All notifications deleted');
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                  >
+                    Delete All
+                  </button>
+                )}
               </div>
-              {reminders.length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No reminders at this time.</p>
-              ) : (
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.lg,
-                  overflowY: "auto",
-                  flex: 1,
-                  minHeight: 0,
-                }}>
-                  {reminders.map((reminder) => {
-                    const isRead = reminder.read || reminder.isRead;
-                    return (
-                      <div
-                        key={reminder.id}
-                        style={{
-                          padding: spacing.xl,
-                          background: isRead ? colors.gray50 : colors.white,
-                          borderRadius: borderRadius.xl,
-                          border: isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.warning}`,
-                          position: "relative",
-                          boxShadow: isRead ? shadows.sm : shadows.md,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                              <h3 style={{
-                                color: colors.primary,
-                                margin: 0,
-                                fontSize: typography.fontSize.lg,
-                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
-                              }}>
-                                Event Reminder
-                              </h3>
-                              {!isRead && (
-                                <span style={{
-                                  background: colors.error,
-                                  color: colors.white,
-                                  borderRadius: borderRadius.full,
-                                  width: "10px",
-                                  height: "10px",
-                                  display: "inline-block",
-                                }} />
-                              )}
-                            </div>
-                            <p style={{
-                              color: colors.gray500,
-                              margin: `${spacing.sm} 0`,
-                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                              fontSize: typography.fontSize.base,
-                            }}>
-                              {reminder.message}
-                            </p>
-                            {reminder.eventStartDate && (
-                              <p style={{
-                                color: colors.gray400,
-                                fontSize: typography.fontSize.sm,
-                                margin: `${spacing.xs} 0`,
-                              }}>
-                                Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
-                              </p>
-                            )}
-                            {reminder.eventId && (
-                              <button
-                                onClick={() => {
-                                  window.location.href = `/events/${reminder.eventId}`;
-                                }}
-                                style={{
-                                  marginTop: spacing.md,
-                                  ...buttonStyles.primary,
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  fontSize: typography.fontSize.sm,
-                                }}
-                              >
-                                View Event
-                              </button>
-                            )}
-                            <p style={{
-                              color: colors.gray400,
-                              fontSize: typography.fontSize.sm,
-                              margin: `${spacing.sm} 0 0 0`,
-                            }}>
-                              {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
-                            </p>
-                          </div>
-                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
+            </div>
+            {notifications.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <div className="text-4xl mb-4">🔔</div>
+                <p>No notifications at this time.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {notifications.map((notif) => {
+                  const isRead = notif.read || notif.isRead;
+                  return (
+                    <div
+                      key={notif.id || notif._id}
+                      className={`p-6 rounded-xl border transition-all ${isRead
+                        ? 'bg-slate-50 border-slate-200'
+                        : 'bg-white border-emerald-200 shadow-md'
+                        }`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {notif.type === 'NewEvent' && <span className="text-2xl">🎉</span>}
+                            {notif.type === 'LoyaltyPartnerAdded' && <span className="text-2xl">⭐</span>}
+                            <h3 className={`text-lg ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                              {notif.type === 'NewEvent' ? 'New Event Available' :
+                                notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
+                                  'Notification'}
+                            </h3>
                             {!isRead && (
-                              <button
-                                onClick={() => {
-                                  markReminderRead(reminder.id);
-                                  fetchReminders();
-                                }}
-                                style={{
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  background: colors.success,
-                                  color: colors.white,
-                                  border: "none",
-                                  borderRadius: borderRadius.md,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Mark Read
-                              </button>
+                              <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
                             )}
+                          </div>
+                          <p className={`text-base mb-2 ${isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                            {notif.message}
+                          </p>
+                          {notif.eventId && (
                             <button
                               onClick={() => {
-                                deleteReminder(reminder.id);
-                                fetchReminders();
+                                window.location.href = `/events/${notif.eventId}`;
                               }}
-                              style={{
-                                padding: `${spacing.xs} ${spacing.md}`,
-                                background: colors.error,
-                                color: colors.white,
-                                border: 'none',
-                                borderRadius: borderRadius.lg,
-                                fontSize: typography.fontSize.sm,
-                                fontWeight: typography.fontWeight.semibold,
-                                cursor: 'pointer',
-                                transition: transitions.fast,
-                                boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.transform = 'translateY(-1px)';
-                                e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                                e.target.style.background = '#b91c1c';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.transform = 'translateY(0)';
-                                e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                                e.target.style.background = colors.error;
-                              }}
+                              className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
                             >
-                              🗑️ Delete
+                              View Event
                             </button>
-                          </div>
+                          )}
+                          <p className="text-xs text-slate-400 mt-3">
+                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          {!isRead && (
+                            <button
+                              onClick={() => {
+                                markEventOfficeNotificationRead(notif.id);
+                                fetchNotifications();
+                              }}
+                              className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors"
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              deleteEventOfficeNotification(notif.id);
+                              fetchNotifications();
+                              showToast.success('Notification deleted');
+                            }}
+                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "polls" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <BoothPollManager />
-            </div>
-          )}
-
-          {activeTab === "loyalty" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <LoyaltyPartnersList />
-            </div>
-          )}
-
-          {activeTab === "vendor-documents" && (
-            <VendorDocuments hideBackButton={true} />
-          )}
-
-          {activeTab === "attendees-report" && (
-            <AttendeesReport hideBackButton={true} />
-          )}
-
-          {activeTab === "sales-report" && (
-            <SalesReport hideBackButton={true} />
-          )}
-
-          {activeTab === "notifications" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-                maxHeight: "80vh",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl, flexShrink: 0 }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold,
-                }}>
-                  Notifications
-                </h2>
-                <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          // Mark all frontend notifications as read
-                          markAllEventOfficeNotificationsRead();
-                          // Mark all backend notifications as read
-                          await adminService.markAllNotificationsRead();
-                          fetchNotifications();
-                          showToast.success('All notifications marked as read');
-                        } catch (err) {
-                          console.error('Error marking all as read:', err);
-                          showToast.error(err?.message || 'Failed to mark all notifications as read');
-                        }
-                      }}
-                      style={{
-                        ...buttonStyles.primary,
-                        padding: `${spacing.sm} ${spacing.md}`,
-                        fontSize: typography.fontSize.sm,
-                      }}
-                    >
-                      Mark All as Read
-                    </button>
-                  )}
-                  {notifications.filter(n => n.type !== 'EventReminder').length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                        if (!confirmed) return;
-                        
-                        try {
-                          // Delete all backend notifications (delete each one individually)
-                          // Backend notifications have _id from MongoDB, frontend have id (and we add _id: id)
-                          // So backend notifications are those that have _id but the _id doesn't match the id field
-                          const backendNotifs = notifications.filter(n => {
-                            // Backend notifications: have _id, and either no id field, or _id !== id
-                            return n._id && (n.id === undefined || String(n._id) !== String(n.id));
-                          });
-                          
-                          // Delete all backend notifications
-                          const deletePromises = backendNotifs.map(notif => 
-                            adminService.deleteNotification(notif._id).catch(err => {
-                              console.error(`Error deleting notification ${notif._id}:`, err);
-                              return null; // Continue even if one fails
-                            })
-                          );
-                          await Promise.all(deletePromises);
-                          
-                          // Delete all frontend notifications
-                          deleteAllEventOfficeNotifications();
-                          
-                          fetchNotifications();
-                          showToast.success('All notifications deleted');
-                        } catch (err) {
-                          console.error('Error deleting all notifications:', err);
-                          showToast.error(err?.message || 'Failed to delete all notifications');
-                        }
-                      }}
-                      style={{
-                        padding: `${spacing.sm} ${spacing.md}`,
-                        background: colors.error,
-                        color: colors.white,
-                        border: 'none',
-                        borderRadius: borderRadius.lg,
-                        fontSize: typography.fontSize.sm,
-                        fontWeight: typography.fontWeight.semibold,
-                        cursor: 'pointer',
-                        transition: transitions.fast,
-                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-1px)';
-                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                        e.target.style.background = '#b91c1c';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                        e.target.style.background = colors.error;
-                      }}
-                    >
-                      Delete All
-                    </button>
-                  )}
-                </div>
-              </div>
-              {notifications.length === 0 ? (
-                <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>No notifications at this time.</p>
-              ) : (
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.lg,
-                  overflowY: "auto",
-                  flex: 1,
-                  minHeight: 0,
-                }}>
-                  {notifications.map((notif) => {
-                    const isRead = notif.read || notif.isRead;
-                    // Frontend notifications: have id, and _id matches id (we set _id: n.id in fetchNotifications)
-                    // Backend notifications: have _id from MongoDB, and either no id or _id !== id
-                    const isFrontend = notif.id && notif._id && String(notif._id) === String(notif.id);
-                    const isBackend = notif._id && (!notif.id || String(notif._id) !== String(notif.id));
-                    return (
-                      <div
-                        key={notif.id || notif._id}
-                        style={{
-                          padding: spacing.xl,
-                          background: notif.isRead ? colors.gray50 : colors.white,
-                          borderRadius: borderRadius.xl,
-                          border: notif.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
-                          position: "relative",
-                          boxShadow: notif.isRead ? shadows.sm : shadows.md,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                              {notif.type === 'WorkshopSubmitted' && (
-                                <span style={{ fontSize: typography.fontSize['2xl'] }}>📝</span>
-                              )}
-                              {notif.type === 'WorkshopEditSubmitted' && (
-                                <span style={{ fontSize: typography.fontSize['2xl'] }}>✏️</span>
-                              )}
-                              {notif.type === 'NewEvent' && (
-                                <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
-                              )}
-                              <h3 style={{
-                                color: colors.primary,
-                                margin: 0,
-                                fontSize: typography.fontSize.lg,
-                                fontWeight: isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
-                              }}>
-                                {notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' :
-                                  notif.type === 'WorkshopEditSubmitted' ? 'Workshop Updated After Edit Request' :
-                                  notif.type === 'NewEvent' ? 'New Event Available' :
-                                    notif.type || 'Notification'}
-                              </h3>
-                              {!isRead && (
-                                <span style={{
-                                  background: colors.error,
-                                  color: colors.white,
-                                  borderRadius: borderRadius.full,
-                                  width: "10px",
-                                  height: "10px",
-                                  display: "inline-block",
-                                }} />
-                              )}
-                            </div>
-                            <p style={{
-                              color: colors.gray500,
-                              margin: `${spacing.sm} 0`,
-                              fontWeight: isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                              fontSize: typography.fontSize.base,
-                            }}>
-                              {notif.type === 'WorkshopSubmitted'
-                                ? `A new workshop "${notif.workshopTitle || 'Untitled'}" has been submitted by a professor and is pending approval.`
-                                : notif.type === 'WorkshopEditSubmitted'
-                                ? notif.message || `A professor has updated a workshop after receiving edit requests. Please review the changes.`
-                                : notif.message || 'No message'}
-                            </p>
-                            {(notif.eventId || (notif.event && (notif.event._id || notif.event))) && (
-                              <button
-                                onClick={() => {
-                                  const eventId = notif.eventId || (notif.event && (notif.event._id || notif.event));
-                                  if (eventId) {
-                                    window.location.href = `/events/${eventId}`;
-                                  }
-                                }}
-                                style={{
-                                  marginTop: spacing.md,
-                                  ...buttonStyles.primary,
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  fontSize: typography.fontSize.sm,
-                                }}
-                              >
-                                {notif.type === 'WorkshopEditSubmitted' ? 'Review Workshop' : 'View Event'}
-                              </button>
-                            )}
-                            <p style={{
-                              color: colors.gray400,
-                              fontSize: typography.fontSize.sm,
-                              margin: `${spacing.sm} 0 0 0`,
-                            }}>
-                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                            </p>
-                          </div>
-                          <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                            {!isRead && isFrontend && (
-                              <button
-                                onClick={() => {
-                                  markEventOfficeNotificationRead(notif.id);
-                                  fetchNotifications();
-                                }}
-                                style={{
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  background: colors.success,
-                                  color: colors.white,
-                                  border: "none",
-                                  borderRadius: borderRadius.md,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Mark Read
-                              </button>
-                            )}
-                            {isFrontend && (
-                              <button
-                                onClick={async () => {
-                                  // Delete frontend notification
-                                  deleteEventOfficeNotification(notif.id);
-                                  
-                                  // If this is a "NewEvent" notification, also delete the corresponding backend "NewEventPublished" notification
-                                  if (notif.type === 'NewEvent' && notif.eventId) {
-                                    try {
-                                      // Fetch backend notifications separately to find the duplicate
-                                      // (it might not be in the current notifications array due to deduplication)
-                                      const backendRes = await adminService.listAdminNotifications();
-                                      const allBackendNotifs = Array.isArray(backendRes?.notifications) 
-                                        ? backendRes.notifications 
-                                        : (Array.isArray(backendRes) ? backendRes : []);
-                                      
-                                      const eventIdToMatch = String(notif.eventId);
-                                      
-                                      // Find the backend notification for the same event
-                                      const backendNotif = allBackendNotifs.find(n => {
-                                        if (n.type !== 'NewEventPublished' || !n._id) return false;
-                                        
-                                        // Get event ID from backend notification
-                                        // Event can be: populated object {_id: ...}, just an ID string, or ObjectId
-                                        let backendEventId = null;
-                                        if (n.event) {
-                                          if (typeof n.event === 'string') {
-                                            backendEventId = n.event;
-                                          } else if (n.event._id) {
-                                            backendEventId = String(n.event._id);
-                                          } else if (n.event.id) {
-                                            backendEventId = String(n.event.id);
-                                          }
-                                        }
-                                        
-                                        // Also check if event is stored directly as a field (not populated)
-                                        if (!backendEventId && n.eventId) {
-                                          backendEventId = String(n.eventId);
-                                        }
-                                        
-                                        return backendEventId && String(backendEventId) === eventIdToMatch;
-                                      });
-                                      
-                                      if (backendNotif && backendNotif._id) {
-                                        // Delete the backend duplicate
-                                        await adminService.deleteNotification(backendNotif._id);
-                                        console.log('Deleted backend duplicate notification:', backendNotif._id);
-                                      } else {
-                                        console.log('No backend duplicate found for event:', eventIdToMatch);
-                                      }
-                                    } catch (err) {
-                                      console.error('Error deleting backend duplicate notification:', err);
-                                      showToast.error('Failed to delete duplicate notification');
-                                    }
-                                  }
-                                  
-                                  fetchNotifications();
-                                }}
-                                style={{
-                                  padding: `${spacing.xs} ${spacing.md}`,
-                                  background: colors.error,
-                                  color: colors.white,
-                                  border: 'none',
-                                  borderRadius: borderRadius.lg,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: 'pointer',
-                                  transition: transitions.fast,
-                                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.transform = 'translateY(-1px)';
-                                  e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                                  e.target.style.background = '#b91c1c';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.transform = 'translateY(0)';
-                                  e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                                  e.target.style.background = colors.error;
-                                }}
-                              >
-                                🗑️ Delete
-                              </button>
-                            )}
-                            {isBackend && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await adminService.deleteNotification(notif._id);
-                                    fetchNotifications();
-                                    showToast.success('Notification deleted');
-                                  } catch (err) {
-                                    console.error('Error deleting backend notification:', err);
-                                    showToast.error(err?.message || 'Failed to delete notification');
-                                  }
-                                }}
-                                style={{
-                                  padding: `${spacing.xs} ${spacing.md}`,
-                                  background: colors.error,
-                                  color: colors.white,
-                                  border: 'none',
-                                  borderRadius: borderRadius.lg,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: 'pointer',
-                                  transition: transitions.fast,
-                                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.transform = 'translateY(-1px)';
-                                  e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                                  e.target.style.background = '#b91c1c';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.transform = 'translateY(0)';
-                                  e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                                  e.target.style.background = colors.error;
-                                }}
-                              >
-                                🗑️ Delete
-                              </button>
-                            )}
-                            {!isRead && isBackend && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await adminService.markNotificationRead(notif._id);
-                                    fetchNotifications();
-                                    showToast.success('Notification marked as read');
-                                  } catch (err) {
-                                    console.error('Error marking notification as read:', err);
-                                    showToast.error(err?.message || 'Failed to mark notification as read');
-                                  }
-                                }}
-                                style={{
-                                  padding: `${spacing.sm} ${spacing.lg}`,
-                                  background: colors.success,
-                                  color: colors.white,
-                                  border: "none",
-                                  borderRadius: borderRadius.md,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Mark Read
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "gym-sessions" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <h2 style={{
-                color: colors.primary,
-                marginBottom: spacing.xl,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-              }}>
-                Gym Sessions
-              </h2>
-              {(!gymSessions || gymSessions.length === 0) ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>No gym sessions scheduled</p>
-                </div>
-              ) : (
-                (() => {
-                  const typeMap = {
-                    yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba', crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
-                  };
-                  const byMonth = (gymSessions || []).reduce((acc, s) => {
-                    const d = s.startDate ? new Date(s.startDate) : null;
-                    const key = d ? d.toLocaleString(undefined, { month: 'long', year: 'numeric' }) : 'Scheduled';
-                    (acc[key] ||= []).push(s);
-                    return acc;
-                  }, {});
-                  const monthKeys = Object.keys(byMonth).sort((a, b) => {
-                    const da = new Date(a); const db = new Date(b);
-                    return (!isNaN(da) && !isNaN(db)) ? (da - db) : a.localeCompare(b);
-                  });
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing['2xl'] }}>
-                      {monthKeys.map((month) => {
-                        const items = byMonth[month] || [];
-                        const byType = items.reduce((acc, s) => {
-                          const label = typeMap[s.sessionType] || s.sessionType || 'Session';
-                          (acc[label] ||= []).push(s);
-                          return acc;
-                        }, {});
-                        const typeKeys = Object.keys(byType).sort();
-                        return (
-                          <div key={month}>
-                            <div style={{
-                              background: colors.bgCard,
-                              padding: `${spacing.lg} ${spacing.xl}`,
-                              borderRadius: borderRadius.xl,
-                              boxShadow: shadows.md,
-                              border: `1px solid ${colors.gray200}`,
-                            }}>
-                              <h3 style={{
-                                margin: 0,
-                                color: colors.primary,
-                                fontSize: typography.fontSize.xl,
-                                fontWeight: typography.fontWeight.bold,
-                              }}>{month}</h3>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                                gap: spacing.lg,
-                                marginTop: spacing.lg
-                              }}>
-                                {typeKeys.map((tk) => (
-                                  <div key={tk} style={{
-                                    background: colors.white,
-                                    border: `1px solid ${colors.gray200}`,
-                                    borderRadius: borderRadius.xl,
-                                    padding: spacing.lg
-                                  }}>
-                                    <div style={{
-                                      fontWeight: typography.fontWeight.extrabold,
-                                      color: colors.primary,
-                                      marginBottom: spacing.sm,
-                                      fontSize: typography.fontSize.base,
-                                    }}>{tk}</div>
-                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: colors.gray700 }}>
-                                      {byType[tk]
-                                        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-                                        .map((s) => {
-                                          const fmtDateTime = (date) => {
-                                            if (!date) return 'TBA';
-                                            const d = new Date(date);
-                                            return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                                          };
-                                          return (
-                                            <li key={s._id || s.id} style={{
-                                              padding: `${spacing.sm} 0`,
-                                              borderTop: `1px solid ${colors.gray100}`,
-                                              display: 'flex',
-                                              justifyContent: 'space-between',
-                                              alignItems: 'center',
-                                              gap: spacing.md
-                                            }}>
-                                              <div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.sm,
-                                                  fontWeight: typography.fontWeight.medium,
-                                                  color: colors.gray700,
-                                                }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.xs,
-                                                  color: colors.gray500,
-                                                  marginTop: spacing.xs,
-                                                }}>
-                                                  Instructor: {s.instructor || 'TBA'} {s.capacity ? ` • Capacity: ${s.capacity}` : ''}
-                                                </div>
-                                              </div>
-                                              <div style={{ display: 'flex', gap: spacing.sm }}>
-                                                <button
-                                                  onClick={() => navigate(`/events-office/gym-sessions/edit/${s._id}`)}
-                                                  style={{
-                                                    padding: `${spacing.xs} ${spacing.md}`,
-                                                    background: colors.info,
-                                                    color: colors.white,
-                                                    border: 'none',
-                                                    borderRadius: borderRadius.md,
-                                                    cursor: 'pointer',
-                                                    fontSize: typography.fontSize.sm,
-                                                    fontWeight: typography.fontWeight.semibold,
-                                                  }}
-                                                >
-                                                  Edit
-                                                </button>
-                                                <button
-                                                  onClick={() => handleDeleteGymSession(s._id)}
-                                                  style={{
-                                                    padding: `${spacing.xs} ${spacing.md}`,
-                                                    background: colors.error,
-                                                    color: colors.white,
-                                                    border: 'none',
-                                                    borderRadius: borderRadius.md,
-                                                    cursor: 'pointer',
-                                                    fontSize: typography.fontSize.sm,
-                                                    fontWeight: typography.fontWeight.semibold,
-                                                  }}
-                                                >
-                                                  Cancel
-                                                </button>
-                                              </div>
-                                            </li>
-                                          );
-                                        })}
-                                    </ul>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
                     </div>
                   );
-                })()
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "vendor-documents" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Vendor Documents</h2>
+              <p className="text-slate-500">Review and approve vendor documentation</p>
+            </div>
+            <VendorDocuments />
+          </div>
+        )}
+
+        {activeTab === "attendees-report" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Attendees Report</h2>
+              <p className="text-slate-500">View attendance statistics</p>
+            </div>
+            <AttendeesReport />
+          </div>
+        )}
+
+        {activeTab === "sales-report" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Sales Report</h2>
+              <p className="text-slate-500">Monitor event sales and revenue</p>
+            </div>
+            <SalesReport />
+          </div>
+        )}
+
+        {activeTab === "gym-sessions" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
+              <p className="text-slate-500">Manage gym sessions and schedules</p>
+            </div>
+            <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              {gymSessions.length === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-6xl mb-6 opacity-50">🏋️</div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">No Sessions Found</h3>
+                  <p className="text-slate-500">There are no gym sessions scheduled at the moment.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {gymSessions.map((session) => (
+                    <div key={session._id || session.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="font-bold text-lg text-slate-900">{session.sessionType}</h3>
+                        <button
+                          onClick={() => handleDeleteGymSession(session._id || session.id)}
+                          className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Cancel Session"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                      <div className="space-y-3 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">👤</span>
+                          <span className="font-medium">{session.instructor}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📅</span>
+                          <span>{new Date(session.startDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">⏰</span>
+                          <span>{new Date(session.startDate).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">👥</span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold">
+                            {session.registeredCount || 0} / {session.capacity}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-      {/* Edit Request Modal */}
-      {editRequestModal.open && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2000,
-          }}
-          onClick={() => setEditRequestModal({ open: false, workshopId: null, editRequest: "" })}
-        >
-          <div
-            style={{
-              background: colors.white,
-              borderRadius: borderRadius['2xl'],
-              padding: spacing['3xl'],
-              maxWidth: "600px",
-              width: "90%",
-              maxHeight: "80vh",
-              overflow: "auto",
-              boxShadow: shadows.lg,
-              border: `1px solid ${colors.gray200}`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{
-              color: colors.primary,
-              marginBottom: spacing.xl,
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-            }}>
-              Request Edits for Workshop
-            </h2>
-            <p style={{
-              color: colors.gray500,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.base,
-            }}>
-              Please specify what changes you'd like the professor to make:
-            </p>
-            <textarea
-              value={editRequestModal.editRequest}
-              onChange={(e) =>
-                setEditRequestModal({ ...editRequestModal, editRequest: e.target.value })
-              }
-              placeholder="Example: Please update the budget amount, add more details to the agenda, change the location to..."
-              style={{
-                width: "100%",
-                minHeight: "150px",
-                resize: "vertical",
-                marginBottom: spacing.xl,
-                padding: spacing.md,
-                border: `1px solid ${colors.gray300}`,
-                borderRadius: borderRadius.md,
-                fontSize: typography.fontSize.base,
-                fontFamily: typography.fontFamily,
-                color: colors.gray700,
-                background: colors.white,
-                transition: transitions.fast,
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = colors.accent;
-                e.target.style.outline = "none";
-                e.target.style.boxShadow = `0 0 0 3px ${colors.accent}20`;
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = colors.gray300;
-                e.target.style.boxShadow = "none";
-              }}
-            />
-            <div style={{ display: "flex", gap: spacing.md, justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setEditRequestModal({ open: false, workshopId: null, editRequest: "" })}
-                style={{
-                  padding: `${spacing.sm} ${spacing.lg}`,
-                  background: colors.gray200,
-                  color: colors.gray700,
-                  border: "none",
-                  borderRadius: borderRadius.md,
-                  cursor: "pointer",
-                  fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitEditRequest}
-                style={{
-                  padding: `${spacing.sm} ${spacing.lg}`,
-                  background: colors.warning,
-                  color: colors.white,
-                  border: "none",
-                  borderRadius: borderRadius.md,
-                  cursor: "pointer",
-                  fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
-                }}
-              >
-                Send Edit Request
-              </button>
+        {activeTab === "polls" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Booth Polls</h2>
+              <p className="text-slate-500">Manage voting for vendor booths</p>
+            </div>
+            <div id="booth-polls-section">
+              <BoothPollManager />
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* QR Code Generator Modal */}
-      {qrCodeEvent && (
-        <QRCodeGenerator
-          event={qrCodeEvent}
-          onClose={() => setQrCodeEvent(null)}
-        />
-      )}
+        {activeTab === "loyalty" && (
+          <div className="space-y-6">
+            <LoyaltyPartnersList />
+          </div>
+        )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
 

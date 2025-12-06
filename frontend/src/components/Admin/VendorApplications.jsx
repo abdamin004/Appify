@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
-import { showToast, confirmDialog } from '../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
+import { showToast } from '../../utils/toast';
 
 export default function VendorApplications() {
-  const navigate = useNavigate();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -15,7 +12,7 @@ export default function VendorApplications() {
     try {
       const res = await adminService.listPendingVendorApplications();
       setApps(res.applications || []);
-    } catch (err) { 
+    } catch (err) {
       const errorMsg = err?.message || 'Failed to load vendor applications';
       setError(errorMsg);
       showToast.error(errorMsg);
@@ -23,7 +20,7 @@ export default function VendorApplications() {
     finally { setLoading(false); }
   };
 
-  useEffect(()=>{ load(); }, []);
+  useEffect(() => { load(); }, []);
 
   const handleReview = async (id, action) => {
     const notes = window.prompt('Optional notes (enter to skip)');
@@ -31,164 +28,76 @@ export default function VendorApplications() {
       await adminService.reviewVendorApplication(id, action, notes);
       showToast.success(`Vendor application ${action === 'approve' ? 'approved' : 'rejected'} successfully`);
       load();
-    } catch (err) { 
+    } catch (err) {
       const errorMsg = err?.message || 'Failed to review application';
       showToast.error(errorMsg);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'] }}>
-          <div style={{ 
-            position: 'relative',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: spacing.xl
-          }}>
-            <button
-              onClick={() => navigate('/Admin')}
-              style={{
-                ...buttonStyles.back,
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: colors.bgCard,
-                color: colors.primary,
-                borderColor: colors.primary
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.accent;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.accent;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = colors.bgCard;
-                e.target.style.color = colors.primary;
-                e.target.style.borderColor = colors.primary;
-              }}
-            >
-              ← Back
-            </button>
-            <h2 style={{ 
-              color: colors.primary, 
-              margin: 0,
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-              textAlign: 'center',
-              textDecoration: 'underline',
-              textDecorationColor: colors.primary,
-              textUnderlineOffset: '4px'
-            }}>Pending Vendor Applications</h2>
+    <div className="max-w-5xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-slate-800">Pending Vendor Applications</h2>
+          <p className="text-slate-500 mt-2">Review and manage vendor requests</p>
+        </div>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-600">Loading applications...</p>
           </div>
-          {loading && (
-            <div style={{ 
-              color: colors.gray500, 
-              fontSize: typography.fontSize.base,
-              textAlign: 'center',
-              padding: spacing['3xl']
-            }}>Loading applications...</div>
-          )}
-          {error && !loading && (
-            <div style={{ 
-              color: colors.error, 
-              background: colors.errorLight,
-              padding: spacing.md,
-              borderRadius: borderRadius.md,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.sm
-            }}>{error}</div>
-          )}
-          {!loading && !error && apps.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: spacing['5xl'],
-              color: colors.gray500
-            }}>
-              <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.lg }}>🏪</div>
-              <h3 style={{
-                color: colors.primary,
-                fontSize: typography.fontSize.xl,
-                fontWeight: typography.fontWeight.bold,
-                marginBottom: spacing.sm
-              }}>No Pending Applications</h3>
-              <p style={{
-                fontSize: typography.fontSize.base,
-                color: colors.gray500,
-                margin: 0
-              }}>There are no pending vendor applications at this time.</p>
-            </div>
-          )}
-          {!loading && apps.length > 0 && (
-            <ul style={{ padding: 0, listStyle: 'none' }}>
-              {apps.map(a => (
-                <li key={a._id} style={{ 
-                  marginBottom: spacing.lg, 
-                  padding: spacing.xl, 
-                  background: colors.white, 
-                  borderRadius: borderRadius.xl, 
-                  border: `1px solid ${colors.gray200}`,
-                  transition: transitions.fast
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = shadows.md;
-                  e.currentTarget.style.borderColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.borderColor = colors.gray200;
-                }}
-                >
-                  <div style={{ 
-                    color: colors.primary, 
-                    fontWeight: typography.fontWeight.bold,
-                    fontSize: typography.fontSize.lg,
-                    marginBottom: spacing.sm
-                  }}>
-                    {a.event?.title} <span style={{ color: colors.gray500, fontWeight: typography.fontWeight.normal }}>({a.event?.type})</span>
+        )}
+
+        {error && !loading && (
+          <div className="alert alert-error shadow-sm mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {!loading && !error && apps.length === 0 && (
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="text-6xl mb-4">🏪</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No Pending Applications</h3>
+            <p className="text-slate-500">There are no pending vendor applications at this time.</p>
+          </div>
+        )}
+
+        {!loading && apps.length > 0 && (
+          <div className="grid grid-cols-1 gap-4">
+            {apps.map(a => (
+              <div key={a._id} className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-slate-800 mb-1">
+                      {a.event?.title} <span className="text-sm font-normal text-slate-500">({a.event?.type})</span>
+                    </h3>
+                    <div className="space-y-1 text-sm text-slate-600">
+                      <p><span className="font-semibold">Organization:</span> {a.organization?.name || 'N/A'}</p>
+                      <p><span className="font-semibold">Vendor Email:</span> {a.vendorUser?.email || 'N/A'}</p>
+                    </div>
                   </div>
-                  <div style={{ color: colors.gray700, marginTop: spacing.xs, fontSize: typography.fontSize.base }}>
-                    <strong>Organization:</strong> {a.organization?.name || 'N/A'}
-                  </div>
-                  <div style={{ color: colors.gray700, marginTop: spacing.xs, fontSize: typography.fontSize.base }}>
-                    <strong>Vendor Email:</strong> {a.vendorUser?.email || 'N/A'}
-                  </div>
-                  <div style={{ marginTop: spacing.lg, display: 'flex', gap: spacing.sm }}>
-                    <button 
-                      onClick={()=>handleReview(a._id, 'approve')} 
-                      style={{ 
-                        ...buttonStyles.primary,
-                        background: colors.success,
-                        color: colors.white,
-                        borderColor: colors.success,
-                        padding: `${spacing.sm} ${spacing.lg}`,
-                        fontSize: typography.fontSize.sm
-                      }}
+
+                  <div className="flex items-center gap-3 self-start md:self-center">
+                    <button
+                      onClick={() => handleReview(a._id, 'approve')}
+                      className="btn btn-success btn-sm text-white"
                     >
                       Approve
                     </button>
-                    <button 
-                      onClick={()=>handleReview(a._id, 'reject')} 
-                      style={{ 
-                        ...buttonStyles.outline,
-                        background: colors.error,
-                        color: colors.white,
-                        borderColor: colors.error,
-                        padding: `${spacing.sm} ${spacing.lg}`,
-                        fontSize: typography.fontSize.sm
-                      }}
+                    <button
+                      onClick={() => handleReview(a._id, 'reject')}
+                      className="btn btn-error btn-sm text-white"
                     >
                       Reject
                     </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

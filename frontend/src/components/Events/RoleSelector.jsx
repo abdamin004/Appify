@@ -21,57 +21,27 @@ function RoleSelector({ selectedRoles = [], onChange, label = "Restrict Event to
   };
 
   return (
-    <div style={{ marginBottom: '20px' }}>
-      <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#003366' }}>
+    <div className="mb-5">
+      <label className="block mb-2 font-bold text-slate-300">
         {label}
-        <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 400, marginLeft: '8px' }}>
+        <span className="text-sm text-slate-500 font-normal ml-2">
           (Leave empty to allow all roles)
         </span>
       </label>
-      
+
       {/* Selected roles display */}
       {selectedRoles.length > 0 && (
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '8px', 
-          marginBottom: '12px',
-          padding: '12px',
-          background: 'rgba(212, 175, 55, 0.1)',
-          borderRadius: '8px',
-          border: '1px solid rgba(212, 175, 55, 0.3)'
-        }}>
+        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-emerald-900/20 rounded-lg border border-emerald-500/30">
           {selectedRoles.map(role => (
             <div
               key={role}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'white',
-                borderRadius: '6px',
-                border: '1px solid rgba(212, 175, 55, 0.3)',
-                fontSize: '0.9rem'
-              }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 rounded-md border border-emerald-500/30 text-sm"
             >
-              <span style={{ color: '#003366', fontWeight: 500 }}>{role}</span>
+              <span className="text-emerald-300 font-medium">{role}</span>
               <button
                 type="button"
                 onClick={() => removeRole(role)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  padding: 0,
-                  width: '20px',
-                  height: '20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
+                className="bg-transparent border-none text-emerald-400 hover:text-emerald-200 cursor-pointer text-lg p-0 w-5 h-5 flex items-center justify-center transition-colors"
               >
                 ×
               </button>
@@ -81,51 +51,26 @@ function RoleSelector({ selectedRoles = [], onChange, label = "Restrict Event to
       )}
 
       {/* Role checkboxes */}
-      <div style={{
-        border: '2px solid rgba(212, 175, 55, 0.3)',
-        borderRadius: '8px',
-        background: 'white',
-        padding: '12px'
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="border border-slate-600 rounded-xl bg-slate-900/50 p-3">
+        <div className="flex flex-col gap-2">
           {AVAILABLE_ROLES.map(role => {
             const isSelected = selectedRoles.includes(role.value);
             return (
               <div
                 key={role.value}
                 onClick={() => toggleRole(role.value)}
-                style={{
-                  padding: '12px',
-                  cursor: 'pointer',
-                  background: isSelected ? 'rgba(212, 175, 55, 0.15)' : 'transparent',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  transition: 'background 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = 'rgba(212, 175, 55, 0.05)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = 'transparent';
-                }}
+                className={`
+                  p-3 cursor-pointer rounded-lg flex items-center gap-3 transition-all
+                  ${isSelected ? 'bg-emerald-600/20 border border-emerald-500/30' : 'hover:bg-slate-800 border border-transparent'}
+                `}
               >
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => {}} // Handled by parent div onClick
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    cursor: 'pointer'
-                  }}
+                  onChange={() => { }} // Handled by parent div onClick
+                  className="checkbox checkbox-sm checkbox-primary border-slate-500"
                 />
-                <span style={{ 
-                  fontWeight: isSelected ? 600 : 500, 
-                  color: '#003366', 
-                  fontSize: '0.95rem' 
-                }}>
+                <span className={`text-sm ${isSelected ? 'font-bold text-emerald-300' : 'font-medium text-slate-300'}`}>
                   {role.label}
                 </span>
               </div>

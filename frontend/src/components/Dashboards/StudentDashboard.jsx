@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import EventsList from "../EventList";
-import Navbar from "../Navbar";
+import DashboardLayout from "../Layout/DashboardLayout";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
 import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
@@ -14,10 +14,6 @@ import StudentPollVoting from "../Polls/StudentPollVoting";
 import {
   getStudentNotifications,
   createStudentNotification,
-  markStudentNotificationRead,
-  markAllStudentNotificationsRead,
-  deleteStudentNotification,
-  deleteAllStudentNotifications,
   getStudentUnreadCount,
   getSeenEventIds,
   markEventsAsSeen,
@@ -28,14 +24,11 @@ import {
   markReminderRead,
   deleteReminder
 } from "../../services/notificationService";
-import userService from "../../services/userService";
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
-import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, pillButtonStyles, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
 import WalletBadge from "../Wallet/WalletBadge";
-import { showToast, confirmDialog } from "../../utils/toast";
+import { showToast } from "../../utils/toast";
 
 function StudentDashboard() {
-  const [activeTab, setActiveTab] = useState("browse");
+  const [activeTab, setActiveTab] = useState("home");
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [courts, setCourts] = useState([]);
   const [presetType, setPresetType] = useState("");
@@ -63,19 +56,15 @@ function StudentDashboard() {
     fetchNotifications();
     fetchReminders();
     fetchGymSessions();
-    // Initialize: mark all current events as seen
     initializeSeenEvents();
-    // Check for reminders immediately
     checkForReminders();
-    // Start polling for new events
     const pollInterval = setInterval(() => {
       checkForNewEvents();
-    }, 30000); // Check every 30 seconds
+    }, 30000);
 
-    // Start checking for reminders
     const reminderInterval = setInterval(() => {
       checkForReminders();
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => {
       clearInterval(pollInterval);
@@ -83,7 +72,6 @@ function StudentDashboard() {
     };
   }, []);
 
-  // Fetch data when switching tabs
   useEffect(() => {
     if (activeTab === 'gym-sessions') {
       setGymSessionsLoading(true);
@@ -95,10 +83,8 @@ function StudentDashboard() {
     }
   }, [activeTab]);
 
-  // Listen to wallet updates from child dialogs (wallet pay/refund/top-up)
   useEffect(() => {
     const handler = (e) => {
-      // Use balance from event detail if available (faster), otherwise fetch
       if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
         setWalletBalance(e.detail.balance);
       } else {
@@ -126,7 +112,6 @@ function StudentDashboard() {
     };
   }, []);
 
-  // After Stripe redirect: if session_id or status=success present, confirm/send receipt and show banner
   useEffect(() => {
     (async () => {
       try {
@@ -136,9 +121,7 @@ function StudentDashboard() {
         const eventId = params.get('eventId');
         if (sessionId) {
           try { await confirmStripeReceipt(sessionId); } catch (_) { }
-          // Refresh registered events to reflect paid flag
           try { await fetchRegisteredEvents(); } catch (_) { }
-          // Banner message
           try {
             const raw = localStorage.getItem('user');
             const u = raw ? JSON.parse(raw) : {};
@@ -146,7 +129,6 @@ function StudentDashboard() {
             setBannerMsg(`Payment successful.${email}`);
             setTimeout(() => setBannerMsg(''), 6000);
           } catch (_) { }
-          // Clean the URL to avoid repeat calls on navigation
           const url = new URL(window.location.href);
           url.searchParams.delete('session_id');
           window.history.replaceState({}, document.title, url.toString());
@@ -166,7 +148,6 @@ function StudentDashboard() {
     })();
   }, []);
 
-  // Fetch data when switching tabs
   useEffect(() => {
     if (activeTab === "registered" && registeredEvents.length === 0) {
       fetchRegisteredEvents();
@@ -181,7 +162,6 @@ function StudentDashboard() {
     }
   }, [activeTab]);
 
-  // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(err => {
@@ -190,7 +170,6 @@ function StudentDashboard() {
     }
   }, []);
 
-  // Listen for new event creation events
   useEffect(() => {
     const handleNewEvent = () => {
       fetchNotifications();
@@ -199,7 +178,6 @@ function StudentDashboard() {
     return () => window.removeEventListener('newEventCreated', handleNewEvent);
   }, []);
 
-  // Listen for loyalty partner added events
   useEffect(() => {
     const handleLoyaltyPartnerAdded = () => {
       fetchNotifications();
@@ -210,23 +188,17 @@ function StudentDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      // Fetch only frontend notifications (localStorage)
       const localNotifs = getStudentNotifications();
-
-      // Convert frontend notifications to match backend format for consistency
       const formattedFrontend = localNotifs.map(n => ({
         ...n,
         read: n.isRead,
         _id: n.id,
       }));
-
-      // Sort by creation date (newest first)
       formattedFrontend.sort((a, b) => {
         const dateA = new Date(a.createdAt || a.date || 0);
         const dateB = new Date(b.createdAt || b.date || 0);
         return dateB - dateA;
       });
-
       setNotifications(formattedFrontend);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -253,13 +225,10 @@ function StudentDashboard() {
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
-
-      // Filter out restricted events that user can't access
       const accessibleEvents = publishedEvents.filter(e => {
         const eventId = e._id || e.id;
         return canUserAccessEvent(eventId);
       });
-
       const seenIds = getSeenEventIds();
       const newEvents = accessibleEvents.filter(e => {
         const eventId = String(e._id || e.id);
@@ -267,23 +236,18 @@ function StudentDashboard() {
       });
 
       if (newEvents.length > 0) {
-        // Mark new events as seen
         const newEventIds = newEvents.map(e => String(e._id || e.id));
         markEventsAsSeen(newEventIds);
-
-        // Create notifications for each new event
         newEvents.forEach(event => {
           const eventId = String(event._id || event.id);
           const eventType = event.type || 'Event';
-          const notification = createStudentNotification({
+          createStudentNotification({
             type: 'NewEvent',
             message: `New ${eventType}: ${event.title}`,
             eventId: eventId,
             eventTitle: event.title,
             eventType: eventType,
           });
-
-          // Show browser notification if permission granted
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`New ${eventType} Available`, {
@@ -296,8 +260,6 @@ function StudentDashboard() {
             }
           }
         });
-
-        // Refresh notifications list
         fetchNotifications();
       }
     } catch (err) {
@@ -307,7 +269,6 @@ function StudentDashboard() {
 
   const fetchReminders = () => {
     try {
-      // Get user-specific reminders (not role-based)
       const userReminders = getCurrentUserReminders();
       setReminders(userReminders);
     } catch (err) {
@@ -318,45 +279,32 @@ function StudentDashboard() {
 
   const checkForReminders = async () => {
     try {
-      // Get registered events
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-
       if (!res.ok) return;
-
       const registeredEvents = await res.json();
       const events = Array.isArray(registeredEvents) ? registeredEvents : [];
-
-      // Get user ID and validate role
       const storedUser = localStorage.getItem("user");
       const user = storedUser ? JSON.parse(storedUser) : null;
       const userId = user && (user._id || user.id);
       if (!userId) return;
-
-      // Validate user role - only allow Student, Staff, TA, Professor, EventOffice
       const allowedRoles = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice'];
       if (!user || !allowedRoles.includes(user.role)) {
-        return; // Skip users with disallowed roles (e.g., Admin, Vendor)
+        return;
       }
-
       const sentReminders = getSentReminders(userId);
       const now = new Date();
-
       events.forEach(event => {
         if (!event.startDate) return;
-
         const startDate = new Date(event.startDate);
         const eventId = String(event._id || event.id);
         const eventTitle = event.title || 'Event';
         const eventType = event.type || 'Event';
-
-        // Check for 1 day reminder (24 hours before)
         const hoursUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         const oneDayReminderId = `${eventId}_1day`;
         const isOneDayTime = hoursUntilEvent >= 23 && hoursUntilEvent <= 25 && startDate > now;
-
         if (isOneDayTime && !sentReminders.has(oneDayReminderId)) {
           markReminderSent(userId, oneDayReminderId);
           createReminderNotification({
@@ -368,7 +316,6 @@ function StudentDashboard() {
             reminderType: '1day',
             eventStartDate: startDate.toISOString(),
           });
-
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -381,12 +328,9 @@ function StudentDashboard() {
             }
           }
         }
-
-        // Check for 1 hour reminder
         const minutesUntilEvent = (startDate.getTime() - now.getTime()) / (1000 * 60);
         const oneHourReminderId = `${eventId}_1hour`;
         const isOneHourTime = minutesUntilEvent >= 50 && minutesUntilEvent <= 70 && startDate > now;
-
         if (isOneHourTime && !sentReminders.has(oneHourReminderId)) {
           markReminderSent(userId, oneHourReminderId);
           createReminderNotification({
@@ -398,7 +342,6 @@ function StudentDashboard() {
             reminderType: '1hour',
             eventStartDate: startDate.toISOString(),
           });
-
           if ('Notification' in window && Notification.permission === 'granted') {
             try {
               new Notification(`Event Reminder: ${eventTitle}`, {
@@ -412,8 +355,6 @@ function StudentDashboard() {
           }
         }
       });
-
-      // Refresh reminders list
       fetchReminders();
       fetchNotifications();
     } catch (err) {
@@ -425,26 +366,22 @@ function StudentDashboard() {
     try {
       const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${API_BASE}/events/registered`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
       if (!res.ok) {
-        // Likely unauthorized if no token; keep empty list gracefully
         try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
         return;
       }
       const data = await res.json();
       const events = Array.isArray(data) ? data : [];
-      // Filter out restricted events that user can't access
       const filteredEvents = events.filter(event => {
         const eventId = event._id || event.id;
-        if (!eventId) return true; // Include events without ID
+        if (!eventId) return true;
         return canUserAccessEvent(eventId);
       });
       setRegisteredEvents(filteredEvents);
@@ -466,98 +403,25 @@ function StudentDashboard() {
     { label: "Unread Notifications", value: unreadNotifications.length || 0 },
   ];
 
-  const tabButtons = [
-    { key: "browse", label: "🎯 Browse Events", onClick: () => setActiveTab("browse") },
-    {
-      key: "gym-sessions",
-      label: "🏋️ Gym Sessions",
-      onClick: () => {
-        setActiveTab("gym-sessions");
-        fetchGymSessions();
-      },
-    },
-    { key: "registered", label: "✓ My Registered Events", onClick: () => setActiveTab("registered") },
-    { key: "favourites", label: "❤️ Favourites", onClick: () => setActiveTab("favourites") },
-    { key: "courts", label: "🏀 Courts", onClick: () => setActiveTab("courts") },
-    {
-      key: "notifications",
-      label: "🔔 Notifications",
-      onClick: () => {
-        setActiveTab("notifications");
-        fetchNotifications();
-      },
-      badgeCount: unreadNotifications.length,
-    },
-    {
-      key: "reminders",
-      label: "⏰ Reminders",
-      onClick: () => {
-        setActiveTab("reminders");
-        fetchReminders();
-      },
-      badgeCount: unreadReminders.length,
-    },
-    { key: "loyalty", label: "🤝 Loyalty Partners", onClick: () => setActiveTab("loyalty"), variant: "gold" },
-    { key: "polls", label: "🗳️ Student Polls", onClick: () => setActiveTab("polls") },
-  ];
-
-  const firstRowCount = Math.ceil(tabButtons.length / 2);
-  const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
-
-  const renderTabButton = (tab) => {
-    const isActive = activeTab === tab.key;
-    const style = getTabButtonStyle(isActive, tab.variant);
-    return (
-      <button key={tab.key} onClick={tab.onClick} style={style}>
-        {tab.label}
-        {tab.badgeCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: spacing.sm,
-              right: spacing.sm,
-              background: colors.error,
-              color: colors.white,
-              borderRadius: borderRadius.full,
-              width: "20px",
-              height: "20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: typography.fontSize.xs,
-              fontWeight: typography.fontWeight.bold,
-            }}
-          >
-            {tab.badgeCount}
-          </span>
-        )}
-      </button>
-    );
-  };
-
   const fetchCourts = async () => {
     try {
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${API_BASE}/courts`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
       const data = await res.json();
       const raw = Array.isArray(data) ? data : (Array.isArray(data.courts) ? data.courts : []);
-      // normalize each court to include availabilityDates and available boolean
       const now = new Date();
       const processed = raw.map(court => {
         const slots = Array.isArray(court.availability) ? court.availability : [];
-        // filter future slots that are not booked
         const availabilityDates = slots
           .filter(s => {
             try {
               if (s.isBooked) return false;
               const slotDate = new Date(s.date);
-              // combine with startTime
               if (!s.startTime) return false;
               const [h, m] = s.startTime.split(':').map(x => parseInt(x, 10));
               slotDate.setHours(h || 0, m || 0, 0, 0);
@@ -565,12 +429,9 @@ function StudentDashboard() {
             } catch (e) { return false; }
           })
           .map(s => ({ slotId: s._id, date: s.date, startTime: s.startTime, endTime: s.endTime }));
-
         const available = (court.status === 'available') && availabilityDates.length > 0;
-
         return { ...court, availabilityDates, available };
       });
-
       if (processed.length === 0) {
         setCourts(generateFakeCourts());
       } else {
@@ -578,7 +439,6 @@ function StudentDashboard() {
       }
     } catch (err) {
       console.error(err);
-      // Frontend-only fallback
       setCourts(generateFakeCourts());
     }
   };
@@ -606,7 +466,6 @@ function StudentDashboard() {
       showToast.success(res.message || 'Registered successfully');
       setGymStatus(prev => ({ ...prev, [sessionId]: { ok: true, msg: res.message || 'Registered successfully' } }));
       await fetchGymSessions();
-      // Refresh registered events so the new registration appears in "My Registered Events" tab
       await fetchRegisteredEvents();
     } catch (err) {
       const msg = (err && err.message) || 'Failed to register';
@@ -674,10 +533,7 @@ function StudentDashboard() {
     try {
       const ids = getFavouriteIds().map(String);
       if (!ids.length) { setFavouriteEvents([]); return; }
-
       let list = [];
-
-      // Fetch published events
       try {
         const res = await fetch(`${API_BASE}/events`);
         const data = await res.json();
@@ -685,8 +541,6 @@ function StudentDashboard() {
       } catch (e) {
         console.error("Error fetching events for favorites:", e);
       }
-
-      // Add frontend-approved workshops
       try {
         const approvedSet = getApprovedWorkshops();
         if (approvedSet.size > 0) {
@@ -696,10 +550,7 @@ function StudentDashboard() {
             const approvedWorkshops = sortData.filter(
               w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
             );
-            // Mark as published for display
             approvedWorkshops.forEach(w => { w.status = 'published'; });
-
-            // Merge avoiding duplicates
             const existingIds = new Set(list.map(e => e._id));
             const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
             list = [...list, ...newWorkshops];
@@ -708,10 +559,8 @@ function StudentDashboard() {
       } catch (e) {
         console.log('Error adding approved workshops to favorites:', e);
       }
-
       const filtered = list.filter(ev => {
         const eventId = ev._id || ev.id;
-        // Check if event is in favorites AND user has access
         return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
       });
       setFavouriteEvents(filtered);
@@ -720,291 +569,272 @@ function StudentDashboard() {
     }
   };
 
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <Navbar />
+  const sidebarMenuItems = [
+    { label: "Home", path: "#", icon: "🏠", onClick: () => setActiveTab("home") },
+    { label: "Browse Events", path: "#", icon: "🎯", onClick: () => setActiveTab("browse") },
+    { label: "Gym Sessions", path: "#", icon: "🏋️", onClick: () => { setActiveTab("gym-sessions"); fetchGymSessions(); } },
+    { label: "My Events", path: "#", icon: "✓", onClick: () => setActiveTab("registered") },
+    { label: "Favourites", path: "#", icon: "❤️", onClick: () => setActiveTab("favourites") },
+    { label: "Courts", path: "#", icon: "🏀", onClick: () => setActiveTab("courts") },
+    { label: "Notifications", path: "#", icon: "🔔", onClick: () => { setActiveTab("notifications"); fetchNotifications(); }, badge: unreadNotifications.length },
+    { label: "Reminders", path: "#", icon: "⏰", onClick: () => { setActiveTab("reminders"); fetchReminders(); }, badge: unreadReminders.length },
+    { label: "Loyalty", path: "#", icon: "🤝", onClick: () => setActiveTab("loyalty") },
+    { label: "Polls", path: "#", icon: "🗳️", onClick: () => setActiveTab("polls") },
+  ];
 
-      <div
-        style={{
-          paddingTop: "120px",
-          padding: "120px 40px 80px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
+  return (
+    <DashboardLayout menuItems={sidebarMenuItems}>
+      <>
         {Boolean(bannerMsg) && (
-          <div style={{
-            position: 'fixed',
-            top: 80,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: colors.success,
-            color: colors.white,
-            borderRadius: borderRadius.lg,
-            padding: `${spacing.md} ${spacing.lg}`,
-            boxShadow: shadows.xl,
-            zIndex: 9999,
-            fontWeight: typography.fontWeight.extrabold,
-            letterSpacing: 0.3,
-            fontSize: typography.fontSize.sm,
-          }}>
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-emerald-500 text-white rounded-lg px-6 py-3 shadow-xl z-[9999] font-bold text-sm tracking-wide">
             {bannerMsg}
           </div>
         )}
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: `${spacing['3xl']} ${spacing['2xl']}`,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            <div style={headerContainerStyle}>
-              <div style={{ flex: "1 1 520px", minWidth: 320 }}>
-                <h1
-                  style={{
-                    fontSize: typography.fontSize['3xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
-                  Welcome back, {user.firstName}! 👋
-                </h1>
-                <p
-                  style={{
-                    fontSize: typography.fontSize.lg,
-                    color: colors.gray500,
-                    margin: 0,
-                  }}
-                >
-                  Discover and register for amazing events
-                </p>
-                <div style={{ height: spacing.md }} />
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.md,
-                  alignItems: "center",
-                  flexShrink: 0,
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: spacing.md,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {statCards.map((card) => (
-                    <div key={card.label} style={statCardBase}>
-                      <div style={statValueStyle}>{card.value}</div>
-                      <div style={statLabelStyle}>{card.label}</div>
-                    </div>
-                  ))}
+
+        {activeTab === "home" && (
+          <div className="space-y-8">
+            <div className="bg-slate-100 p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+                {/* Left Side: Welcome Text */}
+                <div className="flex-1 min-w-[300px]">
+                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
+                    Welcome back, {user.firstName}! 👋
+                  </h1>
+                  <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
+                    Discover and register for amazing events happening on campus.
+                  </p>
                 </div>
-                <WalletBadge
-                  balance={walletBalance}
-                  currency="EGP"
-                  onTopUp={() => setTopUpOpen(true)}
-                  style={{ width: "auto" }}
-                />
+
+                {/* Right Side: Stats & Wallet */}
+                <div className="flex flex-col gap-4 items-end flex-shrink-0 w-full md:w-auto">
+                  {/* Wallet Badge - Top Right */}
+                  <div className="w-full md:w-auto flex justify-end">
+                    <WalletBadge
+                      balance={walletBalance}
+                      currency="EGP"
+                      onTopUp={() => setTopUpOpen(true)}
+                      className="w-full md:w-auto justify-between md:justify-start"
+                    />
+                  </div>
+
+                  {/* Stats Cards */}
+                  <div className="flex gap-3 flex-wrap justify-end w-full md:w-auto">
+                    {statCards.map((card) => (
+                      <div
+                        key={card.label}
+                        className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300"
+                      >
+                        <div className="text-2xl font-bold text-slate-900 mb-1">{card.value}</div>
+                        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{card.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Quick Access & Chatbot */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Quick Access */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                  <span>⚡</span> Quick Access
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setActiveTab('browse')}
+                    className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all text-left group"
+                  >
+                    <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🎯</div>
+                    <div className="font-bold text-slate-700 group-hover:text-emerald-700">Browse Events</div>
+                    <div className="text-xs text-slate-500">Find new activities</div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('courts')}
+                    className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
+                  >
+                    <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🏀</div>
+                    <div className="font-bold text-slate-700 group-hover:text-blue-700">Book Court</div>
+                    <div className="text-xs text-slate-500">Reserve sports facilities</div>
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('gym-sessions'); fetchGymSessions(); }}
+                    className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl transition-all text-left group"
+                  >
+                    <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">🏋️</div>
+                    <div className="font-bold text-slate-700 group-hover:text-amber-700">Gym Sessions</div>
+                    <div className="text-xs text-slate-500">View schedule</div>
+                  </button>
+                  <button
+                    onClick={() => setTopUpOpen(true)}
+                    className="p-4 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl transition-all text-left group"
+                  >
+                    <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">💳</div>
+                    <div className="font-bold text-slate-700 group-hover:text-purple-700">Top Up Wallet</div>
+                    <div className="text-xs text-slate-500">Add funds</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Chatbot Placeholder */}
+              <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center min-h-[200px] relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative z-10">
+                  <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-3xl mb-4 mx-auto">
+                    🤖
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700 mb-1">AI Assistant</h3>
+                  <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                    Coming soon! A smart chatbot to help you navigate events and answer your questions.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Tabs */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: spacing.md,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              flexDirection: "column",
-              gap: spacing.md,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            {tabRows.map((row, idx) => (
-              <div key={`tab-row-${idx}`} style={tabRowStyle}>
-                {row.map(renderTabButton)}
-              </div>
-            ))}
-          </div>
-
-          {/* Content */}
-          {activeTab === "browse" && <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />}
-          {activeTab === "registered" && (
-            <MyEventsList
-              events={registeredEvents.filter(event => {
-                const eventId = event._id || event.id;
-                if (!eventId) return true;
-                const hasAccess = canUserAccessEvent(eventId);
-                if (!hasAccess) {
-                  console.log('Removing restricted event from registered display:', eventId, event.title);
-                }
-                return hasAccess;
-              })}
-              showRefundButton
-              onRefresh={fetchRegisteredEvents}
-            />
+        <div className="mt-8">
+          {activeTab === "browse" && (
+            <div className="space-y-6">
+              <EventsList presetType={presetType} showQuickNav={true} enableFavorites={true} />
+            </div>
           )}
-          {activeTab === "favourites" && <MyEventsList events={favouriteEvents} />}
-          {activeTab === "courts" && <CourtsReserve courts={courts} onReserved={handleReserve} />}
+
+          {activeTab === "registered" && (
+            <div className="space-y-6">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-slate-900">My Events</h2>
+                <p className="text-slate-500">Manage your registrations and view event details</p>
+              </div>
+              <MyEventsList
+                events={registeredEvents.filter(event => {
+                  const eventId = event._id || event.id;
+                  if (!eventId) return true;
+                  const hasAccess = canUserAccessEvent(eventId);
+                  if (!hasAccess) {
+                    console.log('Removing restricted event from registered display:', eventId, event.title);
+                  }
+                  return hasAccess;
+                })}
+                showRefundButton
+                onRefresh={fetchRegisteredEvents}
+              />
+            </div>
+          )}
+
+          {activeTab === "favourites" && (
+            <div className="space-y-6">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
+                <p className="text-slate-500">Your saved events and workshops</p>
+              </div>
+              <MyEventsList events={favouriteEvents} />
+            </div>
+          )}
+
+          {activeTab === "courts" && (
+            <div className="space-y-6">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-slate-900">Sports Courts</h2>
+                <p className="text-slate-500">Book tennis, basketball, and football courts</p>
+              </div>
+              <CourtsReserve courts={courts} onReserved={handleReserve} />
+            </div>
+          )}
 
           {activeTab === "gym-sessions" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <h2 style={{
-                color: colors.primary,
-                marginBottom: spacing.xl,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-              }}>
-                Gym Sessions
-              </h2>
-              {gymSessionsLoading ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>Loading sessions...</p>
-                </div>
-              ) : gymSessionsError ? (
-                <div style={{
-                  color: colors.error,
-                  background: colors.errorLight,
-                  padding: spacing.lg,
-                  borderRadius: borderRadius.xl,
-                  marginBottom: spacing.lg,
-                }}>{gymSessionsError}</div>
-              ) : (!gymSessions || gymSessions.length === 0) ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🏋️</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>No gym sessions scheduled</p>
-                </div>
-              ) : (() => {
-                const typeMap = {
-                  yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba',
-                  crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
-                };
-                const byMonth = (gymSessions || []).reduce((acc, s) => {
-                  const d = s.startDate ? new Date(s.startDate) : null;
-                  const key = d ? d.toLocaleString(undefined, { month: 'long', year: 'numeric' }) : 'Scheduled';
-                  (acc[key] ||= []).push(s);
-                  return acc;
-                }, {});
-                const monthKeys = Object.keys(byMonth).sort((a, b) => {
-                  const da = new Date(a); const db = new Date(b);
-                  return (!isNaN(da) && !isNaN(db)) ? (da - db) : a.localeCompare(b);
-                });
+            <div className="space-y-6">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
+                <p className="text-slate-500">View schedule and register for sessions</p>
+              </div>
+              <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                {gymSessionsLoading ? (
+                  <div className="text-center py-20">
+                    <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                    <p className="text-slate-500 text-base">Loading sessions...</p>
+                  </div>
+                ) : gymSessionsError ? (
+                  <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 flex items-center gap-3">
+                    <span className="text-2xl">⚠️</span>
+                    <span className="font-medium">{gymSessionsError}</span>
+                  </div>
+                ) : (!gymSessions || gymSessions.length === 0) ? (
+                  <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                    <div className="text-6xl mb-6 opacity-50">🏋️</div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">No Sessions Found</h3>
+                    <p className="text-slate-500">There are no gym sessions scheduled at the moment.</p>
+                  </div>
+                ) : (() => {
+                  const typeMap = {
+                    yoga: 'Yoga', pilates: 'Pilates', cardio: 'Aerobics', zumba: 'Zumba',
+                    crossfit: 'Cross Circuit', other: 'Kick-boxing', strength: 'Strength', spinning: 'Spinning'
+                  };
+                  const byMonth = (gymSessions || []).reduce((acc, s) => {
+                    const d = s.startDate ? new Date(s.startDate) : null;
+                    const key = d ? d.toLocaleString(undefined, { month: 'long', year: 'numeric' }) : 'Scheduled';
+                    (acc[key] ||= []).push(s);
+                    return acc;
+                  }, {});
+                  const monthKeys = Object.keys(byMonth).sort((a, b) => {
+                    const da = new Date(a); const db = new Date(b);
+                    return (!isNaN(da) && !isNaN(db)) ? (da - db) : a.localeCompare(b);
+                  });
 
-                const currentUserId = (() => {
-                  try {
-                    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-                    if (!raw) return null;
-                    const u = JSON.parse(raw);
-                    return u && (u._id || u.id) ? String(u._id || u.id) : null;
-                  } catch (_) { return null; }
-                })();
+                  const currentUserId = (() => {
+                    try {
+                      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+                      if (!raw) return null;
+                      const u = JSON.parse(raw);
+                      return u && (u._id || u.id) ? String(u._id || u.id) : null;
+                    } catch (_) { return null; }
+                  })();
 
-                const isStarted = (s) => {
-                  try { return new Date(s.startDate) <= new Date(); } catch { return false; }
-                };
+                  const isStarted = (s) => {
+                    try { return new Date(s.startDate) <= new Date(); } catch { return false; }
+                  };
 
-                const isFull = (s) => {
-                  try {
-                    const reg = Array.isArray(s.registeredUsers) ? s.registeredUsers.length : (s.registeredCount || 0);
-                    return Number(s.capacity || 0) > 0 && reg >= Number(s.capacity || 0);
-                  } catch { return false; }
-                };
+                  const isFull = (s) => {
+                    try {
+                      const reg = Array.isArray(s.registeredUsers) ? s.registeredUsers.length : (s.registeredCount || 0);
+                      return Number(s.capacity || 0) > 0 && reg >= Number(s.capacity || 0);
+                    } catch { return false; }
+                  };
 
-                const alreadyRegistered = (s) => {
-                  try {
-                    if (!currentUserId) return false;
-                    const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
-                    return arr.map(String).includes(String(currentUserId));
-                  } catch { return false; }
-                };
+                  const alreadyRegistered = (s) => {
+                    try {
+                      if (!currentUserId) return false;
+                      const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
+                      return arr.map(String).includes(String(currentUserId));
+                    } catch { return false; }
+                  };
 
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing['2xl'] }}>
-                    {monthKeys.map((month) => {
-                      const items = byMonth[month] || [];
-                      const byType = items.reduce((acc, s) => {
-                        const label = typeMap[s.sessionType] || s.sessionType || 'Session';
-                        (acc[label] ||= []).push(s);
-                        return acc;
-                      }, {});
-                      const typeKeys = Object.keys(byType).sort();
-                      return (
-                        <div key={month}>
-                          <div style={{
-                            background: colors.bgCard,
-                            padding: `${spacing.lg} ${spacing.xl}`,
-                            borderRadius: borderRadius.xl,
-                            boxShadow: shadows.md,
-                            border: `1px solid ${colors.gray200}`,
-                          }}>
-                            <h3 style={{
-                              margin: 0,
-                              color: colors.primary,
-                              fontSize: typography.fontSize.xl,
-                              fontWeight: typography.fontWeight.bold,
-                            }}>{month}</h3>
-                            <div style={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                              gap: spacing.lg,
-                              marginTop: spacing.lg
-                            }}>
+                  return (
+                    <div className="flex flex-col gap-8">
+                      {monthKeys.map((month) => {
+                        const items = byMonth[month] || [];
+                        const byType = items.reduce((acc, s) => {
+                          const label = typeMap[s.sessionType] || s.sessionType || 'Session';
+                          (acc[label] ||= []).push(s);
+                          return acc;
+                        }, {});
+                        const typeKeys = Object.keys(byType).sort();
+                        return (
+                          <div key={month}>
+                            <div className="flex items-center gap-4 mb-6">
+                              <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">{month}</h3>
+                              <div className="h-px bg-slate-200 flex-1"></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                               {typeKeys.map((tk) => (
-                                <div key={tk} style={{
-                                  background: colors.white,
-                                  border: `1px solid ${colors.gray200}`,
-                                  borderRadius: borderRadius.xl,
-                                  padding: spacing.lg
-                                }}>
-                                  <div style={{
-                                    fontWeight: typography.fontWeight.extrabold,
-                                    color: colors.primary,
-                                    marginBottom: spacing.sm,
-                                    fontSize: typography.fontSize.base,
-                                  }}>{tk}</div>
-                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: colors.gray700 }}>
+                                <div key={tk} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
+                                  <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
+                                    <div className="font-bold text-slate-900 text-lg">{tk}</div>
+                                    <div className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">
+                                      {byType[tk].length} Session{byType[tk].length !== 1 ? 's' : ''}
+                                    </div>
+                                  </div>
+                                  <ul className="divide-y divide-slate-100">
                                     {byType[tk]
                                       .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
                                       .map((s) => {
@@ -1013,73 +843,49 @@ function StudentDashboard() {
                                         const full = isFull(s);
                                         const mine = alreadyRegistered(s);
                                         const disabled = started || full || mine || gymBusyId === id;
-                                        const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (gymBusyId === id ? 'Registering...' : 'Register');
+                                        const label = mine ? 'Registered' : full ? 'Full' : started ? 'Started' : (gymBusyId === id ? '...' : 'Register');
                                         const fmtDateTime = (date) => {
                                           if (!date) return 'TBA';
                                           const d = new Date(date);
-                                          return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                          return {
+                                            date: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+                                            time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                          };
                                         };
+                                        const dt = fmtDateTime(s.startDate);
+                                        const st = gymStatus[id];
+
                                         return (
-                                          <li key={id} style={{
-                                            padding: `${spacing.sm} 0`,
-                                            borderTop: `1px solid ${colors.gray100}`
-                                          }}>
-                                            <div style={{
-                                              display: 'flex',
-                                              justifyContent: 'space-between',
-                                              alignItems: 'center',
-                                              gap: spacing.lg
-                                            }}>
+                                          <li key={id} className="p-4 hover:bg-slate-50 transition-colors">
+                                            <div className="flex justify-between items-center gap-4">
                                               <div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.sm,
-                                                  fontWeight: typography.fontWeight.medium,
-                                                  color: colors.gray700,
-                                                }}>{fmtDateTime(s.startDate)}</div>
-                                                <div style={{
-                                                  fontSize: typography.fontSize.xs,
-                                                  color: colors.gray500,
-                                                  marginTop: spacing.xs,
-                                                }}>
-                                                  Instructor: {s.instructor || "TBA"} {s.capacity ? `• Capacity: ${s.capacity}` : ""}
+                                                <div className="flex items-center gap-2 mb-1">
+                                                  <span className="font-bold text-slate-700 text-sm bg-slate-100 px-2 py-0.5 rounded">{dt.date}</span>
+                                                  <span className="text-sm font-medium text-slate-600">{dt.time}</span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex items-center gap-1">
+                                                  <span>👤 {s.instructor || "TBA"}</span>
+                                                  {s.capacity && <span>• 👥 {s.capacity} cap</span>}
                                                 </div>
                                               </div>
                                               <div>
                                                 <button
+                                                  onClick={() => handleGymRegister(id)}
                                                   disabled={disabled}
-                                                  onClick={() => !disabled && handleGymRegister(id)}
-                                                  style={{
-                                                    ...(disabled ? {} : buttonStyles.primary),
-                                                    padding: `${spacing.sm} ${spacing.lg}`,
-                                                    background: disabled ? colors.gray200 : undefined,
-                                                    color: disabled ? colors.gray500 : colors.primary,
-                                                    border: 'none',
-                                                    borderRadius: borderRadius.lg,
-                                                    fontWeight: typography.fontWeight.bold,
-                                                    fontSize: typography.fontSize.sm,
-                                                    cursor: disabled ? 'not-allowed' : 'pointer',
-                                                    opacity: disabled ? 0.7 : 1,
-                                                  }}
-                                                  onMouseEnter={(e) => {
-                                                    if (!disabled) {
-                                                      e.target.style.boxShadow = shadows.accentHover;
-                                                    }
-                                                  }}
-                                                  onMouseLeave={(e) => {
-                                                    if (!disabled) {
-                                                      e.target.style.boxShadow = shadows.accent;
-                                                    }
-                                                  }}
-                                                >{label}</button>
+                                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${disabled
+                                                    ? mine
+                                                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                                    : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-md hover:-translate-y-0.5'
+                                                    }`}
+                                                >
+                                                  {label}
+                                                </button>
                                               </div>
                                             </div>
-                                            {gymStatus[id] && gymStatus[id].msg && (
-                                              <div style={{
-                                                marginTop: spacing.sm,
-                                                fontSize: typography.fontSize.xs,
-                                                color: gymStatus[id].ok ? colors.success : colors.error
-                                              }}>
-                                                {gymStatus[id].msg}
+                                            {st && (
+                                              <div className={`mt-2 text-xs font-medium px-2 py-1 rounded ${st.ok ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                {st.msg}
                                               </div>
                                             )}
                                           </li>
@@ -1090,448 +896,180 @@ function StudentDashboard() {
                               ))}
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "notifications" && (
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+                  <p className="text-slate-500">Updates about events and activities</p>
+                </div>
+              </div>
+              {notifications.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <div className="text-4xl mb-4">🔔</div>
+                  <p>No notifications at this time.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {notifications.map((notif) => {
+                    const isRead = notif.read || notif.isRead;
+                    return (
+                      <div
+                        key={notif.id || notif._id}
+                        className={`p-6 rounded-xl border transition-all ${isRead
+                          ? 'bg-slate-50 border-slate-200'
+                          : 'bg-white border-emerald-200 shadow-md'
+                          }`}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              {notif.type === 'NewEvent' && <span className="text-2xl">🎉</span>}
+                              {notif.type === 'LoyaltyPartnerAdded' && <span className="text-2xl">⭐</span>}
+                              <h3 className={`text-lg ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                                {notif.type === 'NewEvent' ? 'New Event Available' :
+                                  notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
+                                    'Notification'}
+                              </h3>
+                              {!isRead && (
+                                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                              )}
+                            </div>
+                            <p className={`text-base mb-2 ${isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                              {notif.message}
+                            </p>
+                            {notif.eventId && (
+                              <button
+                                onClick={() => {
+                                  window.location.href = `/events/${notif.eventId}`;
+                                }}
+                                className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
+                              >
+                                View Event
+                              </button>
+                            )}
+                            <p className="text-xs text-slate-400 mt-3">
+                              {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                            </p>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === "reminders" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold,
-                }}>
-                  Event Reminders
-                </h2>
-                {reminders.filter(n => !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markReminderRead(reminder.id);
-                      });
-                      fetchReminders();
-                    }}
-                    style={{
-                      ...pillButtonStyles.neutral,
-                      fontSize: typography.fontSize.sm,
-                    }}
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Reminders</h2>
+                  <p className="text-slate-500">Don't miss your upcoming events</p>
+                </div>
               </div>
               {reminders.length === 0 ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏰</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>No reminders at this time.</p>
+                <div className="text-center py-12 text-slate-500">
+                  <div className="text-4xl mb-4">⏰</div>
+                  <p>No reminders at this time.</p>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {reminders.map((reminder) => (
-                    <div
-                      key={reminder.id}
-                      style={{
-                        padding: spacing.xl,
-                        background: reminder.isRead ? colors.gray50 : colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: reminder.isRead ? `1px solid ${colors.gray200}` : `2px solid ${colors.warning}`,
-                        position: "relative",
-                        boxShadow: reminder.isRead ? shadows.sm : shadows.md,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                            <span style={{ fontSize: typography.fontSize['2xl'] }}>⏰</span>
-                            <h3 style={{
-                              color: colors.primary,
-                              margin: 0,
-                              fontSize: typography.fontSize.lg,
-                              fontWeight: reminder.isRead ? typography.fontWeight.medium : typography.fontWeight.bold,
-                            }}>
-                              Event Reminder
-                            </h3>
-                            {!reminder.isRead && (
-                              <span style={{
-                                background: colors.error,
-                                color: colors.white,
-                                borderRadius: borderRadius.full,
-                                width: "10px",
-                                height: "10px",
-                                display: "inline-block",
-                              }} />
-                            )}
-                          </div>
-                          <p style={{
-                            color: colors.gray500,
-                            margin: `${spacing.sm} 0`,
-                            fontWeight: reminder.isRead ? typography.fontWeight.normal : typography.fontWeight.medium,
-                            fontSize: typography.fontSize.base,
-                          }}>
-                            {reminder.message}
-                          </p>
-                          {reminder.eventStartDate && (
-                            <p style={{
-                              color: colors.gray400,
-                              fontSize: typography.fontSize.sm,
-                              margin: `${spacing.xs} 0`,
-                            }}>
-                              Event starts: {new Date(reminder.eventStartDate).toLocaleString()}
+                <div className="flex flex-col gap-4">
+                  {reminders.map((reminder) => {
+                    const isRead = reminder.read || reminder.isRead;
+                    return (
+                      <div
+                        key={reminder.id || reminder._id}
+                        className={`p-6 rounded-xl border transition-all ${isRead
+                          ? 'bg-slate-50 border-slate-200'
+                          : 'bg-white border-amber-200 shadow-md'
+                          }`}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-2xl">⏰</span>
+                              <h3 className={`text-lg ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                                Event Reminder
+                              </h3>
+                              {!isRead && (
+                                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                              )}
+                            </div>
+                            <p className={`text-base mb-2 ${isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                              {reminder.message}
                             </p>
-                          )}
-                          {reminder.eventId && (
+                            <p className="text-xs text-slate-400 mt-3">
+                              {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {!isRead && (
+                              <button
+                                onClick={() => {
+                                  markReminderRead(reminder.id || reminder._id);
+                                  fetchReminders();
+                                }}
+                                className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors"
+                              >
+                                Mark Read
+                              </button>
+                            )}
                             <button
                               onClick={() => {
-                                window.location.href = `/events/${reminder.eventId}`;
-                              }}
-                              style={{
-                                marginTop: spacing.md,
-                                ...buttonStyles.primary,
-                                padding: `${spacing.sm} ${spacing.md}`,
-                                fontSize: typography.fontSize.sm,
-                              }}
-                            >
-                              View Event
-                            </button>
-                          )}
-                          <p style={{
-                            color: colors.gray400,
-                            fontSize: typography.fontSize.sm,
-                            margin: `${spacing.sm} 0 0 0`,
-                          }}>
-                            {reminder.createdAt ? new Date(reminder.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                          {!reminder.isRead && (
-                            <button
-                              onClick={() => {
-                                markReminderRead(reminder.id);
+                                deleteReminder(reminder.id || reminder._id);
                                 fetchReminders();
+                                showToast.success('Reminder deleted');
                               }}
-                              style={{
-                                ...pillButtonStyles.success,
-                                fontSize: typography.fontSize.sm,
-                              }}
+                              className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
                             >
-                              Mark Read
+                              Delete
                             </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              deleteReminder(reminder.id);
-                              fetchReminders();
-                            }}
-                            style={{
-                              padding: `${spacing.xs} ${spacing.md}`,
-                              background: colors.error,
-                              color: colors.white,
-                              border: 'none',
-                              borderRadius: borderRadius.lg,
-                              fontSize: typography.fontSize.sm,
-                              fontWeight: typography.fontWeight.semibold,
-                              cursor: 'pointer',
-                              transition: transitions.fast,
-                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.transform = 'translateY(-1px)';
-                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                              e.target.style.background = '#b91c1c';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.transform = 'translateY(0)';
-                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                              e.target.style.background = colors.error;
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === "loyalty" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
+            <div className="space-y-6">
               <LoyaltyPartnersList />
             </div>
           )}
+
           {activeTab === "polls" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
+            <div className="space-y-6">
               <StudentPollVoting />
             </div>
           )}
-
-          {activeTab === "notifications" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <h2 style={{
-                  color: colors.primary,
-                  margin: 0,
-                  fontSize: typography.fontSize['2xl'],
-                  fontWeight: typography.fontWeight.bold,
-                }}>
-                  Notifications
-                </h2>
-                <div style={{ display: "flex", gap: spacing.md }}>
-                  {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
-                    <button
-                      onClick={() => {
-                        markAllStudentNotificationsRead();
-                        fetchNotifications();
-                        showToast.success('All notifications marked as read');
-                      }}
-                      style={{
-                        ...pillButtonStyles.neutral,
-                        fontSize: typography.fontSize.sm,
-                      }}
-                    >
-                      Mark All as Read
-                    </button>
-                  )}
-                  {notifications.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                        if (confirmed) {
-                          deleteAllStudentNotifications();
-                          fetchNotifications();
-                          showToast.success('All notifications deleted');
-                        }
-                      }}
-                      style={{
-                        padding: `${spacing.sm} ${spacing.md}`,
-                        background: colors.error,
-                        color: colors.white,
-                        border: 'none',
-                        borderRadius: borderRadius.lg,
-                        fontSize: typography.fontSize.sm,
-                        fontWeight: typography.fontWeight.semibold,
-                        cursor: 'pointer',
-                        transition: transitions.fast,
-                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-1px)';
-                        e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                        e.target.style.background = '#b91c1c';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                        e.target.style.background = colors.error;
-                      }}
-                    >
-                      Delete All
-                    </button>
-                  )}
-                </div>
-              </div>
-              {notifications.length === 0 ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: `${spacing['6xl']} ${spacing.xl}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>🔔</div>
-                  <p style={{
-                    color: colors.gray500,
-                    fontSize: typography.fontSize.base,
-                  }}>No notifications at this time.</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
-                  {notifications.map((notif) => (
-                    <div
-                      key={notif.id || notif._id}
-                      style={{
-                        padding: spacing.xl,
-                        background: (notif.read || notif.isRead) ? colors.gray50 : colors.white,
-                        borderRadius: borderRadius.xl,
-                        border: (notif.read || notif.isRead) ? `1px solid ${colors.gray200}` : `2px solid ${colors.accent}`,
-                        position: "relative",
-                        boxShadow: (notif.read || notif.isRead) ? shadows.sm : shadows.md,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.lg }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: spacing.md, marginBottom: spacing.sm }}>
-                            {notif.type === 'NewEvent' && (
-                              <span style={{ fontSize: typography.fontSize['2xl'] }}>🎉</span>
-                            )}
-                            {notif.type === 'LoyaltyPartnerAdded' && (
-                              <span style={{ fontSize: typography.fontSize['2xl'] }}>⭐</span>
-                            )}
-                            <h3 style={{
-                              color: colors.primary,
-                              margin: 0,
-                              fontSize: typography.fontSize.lg,
-                              fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.medium : typography.fontWeight.bold,
-                            }}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' :
-                                notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
-                                  'Notification'}
-                            </h3>
-                            {!(notif.read || notif.isRead) && (
-                              <span style={{
-                                background: colors.error,
-                                color: colors.white,
-                                borderRadius: borderRadius.full,
-                                width: "10px",
-                                height: "10px",
-                                display: "inline-block",
-                              }} />
-                            )}
-                          </div>
-                          <p style={{
-                            color: colors.gray500,
-                            margin: `${spacing.sm} 0`,
-                            fontWeight: (notif.read || notif.isRead) ? typography.fontWeight.normal : typography.fontWeight.medium,
-                            fontSize: typography.fontSize.base,
-                          }}>
-                            {notif.message}
-                          </p>
-                          {notif.eventId && (
-                            <button
-                              onClick={() => {
-                                window.location.href = `/events/${notif.eventId}`;
-                              }}
-                              style={{
-                                marginTop: spacing.md,
-                                ...buttonStyles.primary,
-                                padding: `${spacing.sm} ${spacing.md}`,
-                                fontSize: typography.fontSize.sm,
-                              }}
-                            >
-                              View Event
-                            </button>
-                          )}
-                          <p style={{
-                            color: colors.gray400,
-                            fontSize: typography.fontSize.sm,
-                            margin: `${spacing.sm} 0 0 0`,
-                          }}>
-                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column" }}>
-                          {!notif.isRead && (
-                            <button
-                              onClick={() => {
-                                markStudentNotificationRead(notif.id);
-                                fetchNotifications();
-                              }}
-                              style={{
-                                ...pillButtonStyles.success,
-                                fontSize: typography.fontSize.sm,
-                              }}
-                            >
-                              Mark Read
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              deleteStudentNotification(notif.id);
-                              fetchNotifications();
-                              showToast.success('Notification deleted');
-                            }}
-                            style={{
-                              padding: `${spacing.xs} ${spacing.md}`,
-                              background: colors.error,
-                              color: colors.white,
-                              border: 'none',
-                              borderRadius: borderRadius.lg,
-                              fontSize: typography.fontSize.sm,
-                              fontWeight: typography.fontWeight.semibold,
-                              cursor: 'pointer',
-                              transition: transitions.fast,
-                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.transform = 'translateY(-1px)';
-                              e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                              e.target.style.background = '#b91c1c';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.transform = 'translateY(0)';
-                              e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                              e.target.style.background = colors.error;
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      </div>
-      {topUpOpen && (
+
         <TopUpDialog
           open={topUpOpen}
           onClose={() => setTopUpOpen(false)}
-          onSuccess={(res) => {
-            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
-            if (typeof next === 'number') setWalletBalance(next);
+          onSuccess={(amount) => {
+            setWalletBalance((prev) => (prev || 0) + amount);
+            setTopUpOpen(false);
+            showToast.success(`Successfully added ${amount} EGP to wallet`);
           }}
         />
-      )}
-    </div>
+      </>
+    </DashboardLayout>
   );
 }
 
 export default StudentDashboard;
-
