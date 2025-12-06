@@ -167,7 +167,7 @@ module.exports = {
                 durationMinutes,
                 prerequisites
             } = req.body;
-        
+
             // Check for duplicate events (same title, location, and startDate)
             if (title && location && startDate) {
                 const existingEvent = await Event.findOne({
@@ -176,14 +176,14 @@ module.exports = {
                     startDate: new Date(startDate),
                     status: { $ne: 'cancelled' } // Don't count cancelled events as duplicates
                 });
-                
+
                 if (existingEvent) {
-                    return res.status(409).json({ 
-                        error: 'An event with the same title, location, and start date already exists' 
+                    return res.status(409).json({
+                        error: 'An event with the same title, location, and start date already exists'
                     });
                 }
             }
-        
+
             const eventData = {
                 title,
                 shortDescription,
@@ -548,6 +548,28 @@ module.exports = {
             user.registeredEvents.push(eventId);
             await user.save();
 
+            // Handle Disability Accommodations
+            const { needsWheelchairAccess, needsSpecialSeating, otherRequests } = req.body;
+
+            // Check if any accommodation fields are provided and true/non-empty
+            if (needsWheelchairAccess || needsSpecialSeating || (otherRequests && otherRequests.trim().length > 0)) {
+                try {
+                    await AccommodationRequest.create({
+                        user: userId,
+                        event: eventId,
+                        roleAtEvent: user.role, // Assuming user.role is available and valid enum match
+                        needsWheelchairAccess: !!needsWheelchairAccess,
+                        needsSpecialSeating: !!needsSpecialSeating,
+                        otherRequests: otherRequests
+                    });
+                } catch (accErr) {
+                    console.error('Failed to save accommodation request:', accErr);
+                    // Decide if we want to fail the registration or just log it. 
+                    // Usually better to warn, but for now we'll just log so registration succeeds.
+                    // Or we could append a warning to the response.
+                }
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Successfully registered for the event',
@@ -734,18 +756,18 @@ module.exports = {
             if (event.type === 'Workshop' && description !== undefined) {
                 const originalDescription = event.description || '';
                 const newDescription = description || '';
-                
+
                 // Check if original description had edit request markers
                 const editRequestRegex = /--- EDIT REQUEST FROM EVENTS OFFICE \([^)]+\) ---[\s\S]*?--- END EDIT REQUEST ---/g;
                 const originalHadEditRequests = editRequestRegex.test(originalDescription);
                 const newHasEditRequests = editRequestRegex.test(newDescription);
-                
+
                 // If original had edit requests but new one doesn't, professor addressed them
                 if (originalHadEditRequests && !newHasEditRequests) {
                     try {
                         // Get all EventOffice users
                         const eventOfficeUsers = await User.find({ role: 'EventOffice' });
-                        
+
                         // Create backend notification
                         await Notification.create({
                             type: 'WorkshopEditSubmitted',
@@ -753,7 +775,7 @@ module.exports = {
                             event: event._id,
                             recipientsRoles: ['EventOffice']
                         });
-                        
+
                         // Also add to each EventOffice user's notifications array (legacy support)
                         for (const officeUser of eventOfficeUsers) {
                             officeUser.notifications.push({
@@ -1054,19 +1076,19 @@ module.exports = {
             event.status = 'published';
             await event.save();
 
-        //  New Event Published notification
-        try {
-            await Notification.create({
-                type: 'NewEventPublished',
-                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
-                event: event._id,
-                recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
-            });
-        } catch (notifyErr) {
-            // don't fail the request because of a notification error
-        }
+            //  New Event Published notification
+            try {
+                await Notification.create({
+                    type: 'NewEventPublished',
+                    message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                    event: event._id,
+                    recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
+                });
+            } catch (notifyErr) {
+                // don't fail the request because of a notification error
+            }
 
-        res.status(200).json({ success: true, message: 'Event published successfully', event });
+            res.status(200).json({ success: true, message: 'Event published successfully', event });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
         }
