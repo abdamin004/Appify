@@ -169,14 +169,16 @@ function BoothPollManager() {
 
   return (
     <div id="booth-polls-section">
-      <div className="flex justify-between items-center mb-8">
+      <div className="relative flex justify-center items-center mb-8">
         <h2 className="text-2xl font-bold text-slate-800 m-0">Booth Request Polls</h2>
-        <Button
-          onClick={() => setShowCreatePoll(!showCreatePoll)}
-          className="bg-slate-900 text-white hover:bg-emerald-600"
-        >
-          + Create New Poll
-        </Button>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+          <Button
+            onClick={() => setShowCreatePoll(!showCreatePoll)}
+            className="bg-slate-900 text-white hover:bg-emerald-600"
+          >
+            + Create New Poll
+          </Button>
+        </div>
       </div>
 
       {showCreatePoll && (
@@ -297,7 +299,7 @@ function BoothPollManager() {
           Active Polls ({polls.filter(p => p.status === 'active').length})
         </h3>
         {polls.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl text-center shadow-sm border border-slate-200 text-slate-500">
+          <div className="bg-slate-50 p-12 rounded-2xl text-center border border-slate-200 border-dashed text-slate-500">
             <p>No polls created yet. Create a poll to start voting on vendor requests.</p>
           </div>
         ) : (

@@ -15,7 +15,7 @@ function CompanyDocumentsUpload() {
     try {
       const token = localStorage.getItem("token");
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-      
+
       // Get vendor data from login response stored in localStorage
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
@@ -28,7 +28,7 @@ function CompanyDocumentsUpload() {
           });
         }
       }
-      
+
       // Also try to get from backend if there's a profile endpoint
       // The upload response will also update this, so this is just for initial load
     } catch (err) {
@@ -74,7 +74,7 @@ function CompanyDocumentsUpload() {
     try {
       const token = localStorage.getItem("token");
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-      
+
       const formData = new FormData();
       if (taxCardFile) {
         formData.append('taxCard', taxCardFile);
@@ -102,14 +102,14 @@ function CompanyDocumentsUpload() {
         const logoInput = document.getElementById('logoInput');
         if (taxCardInput) taxCardInput.value = '';
         if (logoInput) logoInput.value = '';
-        
+
         // Update vendor data from response
         if (data.vendor) {
           setVendorData({
             taxCardUrl: data.vendor.taxCardUrl,
             logoUrl: data.vendor.logoUrl,
           });
-          
+
           // Also update localStorage user object
           const storedUser = localStorage.getItem("user");
           if (storedUser) {
@@ -143,229 +143,123 @@ function CompanyDocumentsUpload() {
 
   return (
     <div>
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Company Documents</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
-          Upload your tax card and company logo to prove company validity
-        </p>
-      </div>
-
-      {message.text && (
-        <div style={{
-          padding: '15px',
-          marginBottom: '20px',
-          borderRadius: '10px',
-          background: message.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          border: `2px solid ${message.type === 'success' ? '#10b981' : '#ef4444'}`,
-          color: message.type === 'success' ? '#065f46' : '#991b1b',
-        }}>
-          {message.text}
+      <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+        <div className="text-center mb-8 relative">
+          <h2 className="text-2xl font-bold text-slate-900">Company Documents</h2>
+          <p className="text-slate-500 mt-1">Upload your tax card and company logo to prove company validity</p>
         </div>
-      )}
 
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '30px',
-        borderRadius: '15px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        marginBottom: '30px',
-      }}>
-        {/* Tax Card Upload */}
-        <div style={{ marginBottom: '30px' }}>
-          <label style={{ display: 'block', marginBottom: '10px', color: '#003366', fontWeight: 600, fontSize: '1.1rem' }}>
-            📄 Tax Card *
-          </label>
-          <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '15px' }}>
-            Upload your company tax card (PDF, PNG, JPG, or JPEG - Max 5MB)
-          </p>
-          
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <input
-                id="taxCardInput"
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
-                onChange={(e) => handleFileChange('taxCard', e)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '2px dashed #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                }}
-              />
-              {taxCardFile && (
-                <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#6b7280' }}>
-                  Selected: {taxCardFile.name} ({(taxCardFile.size / 1024).toFixed(2)} KB)
+        {message.text && (
+          <div className={`p-4 mb-6 rounded-xl border-2 flex items-center gap-2 ${message.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+            <span>{message.type === 'success' ? '✓' : '⚠️'}</span> {message.text}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          {/* Tax Card Upload */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <label className="block mb-2 font-bold text-slate-800 text-lg flex items-center gap-2">
+              <span>📄</span> Tax Card <span className="text-red-500">*</span>
+            </label>
+            <p className="text-sm text-slate-500 mb-4">
+              Upload your company tax card (PDF, PNG, JPG - Max 5MB)
+            </p>
+
+            <input
+              id="taxCardInput"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => handleFileChange('taxCard', e)}
+              className="file-input file-input-bordered w-full bg-white mb-4"
+            />
+
+            {taxCardFile && (
+              <div className="text-sm text-emerald-600 font-medium mb-4 p-2 bg-emerald-50 rounded-lg">
+                Selected: {taxCardFile.name} ({(taxCardFile.size / 1024).toFixed(2)} KB)
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              {vendorData.taxCardUrl && (
+                <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-2">Current File</div>
+                  {vendorData.taxCardUrl.includes('.pdf') ? (
+                    <a href={`${baseUrl}${vendorData.taxCardUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold underline">View PDF</a>
+                  ) : (
+                    <img src={`${baseUrl}${vendorData.taxCardUrl}`} alt="Tax Card" className="max-h-32 mx-auto object-contain" />
+                  )}
+                </div>
+              )}
+              {taxCardFile && getFilePreview(taxCardFile) && (
+                <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-2">Preview</div>
+                  <img src={getFilePreview(taxCardFile)} alt="Preview" className="max-h-32 mx-auto object-contain" />
                 </div>
               )}
             </div>
-            
-            {vendorData.taxCardUrl && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Current Tax Card:</div>
-                {vendorData.taxCardUrl.endsWith('.pdf') || vendorData.taxCardUrl.includes('.pdf') ? (
-                  <a
-                    href={`${baseUrl}${vendorData.taxCardUrl}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      padding: '10px 20px',
-                      background: 'rgba(212, 175, 55, 0.15)',
-                      color: '#003366',
-                      borderRadius: '8px',
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                    }}
-                  >
-                    📄 View PDF
-                  </a>
-                ) : (
-                  <img
-                    src={`${baseUrl}${vendorData.taxCardUrl}`}
-                    alt="Tax Card"
-                    style={{
-                      maxWidth: '200px',
-                      maxHeight: '150px',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '8px',
-                      padding: '8px',
-                      background: 'white',
-                    }}
-                  />
-                )}
-              </div>
-            )}
-            
-            {taxCardFile && getFilePreview(taxCardFile) && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</div>
-                <img
-                  src={getFilePreview(taxCardFile)}
-                  alt="Tax Card Preview"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                  }}
-                />
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* Logo Upload */}
-        <div style={{ marginBottom: '30px' }}>
-          <label style={{ display: 'block', marginBottom: '10px', color: '#003366', fontWeight: 600, fontSize: '1.1rem' }}>
-            🏢 Company Logo *
-          </label>
-          <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '15px' }}>
-            Upload your company logo (PNG, JPG, or JPEG - Max 5MB)
-          </p>
-          
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <input
-                id="logoInput"
-                type="file"
-                accept=".png,.jpg,.jpeg"
-                onChange={(e) => handleFileChange('logo', e)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '2px dashed #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                }}
-              />
-              {logoFile && (
-                <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#6b7280' }}>
-                  Selected: {logoFile.name} ({(logoFile.size / 1024).toFixed(2)} KB)
+          {/* Logo Upload */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+            <label className="block mb-2 font-bold text-slate-800 text-lg flex items-center gap-2">
+              <span>🏢</span> Company Logo <span className="text-red-500">*</span>
+            </label>
+            <p className="text-sm text-slate-500 mb-4">
+              Upload your company logo (PNG, JPG - Max 5MB)
+            </p>
+
+            <input
+              id="logoInput"
+              type="file"
+              accept=".png,.jpg,.jpeg"
+              onChange={(e) => handleFileChange('logo', e)}
+              className="file-input file-input-bordered w-full bg-white mb-4"
+            />
+
+            {logoFile && (
+              <div className="text-sm text-emerald-600 font-medium mb-4 p-2 bg-emerald-50 rounded-lg">
+                Selected: {logoFile.name} ({(logoFile.size / 1024).toFixed(2)} KB)
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              {vendorData.logoUrl && (
+                <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-2">Current Logo</div>
+                  <img src={`${baseUrl}${vendorData.logoUrl}`} alt="Logo" className="max-h-32 mx-auto object-contain" />
+                </div>
+              )}
+              {logoFile && getFilePreview(logoFile) && (
+                <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                  <div className="text-xs text-slate-400 font-bold uppercase mb-2">Preview</div>
+                  <img src={getFilePreview(logoFile)} alt="Preview" className="max-h-32 mx-auto object-contain" />
                 </div>
               )}
             </div>
-            
-            {vendorData.logoUrl && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Current Logo:</div>
-                <img
-                  src={`${baseUrl}${vendorData.logoUrl}`}
-                  alt="Company Logo"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                    objectFit: 'contain',
-                  }}
-                />
-              </div>
-            )}
-            
-            {logoFile && getFilePreview(logoFile) && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</div>
-                <img
-                  src={getFilePreview(logoFile)}
-                  alt="Logo Preview"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                    objectFit: 'contain',
-                  }}
-                />
-              </div>
-            )}
           </div>
         </div>
 
-        <button
-          onClick={handleUpload}
-          disabled={uploading || (!taxCardFile && !logoFile)}
-          style={{
-            padding: '14px 28px',
-            background: (uploading || (!taxCardFile && !logoFile))
-              ? '#9ca3af'
-              : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-            color: '#003366',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '1rem',
-            fontWeight: 700,
-            cursor: (uploading || (!taxCardFile && !logoFile)) ? 'not-allowed' : 'pointer',
-            transition: 'all 0.3s',
-          }}
-        >
-          {uploading ? 'Uploading...' : '📤 Upload Documents'}
-        </button>
+        <div className="flex flex-col items-center">
+          <button
+            onClick={handleUpload}
+            disabled={uploading || (!taxCardFile && !logoFile)}
+            className="btn btn-primary btn-lg w-full md:w-auto min-w-[200px] shadow-lg shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 border-none text-white font-bold rounded-xl"
+          >
+            {uploading ? <span className="loading loading-spinner"></span> : '📤 Upload Documents'}
+          </button>
+        </div>
       </div>
 
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '20px',
-        borderRadius: '15px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      }}>
-        <h3 style={{ color: '#003366', marginBottom: '15px', fontSize: '1.1rem' }}>📋 Requirements</h3>
-        <ul style={{ color: '#6b7280', fontSize: '0.9rem', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">📋 Requirements</h3>
+        <ul className="list-disc list-inside text-sm text-slate-600 space-y-2 ml-2">
           <li>Tax card must be a valid PDF or image file</li>
           <li>Company logo must be a PNG, JPG, or JPEG image</li>
           <li>Maximum file size: 5MB per file</li>
           <li>Both documents are required to prove company validity</li>
-          <li>You can update your documents at any time</li>
         </ul>
       </div>
     </div>

@@ -173,7 +173,7 @@ export default function AttendeesReport() {
               <select
                 value={status}
                 onChange={handleStatusChange}
-                className="select select-bordered w-full"
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -189,7 +189,7 @@ export default function AttendeesReport() {
               <select
                 value={type}
                 onChange={handleTypeChange}
-                className="select select-bordered w-full"
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Types</option>
                 <option value="Workshop">Workshop</option>
@@ -208,7 +208,7 @@ export default function AttendeesReport() {
                 placeholder="Search by event name..."
                 value={titleDebounce}
                 onChange={handleTitleChange}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
@@ -218,7 +218,7 @@ export default function AttendeesReport() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
@@ -228,14 +228,14 @@ export default function AttendeesReport() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
-            <button type="submit" className="btn btn-primary">Apply Filters</button>
-            <button type="button" onClick={handleReset} className="btn btn-ghost">Reset Filters</button>
+            <button type="submit" className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none">Apply Filters</button>
+            <button type="button" onClick={handleReset} className="btn btn-ghost text-slate-500 hover:text-slate-800">Reset Filters</button>
             <div className="ml-auto text-slate-500 text-sm">
               {generatedAt ? `Generated at: ${new Date(generatedAt).toLocaleString()}` : null}
             </div>
@@ -246,10 +246,10 @@ export default function AttendeesReport() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
-            <p className="text-lg font-medium text-slate-600">Loading report...</p>
+            <p className="text-lg font-medium text-slate-500">Loading report...</p>
           </div>
         ) : error ? (
-          <div className="alert alert-error shadow-sm mb-6">
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{error}</span>
           </div>
@@ -259,20 +259,20 @@ export default function AttendeesReport() {
             {summary && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <span className="text-emerald-600">📊</span> Summary
+                  <span className="text-emerald-500">📊</span> Summary
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
                     <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.totalEvents}</div>
-                    <div className="text-slate-600 font-medium">Total Events</div>
+                    <div className="text-slate-500 font-medium">Total Events</div>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
                     <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.totalAttendees}</div>
-                    <div className="text-slate-600 font-medium">Total Attendees</div>
+                    <div className="text-slate-500 font-medium">Total Attendees</div>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
                     <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.averageAttendeesPerEvent}</div>
-                    <div className="text-slate-600 font-medium">Avg. Attendees/Event</div>
+                    <div className="text-slate-500 font-medium">Avg. Attendees/Event</div>
                   </div>
                 </div>
               </div>
@@ -281,21 +281,21 @@ export default function AttendeesReport() {
             {/* Breakdown by Type */}
             {breakdownByType.length > 0 && (
               <div className="space-y-6">
-                <h2 className="text-xl font-bold text-slate-800 border-b pb-2">Breakdown by Type</h2>
+                <h2 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">Breakdown by Type</h2>
                 {breakdownByType.map((typeGroup, i) => (
                   <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                       <h3 className="text-lg font-bold text-slate-800">{typeGroup.type}</h3>
                       <div className="flex gap-4 text-sm">
-                        <span className="badge badge-neutral">Events: {typeGroup.totalEvents}</span>
-                        <span className="badge badge-primary">Attendees: {typeGroup.totalAttendees}</span>
+                        <span className="badge bg-slate-200 text-slate-700 border-none">Events: {typeGroup.totalEvents}</span>
+                        <span className="badge bg-emerald-100 text-emerald-800 border-none">Attendees: {typeGroup.totalAttendees}</span>
                       </div>
                     </div>
 
                     <div className="overflow-x-auto">
                       <table className="table w-full">
                         <thead>
-                          <tr className="bg-slate-50 text-slate-600">
+                          <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                             <th>Title</th>
                             <th>Status</th>
                             <th>Attendees</th>
@@ -305,29 +305,29 @@ export default function AttendeesReport() {
                         </thead>
                         <tbody>
                           {typeGroup.events.map((event, j) => (
-                            <tr key={j} className="hover:bg-slate-50">
-                              <td className="font-medium text-slate-800">{event.title}</td>
+                            <tr key={j} className="hover:bg-slate-50 border-b-slate-100">
+                              <td className="font-medium text-slate-900">{event.title}</td>
                               <td>
-                                <span className={`badge badge-sm ${event.status === 'published' ? 'badge-success text-white' :
-                                    event.status === 'draft' ? 'badge-ghost' :
-                                      event.status === 'cancelled' ? 'badge-error text-white' :
-                                        'badge-neutral'
+                                <span className={`badge badge-sm border-none ${event.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                                  event.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                                    event.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                      'bg-slate-100 text-slate-600'
                                   }`}>
                                   {event.status}
                                 </span>
                               </td>
-                              <td>{event.attendeeCount}</td>
-                              <td>{event.capacity}</td>
+                              <td className="text-slate-600">{event.attendeeCount}</td>
+                              <td className="text-slate-600">{event.capacity}</td>
                               <td>
                                 <div className="flex items-center gap-2">
                                   <progress
                                     className={`progress w-20 ${parseFloat(event.utilizationRate) > 90 ? 'progress-success' :
-                                        parseFloat(event.utilizationRate) > 50 ? 'progress-warning' : 'progress-error'
+                                      parseFloat(event.utilizationRate) > 50 ? 'progress-warning' : 'progress-error'
                                       }`}
                                     value={parseFloat(event.utilizationRate)}
                                     max="100"
                                   ></progress>
-                                  <span className="text-xs font-mono">{event.utilizationRate}</span>
+                                  <span className="text-xs font-mono text-slate-500">{event.utilizationRate}</span>
                                 </div>
                               </td>
                             </tr>
@@ -344,12 +344,12 @@ export default function AttendeesReport() {
             {topEvents.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <span className="text-emerald-600">🏆</span> Top Events
+                  <span className="text-emerald-500">🏆</span> Top Events
                 </h2>
                 <div className="overflow-x-auto">
                   <table className="table w-full">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600">
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                         <th>Title</th>
                         <th>Type</th>
                         <th>Start Date</th>
@@ -358,9 +358,9 @@ export default function AttendeesReport() {
                     </thead>
                     <tbody>
                       {topEvents.map((event, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
                           <td className="font-bold text-slate-800">{event.title}</td>
-                          <td><span className="badge badge-ghost badge-sm">{event.type}</span></td>
+                          <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{event.type}</span></td>
                           <td className="text-slate-500 text-sm">{new Date(event.startDate).toLocaleString()}</td>
                           <td className="font-bold text-emerald-600">{event.attendeeCount}</td>
                         </tr>
@@ -378,7 +378,7 @@ export default function AttendeesReport() {
                 <div className="overflow-x-auto">
                   <table className="table w-full">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600">
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                         <th>Title</th>
                         <th>Type</th>
                         <th>Status</th>
@@ -389,21 +389,21 @@ export default function AttendeesReport() {
                     </thead>
                     <tbody>
                       {allEvents.map((event, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
-                          <td className="font-medium text-slate-800">{event.title}</td>
-                          <td><span className="badge badge-ghost badge-sm">{event.type}</span></td>
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{event.title}</td>
+                          <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{event.type}</span></td>
                           <td>
-                            <span className={`badge badge-sm ${event.status === 'published' ? 'badge-success text-white' :
-                                event.status === 'draft' ? 'badge-ghost' :
-                                  event.status === 'cancelled' ? 'badge-error text-white' :
-                                    'badge-neutral'
+                            <span className={`badge badge-sm border-none ${event.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                              event.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                                event.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  'bg-slate-100 text-slate-600'
                               }`}>
                               {event.status}
                             </span>
                           </td>
-                          <td>{event.attendeeCount}</td>
-                          <td>{event.capacity}</td>
-                          <td>{event.utilizationRate}</td>
+                          <td className="text-slate-600">{event.attendeeCount}</td>
+                          <td className="text-slate-600">{event.capacity}</td>
+                          <td className="text-slate-600">{event.utilizationRate}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -150,7 +150,7 @@ export default function SalesReport() {
     <div className="max-w-6xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">Sales Report</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Financial Reports</h2>
           <p className="text-slate-500 mt-2">Financial overview and revenue analysis</p>
         </div>
 
@@ -163,7 +163,7 @@ export default function SalesReport() {
               <select
                 value={type}
                 onChange={handleTypeChange}
-                className="select select-bordered w-full"
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Types</option>
                 <option value="Workshop">Workshop</option>
@@ -182,7 +182,7 @@ export default function SalesReport() {
                 placeholder="Search by event name..."
                 value={titleDebounce}
                 onChange={handleTitleChange}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
@@ -191,7 +191,7 @@ export default function SalesReport() {
               <select
                 value={status}
                 onChange={handleStatusChange}
-                className="select select-bordered w-full"
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -208,7 +208,7 @@ export default function SalesReport() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
@@ -218,7 +218,7 @@ export default function SalesReport() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="input input-bordered w-full"
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
@@ -227,7 +227,7 @@ export default function SalesReport() {
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="select select-bordered w-full"
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="desc">Revenue: High → Low</option>
                 <option value="asc">Revenue: Low → High</option>
@@ -235,18 +235,18 @@ export default function SalesReport() {
             </div>
           </div>
           <div className="flex flex-wrap gap-3 items-center">
-            <button type="submit" className="btn btn-primary">Apply Filters</button>
-            <button type="button" onClick={handleReset} className="btn btn-ghost">Reset Filters</button>
+            <button type="submit" className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none">Apply Filters</button>
+            <button type="button" onClick={handleReset} className="btn btn-ghost text-slate-500 hover:text-slate-800">Reset Filters</button>
           </div>
         </form>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
-            <p className="text-lg font-medium text-slate-600">Loading report...</p>
+            <p className="text-lg font-medium text-slate-500">Loading report...</p>
           </div>
         ) : error ? (
-          <div className="alert alert-error shadow-sm mb-6">
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{error}</span>
           </div>
@@ -255,27 +255,27 @@ export default function SalesReport() {
             {/* Summary */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <span className="text-emerald-600">💰</span> Summary
+                <span className="text-emerald-500">💰</span> Summary
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
-                  <div className="text-sm text-emerald-800 font-medium mb-1">Total Revenue</div>
+                  <div className="text-sm text-emerald-700 font-medium mb-1">Total Revenue</div>
                   <div className="text-3xl font-bold text-emerald-600">{summary?.totalRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div className="text-sm text-slate-600 font-medium mb-1">Trip Revenue</div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="text-sm text-slate-500 font-medium mb-1">Trip Revenue</div>
                   <div className="text-2xl font-bold text-slate-800">{summary?.tripRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div className="text-sm text-slate-600 font-medium mb-1">Vendor Revenue</div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="text-sm text-slate-500 font-medium mb-1">Vendor Revenue</div>
                   <div className="text-2xl font-bold text-slate-800">{summary?.vendorRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div className="text-sm text-slate-600 font-medium mb-1">Total Trip Events</div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="text-sm text-slate-500 font-medium mb-1">Total Trip Events</div>
                   <div className="text-2xl font-bold text-slate-800">{summary?.totalTripEvents ?? 0}</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div className="text-sm text-slate-600 font-medium mb-1">Total Vendor Applications</div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="text-sm text-slate-500 font-medium mb-1">Total Vendor Applications</div>
                   <div className="text-2xl font-bold text-slate-800">{summary?.totalVendorApplications ?? 0}</div>
                 </div>
               </div>
@@ -289,7 +289,7 @@ export default function SalesReport() {
               <div className="overflow-x-auto">
                 <table className="table w-full">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600">
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                       <th>Type</th>
                       <th>Count</th>
                       <th className="text-right">Revenue</th>
@@ -297,9 +297,9 @@ export default function SalesReport() {
                   </thead>
                   <tbody>
                     {sales.revenueByType.length > 0 ? sales.revenueByType.map((r, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="font-medium text-slate-800">{r.type}</td>
-                        <td>{r.count}</td>
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                        <td className="font-medium text-slate-900">{r.type}</td>
+                        <td className="text-slate-600">{r.count}</td>
                         <td className="text-right font-bold text-emerald-600">{r.revenue} EGP</td>
                       </tr>
                     )) : (
@@ -320,7 +320,7 @@ export default function SalesReport() {
               <div className="overflow-x-auto">
                 <table className="table w-full">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600">
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                       <th>Title</th>
                       <th>Status</th>
                       <th>Date</th>
@@ -331,20 +331,20 @@ export default function SalesReport() {
                   </thead>
                   <tbody>
                     {sales.tripEvents.length > 0 ? sales.tripEvents.map((ev, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="font-medium text-slate-800">{ev.title}</td>
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                        <td className="font-medium text-slate-900">{ev.title}</td>
                         <td>
-                          <span className={`badge badge-sm ${ev.status === 'published' ? 'badge-success text-white' :
-                            ev.status === 'draft' ? 'badge-ghost' :
-                              ev.status === 'cancelled' ? 'badge-error text-white' :
-                                'badge-neutral'
+                          <span className={`badge badge-sm border-none ${ev.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                            ev.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                              ev.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-600'
                             }`}>
                             {ev.status}
                           </span>
                         </td>
                         <td className="text-sm text-slate-500">{formatDate(ev.startDate)}</td>
-                        <td>{ev.attendeeCount}</td>
-                        <td className="text-right">{ev.price} EGP</td>
+                        <td className="text-slate-600">{ev.attendeeCount}</td>
+                        <td className="text-right text-slate-600">{ev.price} EGP</td>
                         <td className="text-right font-bold text-emerald-600">{ev.revenue} EGP</td>
                       </tr>
                     )) : (
@@ -366,15 +366,15 @@ export default function SalesReport() {
                 <div className="overflow-x-auto">
                   <table className="table w-full">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600">
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                         <th>Event</th>
                         <th className="text-right">Revenue</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sales.vendorEvents.length > 0 ? sales.vendorEvents.map((v, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
-                          <td className="font-medium text-slate-800">{v.title}</td>
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{v.title}</td>
                           <td className="text-right font-bold text-emerald-600">{v.revenue} EGP</td>
                         </tr>
                       )) : (
@@ -395,15 +395,15 @@ export default function SalesReport() {
                 <div className="overflow-x-auto">
                   <table className="table w-full">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-600">
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                         <th>Vendor</th>
                         <th className="text-right">Revenue</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sales.vendorApplications.length > 0 ? sales.vendorApplications.map((a, i) => (
-                        <tr key={i} className="hover:bg-slate-50">
-                          <td className="font-medium text-slate-800">{a.vendorName}</td>
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{a.vendorName}</td>
                           <td className="text-right font-bold text-emerald-600">{a.revenue} EGP</td>
                         </tr>
                       )) : (
@@ -425,7 +425,7 @@ export default function SalesReport() {
               <div className="overflow-x-auto">
                 <table className="table w-full">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600">
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
                       <th>Title</th>
                       <th>Type</th>
                       <th>Source</th>
@@ -434,10 +434,10 @@ export default function SalesReport() {
                   </thead>
                   <tbody>
                     {sales.topRevenueEvents.length > 0 ? sales.topRevenueEvents.map((ev, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
                         <td className="font-bold text-slate-800">{ev.title}</td>
-                        <td><span className="badge badge-ghost badge-sm">{ev.type}</span></td>
-                        <td><span className="badge badge-neutral badge-sm">{ev.source}</span></td>
+                        <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{ev.type}</span></td>
+                        <td><span className="badge bg-emerald-100 text-emerald-800 border-none badge-sm">{ev.source}</span></td>
                         <td className="text-right font-bold text-emerald-600">{ev.revenue} EGP</td>
                       </tr>
                     )) : (

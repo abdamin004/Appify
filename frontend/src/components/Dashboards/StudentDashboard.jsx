@@ -598,7 +598,7 @@ function StudentDashboard() {
                 {/* Left Side: Welcome Text */}
                 <div className="flex-1 min-w-[300px]">
                   <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
-                    Welcome back, {user.firstName}! 👋
+                    Welcome, {user.firstName}! 👋
                   </h1>
                   <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                     Discover and register for amazing events happening on campus.
@@ -702,9 +702,11 @@ function StudentDashboard() {
 
           {activeTab === "registered" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">My Events</h2>
-                <p className="text-slate-500">Manage your registrations and view event details</p>
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Registered Events</h2>
+                  <p className="text-slate-500 mt-1">Events you have signed up for</p>
+                </div>
               </div>
               <MyEventsList
                 events={registeredEvents.filter(event => {
@@ -724,9 +726,11 @@ function StudentDashboard() {
 
           {activeTab === "favourites" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
-                <p className="text-slate-500">Your saved events and workshops</p>
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
+                  <p className="text-slate-500 mt-1">Your saved events and workshops</p>
+                </div>
               </div>
               <MyEventsList events={favouriteEvents} />
             </div>
@@ -734,24 +738,20 @@ function StudentDashboard() {
 
           {activeTab === "courts" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">Sports Courts</h2>
-                <p className="text-slate-500">Book tennis, basketball, and football courts</p>
-              </div>
               <CourtsReserve courts={courts} onReserved={handleReserve} />
             </div>
           )}
 
           {activeTab === "gym-sessions" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
-                <p className="text-slate-500">View schedule and register for sessions</p>
-              </div>
-              <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-6 lg:p-8 rounded-xl shadow-sm border border-slate-200">
+                <div className="text-center mb-8 relative">
+                  <h2 className="text-2xl font-bold text-slate-800">Gym Sessions</h2>
+                  <p className="text-slate-500 mt-1">View schedule and register for sessions</p>
+                </div>
                 {gymSessionsLoading ? (
                   <div className="text-center py-20">
-                    <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                    <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
                     <p className="text-slate-500 text-base">Loading sessions...</p>
                   </div>
                 ) : gymSessionsError ? (
@@ -761,8 +761,9 @@ function StudentDashboard() {
                   </div>
                 ) : (!gymSessions || gymSessions.length === 0) ? (
                   <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                    <div className="text-6xl mb-6 opacity-50">🏋️</div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">No Sessions Found</h3>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+                      <span>🏋️</span> No Sessions Found
+                    </h3>
                     <p className="text-slate-500">There are no gym sessions scheduled at the moment.</p>
                   </div>
                 ) : (() => {
@@ -907,15 +908,13 @@ function StudentDashboard() {
 
           {activeTab === "notifications" && (
             <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
-                  <p className="text-slate-500">Updates about events and activities</p>
-                </div>
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+                <p className="text-slate-500 mt-2">Updates about events and activities</p>
               </div>
               {notifications.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <div className="text-4xl mb-4">🔔</div>
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-4xl mb-4 opacity-50">🔔</div>
                   <p>No notifications at this time.</p>
                 </div>
               ) : (
@@ -972,15 +971,15 @@ function StudentDashboard() {
 
           {activeTab === "reminders" && (
             <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
+              <div className="text-center mb-8 relative">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">Reminders</h2>
-                  <p className="text-slate-500">Don't miss your upcoming events</p>
+                  <p className="text-slate-500 mt-1">Don't miss your upcoming events</p>
                 </div>
               </div>
               {reminders.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <div className="text-4xl mb-4">⏰</div>
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-4xl mb-4 opacity-50">⏰</div>
                   <p>No reminders at this time.</p>
                 </div>
               ) : (
