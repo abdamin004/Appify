@@ -329,6 +329,22 @@ export default function EventDetails() {
       const cs = await getEventComments(id);
       setComments(Array.isArray(cs) ? cs : []);
       showToast.success('Comment added successfully');
+      
+      // Dispatch event to notify FeedbackAnalytics to refresh
+      // Use a small delay to ensure the backend has processed the comment
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('comment:added', { 
+            detail: { eventId: String(id) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+          console.log('EventDetails: Dispatched comment:added event for eventId:', id);
+        } catch (err) {
+          console.error('Error dispatching comment:added event:', err);
+        }
+      }, 500);
     } catch (err) {
       const errorMsg = err?.message || 'Failed to add comment';
       setError(errorMsg);
@@ -367,6 +383,22 @@ export default function EventDetails() {
       const updatedRatings = await getEventRatings(id);
       setRatings(updatedRatings && typeof updatedRatings === 'object' ? updatedRatings : { average: 0, count: 0, ratings: [], histogram: {} });
       showToast.success('Rating submitted successfully!');
+      
+      // Dispatch event to notify FeedbackAnalytics to refresh
+      // Use a small delay to ensure the backend has processed the rating
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('rating:added', { 
+            detail: { eventId: String(id) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+          console.log('EventDetails: Dispatched rating:added event for eventId:', id);
+        } catch (err) {
+          console.error('Error dispatching rating:added event:', err);
+        }
+      }, 500);
     } catch (err) {
       showToast.error(err?.message || 'Failed to submit rating');
     } finally {

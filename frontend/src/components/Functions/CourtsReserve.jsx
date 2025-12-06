@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import courtService from "../../services/courtService";
 import { showToast } from "../../utils/toast";
+import { checkCourtSlotOverlap } from "../../utils/overlapDetection";
+import { showOverlapWarning } from "../UI/OverlapWarningDialog";
 
 function CourtsReserve({ courts, onReserved }) {
   const [selectedCourt, setSelectedCourt] = useState(null);
@@ -152,6 +154,41 @@ function CourtsReserve({ courts, onReserved }) {
   };
 
   const handleReserve = async (courtId, slotId) => {
+    // Find the slot being reserved
+    const slot = availableSlots.find(s => (s._id || s.id) === slotId);
+    if (!slot) {
+      showToast.error('Slot not found');
+      return;
+    }
+
+    // Check for time overlaps with existing registrations
+    try {
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      
+      if (res.ok) {
+        const registeredEvents = await res.json();
+        const events = Array.isArray(registeredEvents) ? registeredEvents : [];
+        const conflicts = checkCourtSlotOverlap(slot, events);
+        
+        if (conflicts.length > 0) {
+          const courtName = selectedCourt?.name || `${selectedCourt?.type || 'Court'} Court`;
+          const slotTime = `${slot.startTime} - ${slot.endTime || 'TBA'}`;
+          const slotDate = new Date(slot.date);
+          const proceed = await showOverlapWarning(conflicts, `${courtName} (${slotTime})`, slotDate);
+          if (!proceed) {
+            return; // User cancelled
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error checking for overlaps:', err);
+      // Continue with reservation even if overlap check fails
+    }
+
     const slotKey = `${courtId}_${slotId}`;
     setReserving(prev => ({ ...prev, [slotKey]: true }));
 

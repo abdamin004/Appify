@@ -311,6 +311,26 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
   }
 
   const setEventRating = async (eventId, value) => {
+    // Check if event has ended and user is registered
+    const evt = events.find(e => getEventId(e) === eventId);
+    if (!evt) {
+      showToast.error('Event not found');
+      return;
+    }
+
+    const hasEnded = hasEventEnded(evt);
+    const isReg = isRegistered(evt);
+
+    if (!hasEnded) {
+      showToast.warning('You can only rate events after they have ended');
+      return;
+    }
+
+    if (!isReg) {
+      showToast.warning('You must be registered for this event to rate it');
+      return;
+    }
+
     // Update local state immediately for better UX
     setRatings((prev) => {
       const next = { ...prev, [eventId]: value };
@@ -321,6 +341,23 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
     // Send to backend
     try {
       await rateEvent(eventId, value);
+      showToast.success('Rating submitted successfully!');
+      
+      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
+      // Use a small delay to ensure the backend has processed the rating
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('rating:added', { 
+            detail: { eventId: String(eventId) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+          console.log('MyEventsList: Dispatched rating:added event for eventId:', eventId);
+        } catch (err) {
+          console.error('Error dispatching rating:added event:', err);
+        }
+      }, 500);
     } catch (err) {
       console.error('Failed to save rating to backend:', err);
       // Revert local state on error
@@ -405,8 +442,26 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       await addEventComment(eventId, txt);
       setNewCommentByEvent(prev => ({ ...prev, [eventId]: "" }));
       await loadComments(eventId);
+      showToast.success('Comment added successfully!');
+      
+      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
+      // Use a small delay to ensure the backend has processed the comment
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('comment:added', { 
+            detail: { eventId: String(eventId) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+          console.log('MyEventsList: Dispatched comment:added event for eventId:', eventId);
+        } catch (err) {
+          console.error('Error dispatching comment:added event:', err);
+        }
+      }, 500);
     } catch (err) {
       setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to add comment" }));
+      showToast.error(err?.message || "Failed to add comment");
     } finally {
       setCommentsLoading(prev => ({ ...prev, [eventId]: false }));
     }
@@ -671,7 +726,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
                                 {new Date(c.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-slate-600 text-xs leading-relaxed">{c.comment}</p>
+                            <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap break-words">{c.content || c.comment || c.text || 'No content'}</p>
                           </div>
                         ))
                       )}

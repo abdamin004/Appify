@@ -1332,6 +1332,37 @@ module.exports = {
         }
     },
 
+    async getMyCreatedEvents(req, res) {
+        try {
+            const userId = req.user._id;
+            const userRole = req.user.role;
+
+            // Only allow Professor and EventOffice to view their created events
+            if (userRole !== 'Professor' && userRole !== 'EventOffice' && userRole !== 'Admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You do not have permission to view created events'
+                });
+            }
+
+            // Find all events created by this user
+            const events = await Event.find({ createdBy: userId })
+                .populate({ path: 'vendors', options: { strictPopulate: false } })
+                .populate({ path: 'registeredUsers', select: 'firstName lastName email _id' })
+                .sort({ createdAt: -1 }) // Most recent first
+                .exec();
+
+            const enriched = await attachApprovedParticipants(events);
+
+            return res.status(200).json(enriched);
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
     async generateVendorAttendeePasses(req, res) {
         try {
             const { applicationId } = req.params;

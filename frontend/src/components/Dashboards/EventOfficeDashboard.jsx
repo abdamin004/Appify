@@ -13,6 +13,7 @@ import AttendeesReport from "../Admin/AttendeesReport";
 import SalesReport from "../Admin/SalesReport";
 import VendorDocuments from "../Admin/VendorDocuments";
 import { showToast, confirmDialog } from "../../utils/toast";
+import FeedbackAnalytics from "./FeedbackAnalytics";
 
 function EventOfficeDashboard() {
   const navigate = useNavigate();
@@ -46,6 +47,13 @@ function EventOfficeDashboard() {
     : { firstName: "Guest", role: "eventoffice" };
 
   useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/Login');
+      return;
+    }
+
     fetchNotifications();
     fetchReminders();
     initializeSeenEvents();
@@ -55,11 +63,37 @@ function EventOfficeDashboard() {
     const reminderInterval = setInterval(() => {
       checkForReminders();
     }, 60000);
+
+    // Listen for comment/rating events to refresh Feedback Analytics when feedback is added
+    // Always dispatch refresh event - FeedbackAnalytics will listen when mounted
+    const handleCommentAdded = (event) => {
+      console.log('EventOfficeDashboard: Received comment:added event', event.detail);
+      // Always dispatch refresh event - component will refresh when tab is active
+      window.dispatchEvent(new CustomEvent('feedback:refresh', { 
+        detail: { eventId: event.detail?.eventId },
+        bubbles: true 
+      }));
+    };
+    
+    const handleRatingAdded = (event) => {
+      console.log('EventOfficeDashboard: Received rating:added event', event.detail);
+      // Always dispatch refresh event - component will refresh when tab is active
+      window.dispatchEvent(new CustomEvent('feedback:refresh', { 
+        detail: { eventId: event.detail?.eventId },
+        bubbles: true 
+      }));
+    };
+    
+    window.addEventListener('comment:added', handleCommentAdded);
+    window.addEventListener('rating:added', handleRatingAdded);
+
     return () => {
       clearInterval(pollInterval);
       clearInterval(reminderInterval);
+      window.removeEventListener('comment:added', handleCommentAdded);
+      window.removeEventListener('rating:added', handleRatingAdded);
     };
-  }, []);
+  }, [navigate, activeTab]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -87,6 +121,9 @@ function EventOfficeDashboard() {
     } else if (activeTab === 'vendor-requests') {
       // Refresh vendor requests immediately when tab opens
       fetchVendorRequests();
+    } else if (activeTab === 'feedback-analytics') {
+      // Trigger refresh when switching to feedback analytics tab
+      window.dispatchEvent(new CustomEvent('feedback:refresh'));
     }
   }, [activeTab]);
 
@@ -486,7 +523,16 @@ function EventOfficeDashboard() {
 
   const initializeSeenEvents = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
       const res = await fetch(`${API_BASE}/events`);
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/Login');
+        return;
+      }
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
@@ -499,7 +545,16 @@ function EventOfficeDashboard() {
 
   const checkForNewEvents = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
       const res = await fetch(`${API_BASE}/events`);
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/Login');
+        return;
+      }
       const data = await res.json();
       const events = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
       const publishedEvents = events.filter(e => e.status === 'published');
@@ -764,6 +819,7 @@ function EventOfficeDashboard() {
     { key: "gym-sessions", label: "Gym Sessions", icon: "💪" },
     { key: "workshop-approvals", label: "Workshop Approvals", icon: "🎓", badge: pendingWorkshops.length },
     { key: "polls", label: "Booth Polls", icon: "📊" },
+    { key: "feedback-analytics", label: "Feedback Analytics", icon: "📊" },
     { key: "loyalty", label: "Loyalty Partners", icon: "⭐" },
     { key: "archived", label: "Archived Events", icon: "📦" },
     { key: "notifications", label: "Notifications", icon: "🔔", badge: notifications.filter(n => !n.isRead && n.type !== 'EventReminder').length },
@@ -1474,6 +1530,10 @@ function EventOfficeDashboard() {
               <BoothPollManager />
             </div>
           </div>
+        )}
+
+        {activeTab === "feedback-analytics" && (
+          <FeedbackAnalytics />
         )}
 
         {activeTab === "loyalty" && (

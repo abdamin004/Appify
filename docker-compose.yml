@@ -13,6 +13,12 @@ services:
       - mongo-data:/data/db
     networks:
       - university-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   backend:
     build:
@@ -23,22 +29,23 @@ services:
     ports:
       - "5001:5001"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - /app/node_modules  # Keeps container's node_modules intact (good for perf)
     networks:
       - university-network
     environment:
-      - PORT=${PORT}
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRE=${JWT_EXPIRE}
-      - FRONTEND_URL=${FRONTEND_URL}
-      - EMAIL_HOST=${EMAIL_HOST}
-      - EMAIL_PORT=${EMAIL_PORT}
-      - EMAIL_USER=${EMAIL_USER}
-      - EMAIL_PASS=${EMAIL_PASS}
+      - PORT=${PORT:-5001}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:admin123@mongodb:27017/university_events?authSource=admin}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRE=${JWT_EXPIRE:-7d}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER:-}
+      - EMAIL_PASS=${EMAIL_PASS:-}
 
 
   frontend:

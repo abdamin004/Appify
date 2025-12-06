@@ -45,6 +45,9 @@ router.get('/sort', eventController.sortEvents);
 // Get registered events
 router.get('/registered', auth, eventController.getRegisteredEvents);
 
+// Get events created by current user
+router.get('/my-events', auth, roleCheck('Professor', 'EventOffice', 'Admin'), eventController.getMyCreatedEvents);
+
 // POST /events/register/:eventId - Register for an event
 router.post('/register/:eventId', auth, eventController.registerForEvent);
 
