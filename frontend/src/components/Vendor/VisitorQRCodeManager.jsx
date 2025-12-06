@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { getEventById } from '../../services/eventService';
 import vendorService from '../../services/vendorService';
 import { showToast } from '../../utils/toast';
-import Select from '../UI/Select';
 
 function VisitorQRCodeManager() {
   const [approvedApplications, setApprovedApplications] = useState([]);
@@ -147,16 +146,26 @@ function VisitorQRCodeManager() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Visitor QR Codes</h2>
-        <p className="text-slate-400">
+      <div style={{
+        marginBottom: '30px'
+      }}>
+        <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Visitor QR Codes</h2>
+        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
           QR codes are automatically sent via email to registered visitors when they register for your event.
         </p>
       </div>
 
-      <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm mb-8">
-        <Select
-          label="Select Your Event"
+      <div style={{
+        background: 'rgba(255,255,255,0.95)',
+        padding: '25px',
+        borderRadius: '15px',
+        marginBottom: '30px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      }}>
+        <label style={{ display: 'block', marginBottom: '10px', color: '#003366', fontWeight: 600 }}>
+          Select Your Event
+        </label>
+        <select
           value={selectedEvent || ''}
           onChange={(e) => {
             const eventId = e.target.value;
@@ -167,94 +176,127 @@ function VisitorQRCodeManager() {
               setVisitors([]);
             }
           }}
-          options={[
-            { value: "", label: "-- Select an approved event --" },
-            ...approvedApplications.map(app => {
-              const event = app.event;
-              const eventId = event?._id || event?.id || app.event;
-              const eventTitle = event?.title || 'Unknown Event';
-              const eventDate = event?.startDate ? new Date(event.startDate).toLocaleDateString() : '';
-              return {
-                value: eventId,
-                label: `${eventTitle} - ${eventDate} (${app.organization})`
-              };
-            })
-          ]}
-        />
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            fontSize: '0.95rem',
+            color: '#003366',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <option value="">-- Select an approved event --</option>
+          {approvedApplications.map(app => {
+            const event = app.event;
+            const eventId = event?._id || event?.id || app.event;
+            const eventTitle = event?.title || 'Unknown Event';
+            const eventDate = event?.startDate ? new Date(event.startDate).toLocaleDateString() : '';
+            return (
+              <option key={app._id || app.id} value={eventId}>
+                {eventTitle} - {eventDate} ({app.organization})
+              </option>
+            );
+          })}
+        </select>
         {approvedApplications.length === 0 && (
-          <p className="mt-3 text-slate-400 text-sm flex items-center gap-2">
-            <span className="text-amber-400">⚠️</span>
+          <p style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.85rem' }}>
             No approved applications found. Your applications must be approved first.
           </p>
         )}
       </div>
 
       {loading && (
-        <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
-          <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-          <p className="text-slate-400">Loading visitors...</p>
+        <div style={{
+          background: 'rgba(255,255,255,0.95)',
+          padding: '40px',
+          borderRadius: '15px',
+          textAlign: 'center',
+          color: '#6b7280',
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '10px' }}>⏳</div>
+          Loading visitors...
         </div>
       )}
 
       {!loading && visitors.length > 0 && (
-        <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-bold text-white">
+        <div style={{
+          background: 'rgba(255,255,255,0.95)',
+          padding: '25px',
+          borderRadius: '15px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ color: '#003366', margin: 0 }}>
               Registered Visitors ({visitors.length})
             </h3>
-            <div className="text-sm font-medium text-emerald-300 bg-emerald-500/20 px-4 py-2 rounded-full border border-emerald-500/30">
+            <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
               {visitors.filter(v => v.emailSent).length} of {visitors.length} QR code(s) sent via email
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '20px',
+          }}>
             {visitors.map((visitor, index) => (
               <div
                 key={visitor.id || index}
-                className={`p-6 rounded-xl border transition-all hover:shadow-lg ${visitor.emailSent
-                  ? 'bg-slate-800/40 border-emerald-500/30 shadow-lg'
-                  : 'bg-slate-800/40 border-amber-500/30 shadow-lg'
-                  }`}
+                style={{
+                  padding: '20px',
+                  background: visitor.emailSent ? '#f0fdf4' : '#fef3c7',
+                  borderRadius: '12px',
+                  border: `2px solid ${visitor.emailSent ? '#86efac' : '#fde047'}`,
+                }}
               >
-                <div className="mb-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1 min-w-0 mr-3">
-                      <div className="font-bold text-white text-lg truncate mb-1">
+                <div style={{ marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: '#003366', marginBottom: '4px', fontSize: '1.1rem' }}>
                         {visitor.name}
                       </div>
-                      <div className="text-sm text-slate-400 truncate font-medium">
+                      <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
                         {visitor.email}
                       </div>
                     </div>
-                    {visitor.emailSent ? (
-                      <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-xs font-bold whitespace-nowrap border border-emerald-500/30">
+                    {visitor.emailSent && (
+                      <div style={{
+                        padding: '4px 8px',
+                        background: '#10b981',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}>
                         ✓ Sent
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg text-xs font-bold whitespace-nowrap border border-amber-500/30">
+                      </div>
+                    )}
+                    {!visitor.emailSent && (
+                      <div style={{
+                        padding: '4px 8px',
+                        background: '#f59e0b',
+                        color: 'white',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}>
                         Pending
-                      </span>
+                      </div>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-sm text-slate-400 flex items-center gap-2">
-                      <span>📅</span>
-                      <span className="font-medium">{visitor.eventDate ? new Date(visitor.eventDate).toLocaleDateString() : 'TBA'}</span>
-                    </div>
-                    <div className="text-sm text-slate-400 flex items-center gap-2">
-                      <span>📍</span>
-                      <span className="font-medium">{visitor.eventLocation || 'Location TBA'}</span>
-                    </div>
+                  <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '8px' }}>
+                    📅 {visitor.eventDate ? new Date(visitor.eventDate).toLocaleDateString() : 'TBA'}
                   </div>
-
+                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                    📍 {visitor.eventLocation || 'Location TBA'}
+                  </div>
                   {visitor.emailSent && visitor.emailSentAt && (
-                    <div className="text-xs text-emerald-400 mt-4 pt-3 border-t border-emerald-500/20 flex items-center gap-1">
-                      <span>📧</span>
+                    <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '8px', fontStyle: 'italic' }}>
                       QR code sent: {new Date(visitor.emailSentAt).toLocaleString()}
                     </div>
                   )}
                   {!visitor.emailSent && (
-                    <div className="text-xs text-amber-400 mt-4 pt-3 border-t border-amber-500/20 flex items-center gap-1 font-medium">
-                      <span>⏳</span>
+                    <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '8px', fontStyle: 'italic' }}>
                       QR code will be sent automatically via email
                     </div>
                   )}
@@ -266,10 +308,16 @@ function VisitorQRCodeManager() {
       )}
 
       {!loading && selectedEvent && visitors.length === 0 && (
-        <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
-          <div className="text-6xl mb-6 opacity-50">👥</div>
-          <h3 className="text-xl font-bold text-white mb-2">No Registered Visitors</h3>
-          <p className="text-slate-400">No visitors have registered for this event yet.</p>
+        <div style={{
+          background: 'rgba(255,255,255,0.95)',
+          padding: '40px',
+          borderRadius: '15px',
+          textAlign: 'center',
+          color: '#6b7280',
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '10px' }}>👥</div>
+          <h3 style={{ color: '#003366', marginBottom: '10px' }}>No Registered Visitors</h3>
+          <p>No visitors have registered for this event yet.</p>
         </div>
       )}
     </div>
@@ -277,3 +325,4 @@ function VisitorQRCodeManager() {
 }
 
 export default VisitorQRCodeManager;
+

@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import vendorService from '../../services/vendorService';
 import adminService from '../../services/adminService';
 import { showToast, confirmDialog } from '../../utils/toast';
-import {
-  createStudentNotification,
-  createStaffNotification,
+import { 
+  createStudentNotification, 
+  createStaffNotification, 
   createTaNotification,
-  createProfessorNotification
+  createProfessorNotification 
 } from '../../services/notificationService';
+import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
 
 const LoyaltyApplicationsList = () => {
   const [applications, setApplications] = useState([]);
@@ -35,11 +36,11 @@ const LoyaltyApplicationsList = () => {
   const handleCancel = async (applicationId) => {
     const app = applications.find(a => a._id === applicationId);
     const isApproved = app?.status === 'approved';
-    const message = isApproved
+    const message = isApproved 
       ? 'Are you sure you want to cancel this approved loyalty program? This will remove it from the loyalty program list and notify all users. This action cannot be undone.'
       : 'Are you sure you want to cancel this loyalty application? This action cannot be undone.';
     const title = isApproved ? 'Cancel Loyalty Program' : 'Cancel Application';
-
+    
     const confirmed = await confirmDialog(message, title);
     if (!confirmed) {
       return;
@@ -47,7 +48,7 @@ const LoyaltyApplicationsList = () => {
 
     try {
       await vendorService.cancelLoyaltyApplication(applicationId);
-
+      
       // If it was an approved program, create frontend notifications for all users
       if (isApproved && app) {
         const orgName = app.organization || 'A vendor';
@@ -57,18 +58,18 @@ const LoyaltyApplicationsList = () => {
           organization: orgName,
           date: new Date().toISOString(),
         };
-
+        
         try {
           // Create notifications for all user roles
           createStudentNotification(notification);
           createStaffNotification(notification);
           createTaNotification(notification);
-
+          
           // Create notifications for all professors
           try {
             const professors = await adminService.listAllUsers('Professor');
             const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-
+            
             professorList.forEach(professor => {
               const professorId = String(professor._id || professor.id);
               if (professorId) {
@@ -91,16 +92,16 @@ const LoyaltyApplicationsList = () => {
               console.error('Could not create professor notifications from localStorage:', localStorageErr);
             }
           }
-
+          
           // Dispatch event to refresh notifications in all dashboards
           window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
         } catch (notifErr) {
           console.error('Error creating cancellation notifications:', notifErr);
         }
       }
-
-      showToast.success(isApproved
-        ? 'Loyalty program cancelled successfully. Users have been notified.'
+      
+      showToast.success(isApproved 
+        ? 'Loyalty program cancelled successfully. Users have been notified.' 
         : 'Loyalty application cancelled successfully');
       fetchApplications();
     } catch (err) {
@@ -123,25 +124,61 @@ const LoyaltyApplicationsList = () => {
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'approved':
+        return { bg: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' };
+      case 'rejected':
+        return { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' };
+      case 'pending':
+        return { bg: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' };
+      case 'cancelled':
+        return { bg: 'rgba(107, 114, 128, 0.15)', color: '#6b7280' };
+      default:
+        return { bg: 'rgba(107, 114, 128, 0.15)', color: '#6b7280' };
+    }
+  };
+
   if (loading) {
     return (
-      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
-        <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-        <h3 className="text-xl font-bold text-white mb-2">Loading...</h3>
-        <p className="text-slate-400">Please wait while we fetch your loyalty applications.</p>
+      <div style={{
+        background: 'rgba(255,255,255,0.95)',
+        padding: '60px 40px',
+        borderRadius: '20px',
+        textAlign: 'center',
+        boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
+        <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '10px' }}>Loading...</h3>
+        <p style={{ color: '#6b7280' }}>Please wait while we fetch your loyalty applications.</p>
       </div>
     );
   }
 
   if (error && applications.length === 0) {
     return (
-      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
-        <div className="text-4xl mb-4">⚠️</div>
-        <h3 className="text-xl font-bold text-white mb-2">Unable to Load Applications</h3>
-        <p className="text-slate-400 mb-6">{error}</p>
+      <div style={{
+        background: 'rgba(255,255,255,0.95)',
+        padding: '40px',
+        borderRadius: '20px',
+        boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⚠️</div>
+        <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '10px' }}>Unable to Load Applications</h3>
+        <p style={{ color: '#6b7280', marginBottom: '20px' }}>{error}</p>
         <button
           onClick={fetchApplications}
-          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-colors"
+          style={{
+            padding: '12px 24px',
+            background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
+            color: '#003366',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '1rem',
+            fontWeight: '700',
+            cursor: 'pointer'
+          }}
         >
           Retry
         </button>
@@ -151,80 +188,153 @@ const LoyaltyApplicationsList = () => {
 
   if (applications.length === 0) {
     return (
-      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
-        <div className="text-6xl mb-6 opacity-50">📭</div>
-        <h3 className="text-xl font-bold text-white mb-2">No Loyalty Applications</h3>
-        <p className="text-slate-400">You haven't submitted any loyalty program applications yet.</p>
+      <div style={{
+        background: 'rgba(255,255,255,0.95)',
+        padding: '60px 40px',
+        borderRadius: '20px',
+        textAlign: 'center',
+        boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📭</div>
+        <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '10px' }}>No Loyalty Applications</h3>
+        <p style={{ color: '#6b7280' }}>You haven't submitted any loyalty program applications yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
-      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-        <span>📋</span> My Loyalty Applications
+    <div style={{
+      background: 'rgba(255,255,255,0.95)',
+      padding: '30px',
+      borderRadius: '20px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
+    }}>
+      <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '20px' }}>
+        My Loyalty Applications
       </h3>
-      <div className="flex flex-col gap-6">
-        {applications.map((app) => (
-          <div
-            key={app._id}
-            className="p-6 border border-slate-700 rounded-xl bg-slate-800/40 hover:border-emerald-500/50 transition-all group"
-          >
-            <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
-              <div className="flex-1">
-                <h4 className="text-lg font-bold text-white mb-3 group-hover:text-emerald-400 transition-colors">
-                  {app.organization}
-                </h4>
-                <div className="flex gap-3 flex-wrap mb-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${app.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
-                    app.status === 'rejected' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
-                      app.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
-                        'bg-slate-700 text-slate-300 border-slate-600'
-                    }`}>
-                    {app.status}
-                  </span>
-                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-xs font-bold border border-amber-500/30 flex items-center gap-1">
-                    <span>🏷️</span> {app.discountRate}% Discount
-                  </span>
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-bold border border-blue-500/30 font-mono">
-                    {app.promoCode}
-                  </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {applications.map((app) => {
+          const statusStyle = getStatusColor(app.status);
+          return (
+            <div
+              key={app._id}
+              style={{
+                padding: '20px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '12px',
+                background: '#f9fafb'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ fontSize: '1.2rem', color: '#003366', marginBottom: '8px' }}>
+                    {app.organization}
+                  </h4>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    <span style={{
+                      padding: '6px 12px',
+                      background: statusStyle.bg,
+                      color: statusStyle.color,
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      textTransform: 'capitalize'
+                    }}>
+                      {app.status}
+                    </span>
+                    <span style={{
+                      padding: '6px 12px',
+                      background: 'rgba(212, 175, 55, 0.15)',
+                      color: '#d4af37',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600'
+                    }}>
+                      {app.discountRate}% Discount
+                    </span>
+                    <span style={{
+                      padding: '6px 12px',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: '#3b82f6',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600'
+                    }}>
+                      Code: {app.promoCode}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {(app.status === 'pending' || app.status === 'approved') && (
+                    <button
+                      onClick={() => handleCancel(app._id)}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#fecaca';
+                        e.target.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#fee2e2';
+                        e.target.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      {app.status === 'approved' ? 'Cancel Program' : 'Cancel'}
+                    </button>
+                  )}
+                  {app.status === 'cancelled' && (
+                    <button
+                      onClick={() => handleDelete(app._id)}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#f3f4f6',
+                        color: '#374151',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#e5e7eb';
+                        e.target.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#f3f4f6';
+                        e.target.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-2">
-                {(app.status === 'pending' || app.status === 'approved') && (
-                  <button
-                    onClick={() => handleCancel(app._id)}
-                    className="px-4 py-2 bg-slate-800 text-red-400 border border-red-500/30 rounded-lg text-sm font-bold hover:bg-red-500/10 hover:border-red-400 transition-colors shadow-sm"
-                  >
-                    {app.status === 'approved' ? 'Cancel Program' : 'Cancel'}
-                  </button>
-                )}
-                {app.status === 'cancelled' && (
-                  <button
-                    onClick={() => handleDelete(app._id)}
-                    className="px-4 py-2 bg-slate-800 text-slate-400 border border-slate-600 rounded-lg text-sm font-bold hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-colors shadow-sm"
-                  >
-                    Delete
-                  </button>
-                )}
+              <div style={{ marginTop: '15px' }}>
+                <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '8px', fontWeight: '600' }}>
+                  Terms and Conditions:
+                </p>
+                <p style={{ color: '#374151', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                  {app.termsAndConditions}
+                </p>
               </div>
+              {app.createdAt && (
+                <p style={{ color: '#9ca3af', fontSize: '0.85rem', marginTop: '15px' }}>
+                  Submitted: {new Date(app.createdAt).toLocaleDateString()}
+                </p>
+              )}
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-700">
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
-                Terms and Conditions
-              </p>
-              <p className="text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                {app.termsAndConditions}
-              </p>
-            </div>
-            {app.createdAt && (
-              <p className="text-slate-500 text-xs mt-4 font-medium flex items-center gap-1">
-                <span>🕒</span> Submitted: {new Date(app.createdAt).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
