@@ -157,18 +157,19 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-sm max-w-2xl mx-auto border border-slate-100">
+
+    <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg max-w-2xl mx-auto border border-slate-700 backdrop-blur-sm">
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="text-2xl font-bold text-white mb-2">
           Apply to GUC Loyalty Program
         </h2>
-        <p className="text-slate-500">
+        <p className="text-slate-400">
           Join our loyalty program to offer exclusive discounts to the GUC community.
         </p>
       </div>
 
       {vendorInfo?.companyName && (
-        <div className="p-4 bg-emerald-50 rounded-xl mb-8 text-sm text-emerald-800 border border-emerald-100 flex items-center gap-3">
+        <div className="p-4 bg-emerald-900/20 rounded-xl mb-8 text-sm text-emerald-300 border border-emerald-500/30 flex items-center gap-3">
           <span className="text-xl">✓</span>
           <strong>Organization name auto-filled with your account info</strong>
         </div>
@@ -176,8 +177,8 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block mb-2 text-slate-900 font-bold text-sm uppercase tracking-wide">
-            Organization Name <span className="text-red-500">*</span>
+          <label className="block mb-2 text-slate-300 font-bold text-sm uppercase tracking-wide">
+            Organization Name <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
@@ -185,15 +186,15 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             value={formData.organization}
             onChange={handleChange}
             required
-            className="input input-bordered w-full bg-slate-50 focus:bg-white transition-colors"
+            className="input input-bordered w-full bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all"
             placeholder="Enter organization name"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block mb-2 text-slate-900 font-bold text-sm uppercase tracking-wide">
-              Discount Rate (%) <span className="text-red-500">*</span>
+            <label className="block mb-2 text-slate-300 font-bold text-sm uppercase tracking-wide">
+              Discount Rate (%) <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <input
@@ -205,7 +206,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
                 min="0"
                 max="100"
                 step="0.1"
-                className="input input-bordered w-full bg-slate-50 focus:bg-white transition-colors pr-8"
+                className="input input-bordered w-full bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all pr-8"
                 placeholder="e.g., 15"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
@@ -216,8 +217,8 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
           </div>
 
           <div>
-            <label className="block mb-2 text-slate-900 font-bold text-sm uppercase tracking-wide">
-              Promo Code <span className="text-red-500">*</span>
+            <label className="block mb-2 text-slate-300 font-bold text-sm uppercase tracking-wide">
+              Promo Code <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -225,15 +226,15 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
               value={formData.promoCode}
               onChange={handleChange}
               required
-              className="input input-bordered w-full bg-slate-50 focus:bg-white transition-colors font-mono"
+              className="input input-bordered w-full bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all font-mono"
               placeholder="e.g., GUC2024"
             />
           </div>
         </div>
 
         <div>
-          <label className="block mb-2 text-slate-900 font-bold text-sm uppercase tracking-wide">
-            Terms and Conditions <span className="text-red-500">*</span>
+          <label className="block mb-2 text-slate-300 font-bold text-sm uppercase tracking-wide">
+            Terms and Conditions <span className="text-red-400">*</span>
           </label>
           <textarea
             name="termsAndConditions"
@@ -241,18 +242,18 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             onChange={handleChange}
             required
             rows="5"
-            className="textarea textarea-bordered w-full bg-slate-50 focus:bg-white transition-colors text-base"
+            className="textarea textarea-bordered w-full bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all text-base"
             placeholder="Enter the terms and conditions for your loyalty program offer..."
           />
         </div>
 
-        <div className="flex gap-4 justify-end pt-4 border-t border-slate-100 mt-8">
+        <div className="flex gap-4 justify-end pt-4 border-t border-slate-700 mt-8">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-800 transition-colors"
             >
               Cancel
             </button>
@@ -260,7 +261,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-emerald-600 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm"
+            className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center gap-2">

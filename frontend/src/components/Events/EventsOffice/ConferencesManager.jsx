@@ -259,10 +259,10 @@ function ConferencesManager({ editOnly = false }) {
 
           <div className="form-control">
             <label className="label">
-              <span className="label-text font-bold text-slate-700">Full Agenda</span>
+              <span className="label-text font-bold text-slate-300">Full Agenda</span>
             </label>
             <textarea
-              className="textarea textarea-bordered h-32 focus:textarea-primary"
+              className="textarea w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all h-32"
               value={editData.agenda}
               onChange={e => setEditData({ ...editData, agenda: e.target.value })}
             />
@@ -390,7 +390,7 @@ function ConferencesManager({ editOnly = false }) {
             <span className="label-text font-bold text-slate-700">Full Agenda</span>
           </label>
           <textarea
-            className="textarea textarea-bordered h-32 focus:textarea-primary"
+            className="textarea w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all h-32"
             value={form.agenda}
             onChange={e => setForm({ ...form, agenda: e.target.value })}
             placeholder="Detailed schedule..."
@@ -447,15 +447,15 @@ function ConferencesManager({ editOnly = false }) {
       </form>
 
       {!editOnly && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Conferences</h2>
+        <div className="mt-16 pt-10 border-t border-slate-700">
+          <h2 className="text-2xl font-bold text-white mb-6">Existing Conferences</h2>
 
           {listLoading ? (
             <div className="text-center py-10">
-              <span className="loading loading-spinner loading-lg text-primary"></span>
+              <span className="loading loading-spinner loading-lg text-emerald-500"></span>
             </div>
           ) : confs.length === 0 ? (
-            <div className="text-center py-10 text-slate-500">
+            <div className="text-center py-10 text-slate-400 bg-slate-800/30 rounded-xl border border-slate-700">
               No conferences found.
             </div>
           ) : (
@@ -463,23 +463,23 @@ function ConferencesManager({ editOnly = false }) {
               {confs.map((c) => (
                 <div
                   key={c._id}
-                  className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group"
+                  className="bg-slate-800/40 border border-slate-700 rounded-xl p-6 shadow-lg hover:border-emerald-500/50 transition-all group"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition-colors">
                       {c.title}
                     </h3>
-                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'published' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300 border border-slate-600'
                       }`}>
                       {c.status || 'published'}
                     </span>
                   </div>
 
-                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-slate-400 text-sm mb-4 line-clamp-2">
                     {c.shortDescription || 'No description provided.'}
                   </p>
 
-                  <div className="space-y-2 text-sm text-slate-500 mb-6">
+                  <div className="space-y-2 text-sm text-slate-400 mb-6">
                     <div className="flex items-center gap-2">
                       <span>📅</span>
                       {c.startDate ? new Date(c.startDate).toLocaleDateString() : 'TBA'} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'TBA'}
@@ -487,7 +487,7 @@ function ConferencesManager({ editOnly = false }) {
                     {c.websiteLink && (
                       <div className="flex items-center gap-2">
                         <span>🔗</span>
-                        <a href={c.websiteLink} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                        <a href={c.websiteLink} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 hover:underline">
                           Website
                         </a>
                       </div>

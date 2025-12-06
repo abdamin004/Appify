@@ -125,23 +125,23 @@ const LoyaltyApplicationsList = () => {
 
   if (loading) {
     return (
-      <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
         <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Loading...</h3>
-        <p className="text-slate-500">Please wait while we fetch your loyalty applications.</p>
+        <h3 className="text-xl font-bold text-white mb-2">Loading...</h3>
+        <p className="text-slate-400">Please wait while we fetch your loyalty applications.</p>
       </div>
     );
   }
 
   if (error && applications.length === 0) {
     return (
-      <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
         <div className="text-4xl mb-4">⚠️</div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Unable to Load Applications</h3>
-        <p className="text-slate-500 mb-6">{error}</p>
+        <h3 className="text-xl font-bold text-white mb-2">Unable to Load Applications</h3>
+        <p className="text-slate-400 mb-6">{error}</p>
         <button
           onClick={fetchApplications}
-          className="px-6 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors"
+          className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-colors"
         >
           Retry
         </button>
@@ -151,42 +151,42 @@ const LoyaltyApplicationsList = () => {
 
   if (applications.length === 0) {
     return (
-      <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+      <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
         <div className="text-6xl mb-6 opacity-50">📭</div>
-        <h3 className="text-xl font-bold text-slate-800 mb-2">No Loyalty Applications</h3>
-        <p className="text-slate-500">You haven't submitted any loyalty program applications yet.</p>
+        <h3 className="text-xl font-bold text-white mb-2">No Loyalty Applications</h3>
+        <p className="text-slate-400">You haven't submitted any loyalty program applications yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+    <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
+      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
         <span>📋</span> My Loyalty Applications
       </h3>
       <div className="flex flex-col gap-6">
         {applications.map((app) => (
           <div
             key={app._id}
-            className="p-6 border border-slate-200 rounded-xl bg-white hover:shadow-md transition-all group"
+            className="p-6 border border-slate-700 rounded-xl bg-slate-800/40 hover:border-emerald-500/50 transition-all group"
           >
             <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
               <div className="flex-1">
-                <h4 className="text-lg font-bold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
+                <h4 className="text-lg font-bold text-white mb-3 group-hover:text-emerald-400 transition-colors">
                   {app.organization}
                 </h4>
                 <div className="flex gap-3 flex-wrap mb-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${app.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                    app.status === 'rejected' ? 'bg-red-50 text-red-600 border-red-100' :
-                      app.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                        'bg-slate-100 text-slate-500 border-slate-200'
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${app.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                    app.status === 'rejected' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                      app.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                        'bg-slate-700 text-slate-300 border-slate-600'
                     }`}>
                     {app.status}
                   </span>
-                  <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-100 flex items-center gap-1">
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-xs font-bold border border-amber-500/30 flex items-center gap-1">
                     <span>🏷️</span> {app.discountRate}% Discount
                   </span>
-                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100 font-mono">
+                  <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-bold border border-blue-500/30 font-mono">
                     {app.promoCode}
                   </span>
                 </div>
@@ -195,7 +195,7 @@ const LoyaltyApplicationsList = () => {
                 {(app.status === 'pending' || app.status === 'approved') && (
                   <button
                     onClick={() => handleCancel(app._id)}
-                    className="px-4 py-2 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors shadow-sm"
+                    className="px-4 py-2 bg-slate-800 text-red-400 border border-red-500/30 rounded-lg text-sm font-bold hover:bg-red-500/10 hover:border-red-400 transition-colors shadow-sm"
                   >
                     {app.status === 'approved' ? 'Cancel Program' : 'Cancel'}
                   </button>
@@ -203,23 +203,23 @@ const LoyaltyApplicationsList = () => {
                 {app.status === 'cancelled' && (
                   <button
                     onClick={() => handleDelete(app._id)}
-                    className="px-4 py-2 bg-white text-slate-400 border border-slate-200 rounded-lg text-sm font-bold hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors shadow-sm"
+                    className="px-4 py-2 bg-slate-800 text-slate-400 border border-slate-600 rounded-lg text-sm font-bold hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-colors shadow-sm"
                   >
                     Delete
                   </button>
                 )}
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-2">
+            <div className="mt-4 pt-4 border-t border-slate-700">
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
                 Terms and Conditions
               </p>
-              <p className="text-slate-700 text-sm leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <p className="text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                 {app.termsAndConditions}
               </p>
             </div>
             {app.createdAt && (
-              <p className="text-slate-400 text-xs mt-4 font-medium flex items-center gap-1">
+              <p className="text-slate-500 text-xs mt-4 font-medium flex items-center gap-1">
                 <span>🕒</span> Submitted: {new Date(app.createdAt).toLocaleDateString()}
               </p>
             )}

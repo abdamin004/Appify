@@ -367,7 +367,7 @@ function WorkshopsManager({ editOnly = false }) {
                 <span className="label-text font-semibold text-slate-700">Full Agenda</span>
               </label>
               <textarea
-                className="textarea textarea-bordered h-32 w-full focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="textarea w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all h-32"
                 value={editData.agenda}
                 onChange={e => setEditData({ ...editData, agenda: e.target.value })}
                 placeholder="Enter the full agenda here..."
@@ -427,7 +427,7 @@ function WorkshopsManager({ editOnly = false }) {
               </Button>
             </div>
 
-            <div className="pt-6 border-t border-slate-100 flex gap-4">
+            <div className="pt-6 border-t border-slate-700 flex gap-4">
               <Button
                 onClick={() => onSave(editOnly ? editId : editing)}
                 loading={loading}
@@ -560,18 +560,18 @@ function WorkshopsManager({ editOnly = false }) {
             <span className="label-text font-semibold text-slate-700">Full Agenda</span>
           </label>
           <textarea
-            className="textarea textarea-bordered h-32 w-full focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            className="textarea w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all h-32"
             value={form.agenda}
             onChange={e => setForm({ ...form, agenda: e.target.value })}
             placeholder="Enter the full agenda here..."
           />
         </div>
 
-        <div className="border-t border-slate-200 pt-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Professor(s) Participating</h3>
+        <div className="border-t border-slate-700 pt-6">
+          <h3 className="text-lg font-bold text-white mb-4">Professor(s) Participating</h3>
 
           {professorInfo && form.professors?.[0]?.name && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800 flex items-center gap-2">
+            <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-3 mb-4 text-sm text-emerald-300 flex items-center gap-2">
               <span>✓</span> First professor auto-filled with your account info
             </div>
           )}
@@ -638,8 +638,8 @@ function WorkshopsManager({ editOnly = false }) {
       </form>
 
       {!editOnly && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">My Workshops</h2>
+        <div className="mt-16 pt-10 border-t border-slate-700">
+          <h2 className="text-2xl font-bold text-white mb-6">My Workshops</h2>
 
           <div className="mb-6">
             <Input
@@ -651,7 +651,7 @@ function WorkshopsManager({ editOnly = false }) {
           </div>
 
           {workshops.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="text-center py-10 text-slate-400 bg-slate-800/30 rounded-xl border border-slate-700">
               {professorFilter ? 'No workshops found matching filter.' : 'Enter a professor name to see workshops.'}
             </div>
           ) : (
@@ -659,20 +659,20 @@ function WorkshopsManager({ editOnly = false }) {
               {workshops.map((w) => (
                 <div
                   key={w._id}
-                  className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group"
+                  className="bg-slate-800/40 border border-slate-700 rounded-xl p-6 shadow-lg hover:border-emerald-500/50 transition-all group"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors">
+                    <h3 className="font-bold text-lg text-white group-hover:text-emerald-400 transition-colors">
                       {w.title}
                     </h3>
-                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${w.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
-                        w.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${w.status === 'published' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                      w.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-700 text-slate-300 border border-slate-600'
                       }`}>
                       {w.status || 'pending'}
                     </span>
                   </div>
 
-                  <div className="space-y-2 text-sm text-slate-500 mb-6">
+                  <div className="space-y-2 text-sm text-slate-400 mb-6">
                     <div className="flex items-center gap-2">
                       <span>📍</span>
                       {w.location} • {w.facultyName}

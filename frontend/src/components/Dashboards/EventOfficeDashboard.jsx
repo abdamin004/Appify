@@ -751,6 +751,7 @@ function EventOfficeDashboard() {
       icon: "➕",
       children: [
         { key: "create-bazaar", label: "Bazaar", icon: "🏪", onClick: () => handleCreateEvent('bazaar') },
+        { key: "create-booth", label: "Booth", icon: "🎪", onClick: () => handleCreateEvent('booth') },
         { key: "create-conference", label: "Conference", icon: "🎤", onClick: () => handleCreateEvent('conference') },
         { key: "create-gym", label: "Gym Session", icon: "💪", onClick: () => handleCreateEvent('gym') },
         { key: "create-trip", label: "Trip", icon: "🚌", onClick: () => handleCreateEvent('trip') },

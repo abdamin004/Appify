@@ -37,11 +37,11 @@ exports.signupUser = async (req, res) => {
     const roleLower = String(role || '').trim().toLowerCase();
     const roleCanonical =
       roleLower === 'student' ? 'Student' :
-      roleLower === 'staff' ? 'Staff' :
-      roleLower === 'ta' ? 'TA' :
-      roleLower === 'professor' ? 'Professor' :
-      roleLower === 'admin' ? 'Admin' :
-      roleLower === 'eventoffice' ? 'EventOffice' : (role || '');
+        roleLower === 'staff' ? 'Staff' :
+          roleLower === 'ta' ? 'TA' :
+            roleLower === 'professor' ? 'Professor' :
+              roleLower === 'admin' ? 'Admin' :
+                roleLower === 'eventoffice' ? 'EventOffice' : (role || '');
 
     // Validation 3ashan n2kd en kol el fields mwgoda
     if (!firstName || !lastName || !email || !password || !role) {
@@ -103,7 +103,7 @@ exports.signupUser = async (req, res) => {
         message: 'User registered successfully. Your account is pending admin approval. You will receive a verification email once approved.'
       });
     }
-    
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -171,13 +171,13 @@ exports.login = async (req, res) => {
 
     // law lesa malainash, el credentials ghlt
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(404).json({ message: 'Email not found. Please sign up first.' });
     }
 
     // n3ml check 3ala el password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Incorrect password. Please try again.' });
     }
 
     // check law el user et7zr (blocked)
@@ -187,7 +187,7 @@ exports.login = async (req, res) => {
 
     // check law el user verified (for users bs, msh vendors)
     if (!isVendor && !user.isVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: 'Please verify your email before logging in. Check your email for the verification link.'
       });
     }
@@ -210,7 +210,7 @@ exports.login = async (req, res) => {
     const token = generateToken(user._id);
 
     // response elly byrga3 ll frontend
-    if(isVendor) {
+    if (isVendor) {
       res.json({
         success: true,
         token,
@@ -226,17 +226,17 @@ exports.login = async (req, res) => {
       res.json({
         success: true,
         token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        companyName: user.companyName,
-        isVerified: user.isVerified
-      }
-    });
-  }
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          companyName: user.companyName,
+          isVerified: user.isVerified
+        }
+      });
+    }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -261,9 +261,9 @@ exports.verifyEmail = async (req, res) => {
     user.verificationToken = undefined;
     await user.save();
 
-    res.json({ 
+    res.json({
       success: true,
-      message: 'Email verified successfully. You can now login.' 
+      message: 'Email verified successfully. You can now login.'
     });
   } catch (error) {
     console.error(error);
@@ -277,8 +277,8 @@ exports.verifyEmail = async (req, res) => {
 // @access  Public
 exports.logout = async (req, res) => {
   // fe JWT system el logout bykoon mn el frontend (by delete el token)
-  res.json({ 
+  res.json({
     success: true,
-    message: 'Logged out successfully' 
+    message: 'Logged out successfully'
   });
 };

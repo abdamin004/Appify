@@ -144,29 +144,29 @@ function CompanyDocumentsUpload() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Company Documents</h2>
-        <p className="text-slate-500">
+        <h2 className="text-2xl font-bold text-white mb-2">Company Documents</h2>
+        <p className="text-slate-400">
           Upload your tax card and company logo to prove company validity
         </p>
       </div>
 
       {message.text && (
         <div className={`p-4 mb-6 rounded-xl border flex items-center gap-3 ${message.type === 'success'
-          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          : 'bg-red-50 border-red-200 text-red-700'
+          ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-300'
+          : 'bg-red-900/20 border-red-500/30 text-red-300'
           }`}>
           <span className="text-xl">{message.type === 'success' ? '✅' : '⚠️'}</span>
           <span className="font-medium">{message.text}</span>
         </div>
       )}
 
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+      <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm mb-8">
         {/* Tax Card Upload */}
         <div className="mb-10">
-          <label className="block mb-2 text-slate-900 font-bold text-lg flex items-center gap-2">
-            📄 Tax Card <span className="text-red-500">*</span>
+          <label className="block mb-2 text-white font-bold text-lg flex items-center gap-2">
+            📄 Tax Card <span className="text-red-400">*</span>
           </label>
-          <p className="text-slate-500 text-sm mb-6">
+          <p className="text-slate-400 text-sm mb-6">
             Upload your company tax card (PDF, PNG, JPG, or JPEG - Max 5MB)
           </p>
 
@@ -177,10 +177,10 @@ function CompanyDocumentsUpload() {
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg"
                 onChange={(e) => handleFileChange('taxCard', e)}
-                className="file-input file-input-bordered file-input-primary w-full bg-slate-50 focus:bg-white transition-colors"
+                className="file-input file-input-bordered file-input-primary w-full bg-slate-800/50 border-slate-600 text-white focus:border-emerald-500 transition-colors"
               />
               {taxCardFile && (
-                <div className="mt-3 text-sm text-slate-600 font-medium flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
+                <div className="mt-3 text-sm text-slate-300 font-medium flex items-center gap-2 bg-slate-800/30 p-2 rounded-lg border border-slate-700 inline-block">
                   <span>📎</span>
                   Selected: {taxCardFile.name} ({(taxCardFile.size / 1024).toFixed(2)} KB)
                 </div>
@@ -188,14 +188,14 @@ function CompanyDocumentsUpload() {
             </div>
 
             {vendorData.taxCardUrl && (
-              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Current Tax Card</div>
+              <div className="text-center bg-slate-800/30 p-4 rounded-xl border border-slate-700">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Current Tax Card</div>
                 {vendorData.taxCardUrl.endsWith('.pdf') || vendorData.taxCardUrl.includes('.pdf') ? (
                   <a
                     href={`${baseUrl}${vendorData.taxCardUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 border border-slate-600 text-white rounded-lg font-bold hover:bg-slate-800 hover:border-slate-500 transition-all shadow-sm"
                   >
                     📄 View PDF
                   </a>
@@ -203,33 +203,33 @@ function CompanyDocumentsUpload() {
                   <img
                     src={`${baseUrl}${vendorData.taxCardUrl}`}
                     alt="Tax Card"
-                    className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
+                    className="max-w-[200px] max-h-[150px] border border-slate-700 rounded-lg bg-slate-900 shadow-sm object-contain"
                   />
                 )}
               </div>
             )}
 
             {taxCardFile && getFilePreview(taxCardFile) && (
-              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Preview</div>
+              <div className="text-center bg-slate-800/30 p-4 rounded-xl border border-slate-700">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Preview</div>
                 <img
                   src={getFilePreview(taxCardFile)}
                   alt="Tax Card Preview"
-                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
+                  className="max-w-[200px] max-h-[150px] border border-slate-700 rounded-lg bg-slate-900 shadow-sm object-contain"
                 />
               </div>
             )}
           </div>
         </div>
 
-        <div className="divider"></div>
+        <div className="divider before:bg-slate-700 after:bg-slate-700"></div>
 
         {/* Logo Upload */}
         <div className="mb-10">
-          <label className="block mb-2 text-slate-900 font-bold text-lg flex items-center gap-2">
-            🏢 Company Logo <span className="text-red-500">*</span>
+          <label className="block mb-2 text-white font-bold text-lg flex items-center gap-2">
+            🏢 Company Logo <span className="text-red-400">*</span>
           </label>
-          <p className="text-slate-500 text-sm mb-6">
+          <p className="text-slate-400 text-sm mb-6">
             Upload your company logo (PNG, JPG, or JPEG - Max 5MB)
           </p>
 
@@ -240,10 +240,10 @@ function CompanyDocumentsUpload() {
                 type="file"
                 accept=".png,.jpg,.jpeg"
                 onChange={(e) => handleFileChange('logo', e)}
-                className="file-input file-input-bordered file-input-primary w-full bg-slate-50 focus:bg-white transition-colors"
+                className="file-input file-input-bordered file-input-primary w-full bg-slate-800/50 border-slate-600 text-white focus:border-emerald-500 transition-colors"
               />
               {logoFile && (
-                <div className="mt-3 text-sm text-slate-600 font-medium flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
+                <div className="mt-3 text-sm text-slate-300 font-medium flex items-center gap-2 bg-slate-800/30 p-2 rounded-lg border border-slate-700 inline-block">
                   <span>📎</span>
                   Selected: {logoFile.name} ({(logoFile.size / 1024).toFixed(2)} KB)
                 </div>
@@ -251,23 +251,23 @@ function CompanyDocumentsUpload() {
             </div>
 
             {vendorData.logoUrl && (
-              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Current Logo</div>
+              <div className="text-center bg-slate-800/30 p-4 rounded-xl border border-slate-700">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Current Logo</div>
                 <img
                   src={`${baseUrl}${vendorData.logoUrl}`}
                   alt="Company Logo"
-                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
+                  className="max-w-[200px] max-h-[150px] border border-slate-700 rounded-lg bg-slate-900 shadow-sm object-contain"
                 />
               </div>
             )}
 
             {logoFile && getFilePreview(logoFile) && (
-              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Preview</div>
+              <div className="text-center bg-slate-800/30 p-4 rounded-xl border border-slate-700">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Preview</div>
                 <img
                   src={getFilePreview(logoFile)}
                   alt="Logo Preview"
-                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
+                  className="max-w-[200px] max-h-[150px] border border-slate-700 rounded-lg bg-slate-900 shadow-sm object-contain"
                 />
               </div>
             )}
@@ -279,8 +279,8 @@ function CompanyDocumentsUpload() {
             onClick={handleUpload}
             disabled={uploading || (!taxCardFile && !logoFile)}
             className={`px-8 py-3 rounded-xl font-bold text-lg transition-all shadow-sm ${uploading || (!taxCardFile && !logoFile)
-              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-lg hover:-translate-y-0.5'
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              : 'bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-lg hover:-translate-y-0.5'
               }`}
           >
             {uploading ? (
@@ -297,11 +297,11 @@ function CompanyDocumentsUpload() {
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <span>📋</span> Requirements
         </h3>
-        <ul className="space-y-3 text-slate-600">
+        <ul className="space-y-3 text-slate-400">
           <li className="flex items-start gap-3">
             <span className="text-emerald-500 mt-1">✓</span>
             <span>Tax card must be a valid PDF or image file</span>

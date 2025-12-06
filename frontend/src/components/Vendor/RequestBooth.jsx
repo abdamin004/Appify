@@ -273,13 +273,13 @@ export default function RequestBooth() {
           ]}
         />
 
-        <div className="border-t border-slate-200 pt-6">
-          <label className="block text-sm font-semibold text-slate-700 mb-4">
+        <div className="border-t border-slate-700 pt-6">
+          <label className="block text-sm font-semibold text-slate-300 mb-4">
             Attendees (up to 5) - Name, Email, and ID Number required
           </label>
           <div className="space-y-4">
             {(formData.attendees || []).map((a, idx) => (
-              <div key={idx} className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <div key={idx} className="flex flex-col md:flex-row gap-4 items-end bg-slate-800/50 p-4 rounded-lg border border-slate-700">
                 <div className="flex-1 w-full">
                   <Input
                     placeholder="Name *"
@@ -307,7 +307,7 @@ export default function RequestBooth() {
                 </div>
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 mb-[2px]"
+                  className="text-red-400 border-red-500/30 hover:bg-red-500/10 hover:border-red-400 mb-[2px]"
                   onClick={() => removeAttendee(idx)}
                   type="button"
                 >
@@ -356,13 +356,13 @@ export default function RequestBooth() {
 
         <div className="form-control">
           <label className="label">
-            <span className="label-text font-semibold text-slate-700">Notes</span>
+            <span className="label-text font-semibold text-slate-300">Notes</span>
           </label>
           <textarea
             value={formData.notes}
             onChange={e => setField('notes', e.target.value)}
             rows={4}
-            className="textarea textarea-bordered w-full text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            className="textarea w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all"
             placeholder="Any additional information..."
           />
         </div>

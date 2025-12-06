@@ -5,11 +5,11 @@ const Input = ({ label, error, className = '', ...props }) => {
         <div className="form-control w-full">
             {label && (
                 <label className="label">
-                    <span className="label-text font-bold text-base-content">{label}</span>
+                    <span className="label-text font-bold text-slate-300">{label}</span>
                 </label>
             )}
             <input
-                className={`input input-bordered w-full bg-base-100 text-base-content focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all ${error ? 'input-error' : ''} ${className}`}
+                className={`input w-full bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all ${error ? 'input-error' : ''} ${className}`}
                 {...props}
             />
             {error && (

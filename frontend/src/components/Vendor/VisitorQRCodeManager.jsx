@@ -148,13 +148,13 @@ function VisitorQRCodeManager() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Visitor QR Codes</h2>
-        <p className="text-slate-500">
+        <h2 className="text-2xl font-bold text-white mb-2">Visitor QR Codes</h2>
+        <p className="text-slate-400">
           QR codes are automatically sent via email to registered visitors when they register for your event.
         </p>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
+      <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm mb-8">
         <Select
           label="Select Your Event"
           value={selectedEvent || ''}
@@ -182,27 +182,27 @@ function VisitorQRCodeManager() {
           ]}
         />
         {approvedApplications.length === 0 && (
-          <p className="mt-3 text-slate-500 text-sm flex items-center gap-2">
-            <span className="text-amber-500">⚠️</span>
+          <p className="mt-3 text-slate-400 text-sm flex items-center gap-2">
+            <span className="text-amber-400">⚠️</span>
             No approved applications found. Your applications must be approved first.
           </p>
         )}
       </div>
 
       {loading && (
-        <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+        <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
           <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-          <p className="text-slate-500">Loading visitors...</p>
+          <p className="text-slate-400">Loading visitors...</p>
         </div>
       )}
 
       {!loading && visitors.length > 0 && (
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+        <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg border border-slate-700 backdrop-blur-sm">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-bold text-slate-900">
+            <h3 className="text-xl font-bold text-white">
               Registered Visitors ({visitors.length})
             </h3>
-            <div className="text-sm font-medium text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
+            <div className="text-sm font-medium text-emerald-300 bg-emerald-500/20 px-4 py-2 rounded-full border border-emerald-500/30">
               {visitors.filter(v => v.emailSent).length} of {visitors.length} QR code(s) sent via email
             </div>
           </div>
@@ -210,50 +210,50 @@ function VisitorQRCodeManager() {
             {visitors.map((visitor, index) => (
               <div
                 key={visitor.id || index}
-                className={`p-6 rounded-xl border transition-all hover:shadow-md ${visitor.emailSent
-                  ? 'bg-white border-emerald-200 shadow-sm'
-                  : 'bg-white border-amber-200 shadow-sm'
+                className={`p-6 rounded-xl border transition-all hover:shadow-lg ${visitor.emailSent
+                  ? 'bg-slate-800/40 border-emerald-500/30 shadow-lg'
+                  : 'bg-slate-800/40 border-amber-500/30 shadow-lg'
                   }`}
               >
                 <div className="mb-4">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1 min-w-0 mr-3">
-                      <div className="font-bold text-slate-900 text-lg truncate mb-1">
+                      <div className="font-bold text-white text-lg truncate mb-1">
                         {visitor.name}
                       </div>
-                      <div className="text-sm text-slate-500 truncate font-medium">
+                      <div className="text-sm text-slate-400 truncate font-medium">
                         {visitor.email}
                       </div>
                     </div>
                     {visitor.emailSent ? (
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold whitespace-nowrap border border-emerald-200">
+                      <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-xs font-bold whitespace-nowrap border border-emerald-500/30">
                         ✓ Sent
                       </span>
                     ) : (
-                      <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold whitespace-nowrap border border-amber-200">
+                      <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg text-xs font-bold whitespace-nowrap border border-amber-500/30">
                         Pending
                       </span>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <div className="text-sm text-slate-600 flex items-center gap-2">
+                    <div className="text-sm text-slate-400 flex items-center gap-2">
                       <span>📅</span>
                       <span className="font-medium">{visitor.eventDate ? new Date(visitor.eventDate).toLocaleDateString() : 'TBA'}</span>
                     </div>
-                    <div className="text-sm text-slate-600 flex items-center gap-2">
+                    <div className="text-sm text-slate-400 flex items-center gap-2">
                       <span>📍</span>
                       <span className="font-medium">{visitor.eventLocation || 'Location TBA'}</span>
                     </div>
                   </div>
 
                   {visitor.emailSent && visitor.emailSentAt && (
-                    <div className="text-xs text-emerald-600 mt-4 pt-3 border-t border-emerald-100 flex items-center gap-1">
+                    <div className="text-xs text-emerald-400 mt-4 pt-3 border-t border-emerald-500/20 flex items-center gap-1">
                       <span>📧</span>
                       QR code sent: {new Date(visitor.emailSentAt).toLocaleString()}
                     </div>
                   )}
                   {!visitor.emailSent && (
-                    <div className="text-xs text-amber-600 mt-4 pt-3 border-t border-amber-100 flex items-center gap-1 font-medium">
+                    <div className="text-xs text-amber-400 mt-4 pt-3 border-t border-amber-500/20 flex items-center gap-1 font-medium">
                       <span>⏳</span>
                       QR code will be sent automatically via email
                     </div>
@@ -266,10 +266,10 @@ function VisitorQRCodeManager() {
       )}
 
       {!loading && selectedEvent && visitors.length === 0 && (
-        <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+        <div className="bg-slate-900/50 p-20 rounded-2xl text-center shadow-lg border border-slate-700 backdrop-blur-sm">
           <div className="text-6xl mb-6 opacity-50">👥</div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">No Registered Visitors</h3>
-          <p className="text-slate-500">No visitors have registered for this event yet.</p>
+          <h3 className="text-xl font-bold text-white mb-2">No Registered Visitors</h3>
+          <p className="text-slate-400">No visitors have registered for this event yet.</p>
         </div>
       )}
     </div>
