@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import '../../Form.css';
-import '../../managerForm.css';
 import { createBazaar, listBazaars, updateEvent, getEventById } from '../../../services/eventService';
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../../../utils/designSystem';
+import Input from '../../UI/Input';
+import Button from '../../UI/Button';
+import FormLayout from '../../UI/FormLayout';
 
 function BazaarsManager({ editOnly = false }) {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ function BazaarsManager({ editOnly = false }) {
   const params = useParams();
   const autoEditApplied = useRef(false);
   const editId = editOnly ? params.id : null;
+
   const [form, setForm] = useState({
     title: '',
     shortDescription: '',
@@ -38,10 +39,11 @@ function BazaarsManager({ editOnly = false }) {
 
   async function refresh() {
     if (!editOnly) {
-    const rows = await listBazaars();
-    setBazaars(rows);
+      const rows = await listBazaars();
+      setBazaars(rows);
+    }
   }
-  }
+
   useEffect(() => { refresh(); }, [editOnly]);
 
   // Load event for editing when in edit-only mode
@@ -111,12 +113,12 @@ function BazaarsManager({ editOnly = false }) {
       };
       const createdBazaar = await createBazaar(payload);
       showToast.success('Bazaar created successfully');
-      
+
       const bazaarEvent = createdBazaar?.event || createdBazaar;
-      
+
       setForm({ title: '', shortDescription: '', location: '', startDate: '', endDate: '', registrationDeadline: '', status: 'published' });
       setAllowedRoles([]);
-      
+
       // Create notifications for all users if event is published
       if (bazaarEvent && (bazaarEvent.status === 'published' || form.status === 'published')) {
         const { notifyAllUsersAboutNewEvent } = await import('../../../services/eventService');
@@ -131,23 +133,24 @@ function BazaarsManager({ editOnly = false }) {
     } finally { setLoading(false); }
   };
 
-  const startEdit = (row) => { 
-    setEditing(row._id); 
+  const startEdit = (row) => {
+    setEditing(row._id);
     setEditData({
-      title: row.title || '', 
-      shortDescription: row.shortDescription || '', 
+      title: row.title || '',
+      shortDescription: row.shortDescription || '',
       location: row.location || '',
-      startDate: row.startDate ? row.startDate.slice(0,16) : '', 
-      endDate: row.endDate ? row.endDate.slice(0,16) : '',
-      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0,16) : '', 
+      startDate: row.startDate ? row.startDate.slice(0, 16) : '',
+      endDate: row.endDate ? row.endDate.slice(0, 16) : '',
+      registrationDeadline: row.registrationDeadline ? row.registrationDeadline.slice(0, 16) : '',
       status: row.status || 'published'
     });
     setAllowedRoles(Array.isArray(row.allowedRoles) ? row.allowedRoles : []);
   };
+
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const payload = { 
+      const payload = {
         ...editData,
         allowedRoles: allowedRoles.length > 0 ? allowedRoles : undefined
       };
@@ -166,404 +169,208 @@ function BazaarsManager({ editOnly = false }) {
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: colors.bgPrimary,
-      padding: `${spacing['8xl']} ${spacing.xl} ${spacing['6xl']}`,
-    }}>
-      <div style={{ position: 'relative' }}>
-        <div style={{
-          position: 'absolute',
-          top: -40,
-          right: -40,
-          width: 260,
-          height: 260,
-          background: 'rgba(212,175,55,0.12)',
-          borderRadius: '50%',
-          filter: 'blur(60px)'
-        }} />
-      </div>
-      <div style={{
-        maxWidth: 1100,
-        margin: '0 auto',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,250,251,0.98) 100%)',
-        borderRadius: borderRadius['2xl'],
-        padding: spacing['3xl'],
-        boxShadow: '0 10px 40px rgba(0,51,102,0.15), 0 2px 8px rgba(0,0,0,0.1)',
-        border: `1px solid rgba(0,51,102,0.1)`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: spacing.md }}>
-          <button
-            onClick={() => navigate('/EventOfficeDashboard')}
-            style={{
-              ...buttonStyles.back,
-              background: colors.bgCard,
-              color: colors.primary,
-              borderColor: colors.primary
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = colors.accent;
-              e.target.style.color = colors.primary;
-              e.target.style.borderColor = colors.accent;
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = colors.bgCard;
-              e.target.style.color = colors.primary;
-              e.target.style.borderColor = colors.primary;
-            }}
-          >
-            ← Back
-          </button>
-        </div>
-        <h1 style={{
-          margin: 0,
-          color: colors.primary,
-          fontWeight: typography.fontWeight.extrabold,
-          fontSize: typography.fontSize['2xl'],
-          textAlign: 'center',
-          marginBottom: spacing['2xl']
-        }}>{editOnly ? 'Edit Bazaar' : 'Events Office — Bazaars'}</h1>
+  if (editing || (editOnly && editId)) {
+    return (
+      <FormLayout
+        title="Edit Bazaar"
+        subtitle="Update bazaar details and settings"
+        backLink="/EventOfficeDashboard"
+      >
+        <div className="space-y-6">
+          <Input
+            label="Title *"
+            value={editData.title}
+            onChange={e => setEditData({ ...editData, title: e.target.value })}
+            required
+          />
 
-        {!editOnly && (
-          <>
-            <h2 style={{
-              color: colors.primary,
-              fontWeight: typography.fontWeight.bold,
-              fontSize: typography.fontSize.lg,
-              marginTop: spacing.xl,
-              marginBottom: spacing.lg,
-            }}>Create Bazaar</h2>
-            {!editing && (
-        <form className="form managerForm" onSubmit={onCreate}>
-          <label>
-            <input className="input" required value={form.title} onChange={e=>setForm({ ...form, title: e.target.value })} />
-            <span>Title</span>
-          </label>
-          <label>
-            <input className="input" value={form.shortDescription} onChange={e=>setForm({ ...form, shortDescription: e.target.value })} />
-            <span>Short Description</span>
-          </label>
-          {/* Row 1: Start / End */}
-          <div className="flex grid-2">
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.startDate} onChange={e=>setForm({ ...form, startDate: e.target.value })} />
-              <span>Start Date/Time</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " required value={form.endDate} onChange={e=>setForm({ ...form, endDate: e.target.value })} />
-              <span>End Date/Time</span>
-            </label>
+          <Input
+            label="Short Description"
+            value={editData.shortDescription}
+            onChange={e => setEditData({ ...editData, shortDescription: e.target.value })}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Start Date/Time *"
+              type="datetime-local"
+              value={editData.startDate}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              required
+            />
+            <Input
+              label="End Date/Time *"
+              type="datetime-local"
+              value={editData.endDate}
+              onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              required
+            />
           </div>
-          {/* Row 2: Location / Deadline */}
-          <div className="flex grid-2">
-            <label>
-              <input className="input" required value={form.location} onChange={e=>setForm({ ...form, location: e.target.value })} />
-              <span>Location</span>
-            </label>
-            <label>
-              <input className="input" type="datetime-local" placeholder=" " value={form.registrationDeadline} onChange={e=>setForm({ ...form, registrationDeadline: e.target.value })} />
-              <span>Registration Deadline</span>
-            </label>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Location *"
+              value={editData.location}
+              onChange={e => setEditData({ ...editData, location: e.target.value })}
+              required
+            />
+            <Input
+              label="Registration Deadline"
+              type="datetime-local"
+              value={editData.registrationDeadline}
+              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+            />
           </div>
-          <RoleSelector 
+
+          <RoleSelector
             selectedRoles={allowedRoles}
             onChange={setAllowedRoles}
             label="Restrict Event to Specific Roles"
           />
-          <button 
-            className="submit" 
-            type="submit" 
-            disabled={loading} 
-            style={{ 
-              ...buttonStyles.primary,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accentHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = shadows.accent;
-              }
-            }}
+
+          <div className="pt-6 border-t border-slate-100 flex gap-4">
+            <Button
+              onClick={() => onSave(editOnly ? editId : editing)}
+              loading={loading}
+              className="flex-1"
+            >
+              Save Changes
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditing(null);
+                if (editOnly) navigate('/EventOfficeDashboard');
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </FormLayout>
+    );
+  }
+
+  return (
+    <FormLayout
+      title="Create Bazaar"
+      subtitle="Set up a new bazaar event for vendors and attendees"
+      backLink="/EventOfficeDashboard"
+    >
+      <form onSubmit={onCreate} className="space-y-6">
+        <Input
+          label="Title *"
+          value={form.title}
+          onChange={e => setForm({ ...form, title: e.target.value })}
+          required
+          placeholder="e.g. Spring Bazaar 2024"
+        />
+
+        <Input
+          label="Short Description"
+          value={form.shortDescription}
+          onChange={e => setForm({ ...form, shortDescription: e.target.value })}
+          placeholder="Brief summary of the event..."
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Start Date/Time *"
+            type="datetime-local"
+            value={form.startDate}
+            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            required
+          />
+          <Input
+            label="End Date/Time *"
+            type="datetime-local"
+            value={form.endDate}
+            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Location *"
+            value={form.location}
+            onChange={e => setForm({ ...form, location: e.target.value })}
+            required
+            placeholder="e.g. Main Campus Square"
+          />
+          <Input
+            label="Registration Deadline"
+            type="datetime-local"
+            value={form.registrationDeadline}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+          />
+        </div>
+
+        <RoleSelector
+          selectedRoles={allowedRoles}
+          onChange={setAllowedRoles}
+          label="Restrict Event to Specific Roles"
+        />
+
+        <div className="pt-6">
+          <Button
+            type="submit"
+            loading={loading}
+            className="w-full text-lg"
           >
-            {loading ? 'Creating...' : 'Create Bazaar'}
-          </button>
-        </form>
-            )}
-          </>
-        )}
+            Create Bazaar
+          </Button>
+        </div>
+      </form>
 
-        {(editing || (editOnly && editId)) && (() => {
-          const bz = editOnly && editId ? null : bazaars.find(b => b._id === editing);
-          const currentEditId = editOnly ? editId : editing;
-          if (!currentEditId) return null;
-          return (
-            <div style={{
-              background: colors.white,
-              borderRadius: borderRadius.xl,
-              padding: spacing['2xl'],
-              marginTop: spacing.xl,
-              marginBottom: spacing['2xl'],
-              boxShadow: shadows.lg,
-              border: `1px solid ${colors.gray200}`,
-            }}>
-              <div style={{
-                marginBottom: spacing.xl,
-                paddingBottom: spacing.lg,
-                borderBottom: `2px solid ${colors.gray200}`,
-              }}>
-                <h2 style={{
-                  color: colors.primary,
-                  fontWeight: typography.fontWeight.bold,
-                  fontSize: typography.fontSize.xl,
-                  margin: 0,
-                }}>✏️ Edit Bazaar</h2>
-              </div>
-              <div style={{ display: 'grid', gap: spacing.lg }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Title *</span>
-                    <input
-                      className="input"
-                      required
-                      value={editData.title}
-                      onChange={e => setEditData({ ...editData, title: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
+      {/* Existing Bazaars List - Only show if not in edit mode */}
+      {!editOnly && bazaars.length > 0 && (
+        <div className="mt-16 pt-10 border-t border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Bazaars</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {bazaars.map((bz) => (
+              <div
+                key={bz._id}
+                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
+                    {bz.title}
+                  </h3>
+                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${bz.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                    {bz.status}
+                  </span>
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Short Description</span>
-                    <input
-                      className="input"
-                      value={editData.shortDescription}
-                      onChange={e => setEditData({ ...editData, shortDescription: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Start Date/Time *</span>
-                    <input
-                      className="input"
-                      type="datetime-local"
-                      required
-                      value={editData.startDate}
-                      onChange={e => setEditData({ ...editData, startDate: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>End Date/Time *</span>
-                    <input
-                      className="input"
-                      type="datetime-local"
-                      required
-                      value={editData.endDate}
-                      onChange={e => setEditData({ ...editData, endDate: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: spacing.md }}>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Location *</span>
-                    <input
-                      className="input"
-                      required
-                      value={editData.location}
-                      onChange={e => setEditData({ ...editData, location: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                  <label style={{ display: 'block', marginBottom: spacing.sm }}>
-                    <span style={{
-                      display: 'block',
-                      color: colors.primary,
-                      fontWeight: typography.fontWeight.semibold,
-                      marginBottom: spacing.xs,
-                      fontSize: typography.fontSize.sm,
-                    }}>Registration Deadline</span>
-                    <input
-                      className="input"
-                      type="datetime-local"
-                      value={editData.registrationDeadline}
-                      onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
-                      style={{ ...inputStyles.base, width: '100%' }}
-                    />
-                  </label>
-                </div>
-                <RoleSelector 
-                  selectedRoles={allowedRoles}
-                  onChange={setAllowedRoles}
-                  label="Restrict Event to Specific Roles"
-                />
-                <div style={{ 
-                  display: 'flex', 
-                  gap: spacing.md, 
-                  marginTop: spacing.lg,
-                  paddingTop: spacing.lg,
-                  borderTop: `1px solid ${colors.gray200}`,
-                }}>
-                  <button 
-                    type="button" 
-                    onClick={() => onSave(currentEditId)} 
-                    disabled={loading}
-                    style={{
-                      ...buttonStyles.primary,
-                      flex: 1,
-                      padding: `${spacing.md} ${spacing.xl}`,
-                      fontSize: typography.fontSize.base,
-                      opacity: loading ? 0.7 : 1,
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!loading) {
-                        e.target.style.boxShadow = shadows.accentHover;
-                        e.target.style.transform = 'translateY(-2px)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!loading) {
-                        e.target.style.boxShadow = shadows.accent;
-                        e.target.style.transform = 'translateY(0)';
-                      }
-                    }}
-                  >
-                    {loading ? '💾 Saving...' : '💾 Save Changes'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
-        {!editOnly && (
-          <>
-            <h2 style={{
-              color: colors.primary,
-              fontWeight: typography.fontWeight.bold,
-              fontSize: typography.fontSize.lg,
-              marginTop: spacing['3xl'],
-              marginBottom: spacing.lg,
-            }}>Existing Bazaars</h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: spacing.lg
-            }}>
-              {bazaars.map((bz) => (
-                <div key={bz._id} style={{
-                  border: `1px solid ${colors.gray200}`,
-                  borderRadius: borderRadius.xl,
-                  padding: spacing.lg,
-                  background: colors.white,
-                  boxShadow: shadows.md,
-                  transition: transitions.normal,
-                }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = shadows.lg;
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = shadows.md;
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
+                <p className="text-slate-600 text-sm mb-4 line-clamp-2">
+                  {bz.shortDescription || 'No description provided.'}
+                </p>
+
+                <div className="space-y-2 text-sm text-slate-500 mb-6">
+                  <div className="flex items-center gap-2">
+                    <span>📍</span> {bz.location}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>📅</span> {new Date(bz.startDate).toLocaleDateString()}
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)}
                 >
-                  {editing !== bz._id && (
-                    <div>
-                      <div style={{
-                        fontWeight: typography.fontWeight.extrabold,
-                        color: colors.primary,
-                        fontSize: typography.fontSize.lg,
-                        marginBottom: spacing.sm,
-                      }}>
-                        {bz.title}
-                      </div>
-                      <div style={{
-                        color: colors.gray700,
-                        fontSize: typography.fontSize.sm,
-                        marginBottom: spacing.xs,
-                      }}>
-                        {bz.shortDescription || '—'}
-                      </div>
-                      <div style={{
-                        color: colors.gray500,
-                        fontSize: typography.fontSize.xs,
-                        marginTop: spacing.sm,
-                        marginBottom: spacing.xs,
-                      }}>
-                        📍 {bz.location}
-                      </div>
-                      <div style={{
-                        color: colors.gray500,
-                        fontSize: typography.fontSize.xs,
-                        marginBottom: spacing.md,
-                      }}>
-                        From {new Date(bz.startDate).toLocaleString()} to {bz.endDate ? new Date(bz.endDate).toLocaleString() : '—'}
-                      </div>
-                      <button
-                        className="submit"
-                        onClick={() => navigate(`/events-office/bazaars/edit/${bz._id}`)}
-                        style={{
-                          ...buttonStyles.primary,
-                          width: '100%',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.boxShadow = shadows.accentHover;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.boxShadow = shadows.accent;
-                        }}
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+                  Edit Details
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </FormLayout>
   );
 }
 

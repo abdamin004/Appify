@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 function SignupStaff() {
@@ -12,8 +11,9 @@ function SignupStaff() {
     role: "",
     staffId: "",
   });
-  
+
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -22,7 +22,11 @@ function SignupStaff() {
     });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
     console.log("Staff Signup Data:", formData);
 
     try {
@@ -42,232 +46,144 @@ function SignupStaff() {
 
       const data = await response.json();
       console.log("Signup response:", data);
-      setMessage("Signup successful! ✅");
+      setMessage("Signup successful! ✅ Redirecting to login...");
     } catch (error) {
       console.error("Signup error:", error);
       setMessage("Signup failed: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-      if (message === "Signup successful! ✅") {
-        setTimeout(() => {
-          navigate("/login");
-        }, 1000);
-      }
-    }, [message]);
+    if (message.includes("successful")) {
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
+    }
+  }, [message, navigate]);
 
   return (
-    <div style={{
-      maxWidth: '500px',
-      margin: '0 auto',
-      padding: '30px'
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h2 style={{ 
-          fontSize: '2rem', 
-          fontWeight: 'bold', 
-          color: '#003366', 
-          marginBottom: '10px' 
-        }}>
+    <div className="max-w-md mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-white mb-2">
           Staff / TA / Professor Signup
         </h2>
-        <p style={{ fontSize: '1rem', color: '#6b7280' }}>
+        <p className="text-slate-400">
           Register now to access your staff portal
         </p>
       </div>
 
-      <div>
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <div style={labelStyle}>
-              <span style={spanStyle}>First Name</span>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1">First Name</label>
+            <input
+              type="text"
+              name="firstName"
+              value={formData.firstName}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              placeholder="John"
+            />
           </div>
-
-          <div style={{ flex: 1 }}>
-            <div style={labelStyle}>
-              <span style={spanStyle}>Last Name</span>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-              />
-            </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1">Last Name</label>
+            <input
+              type="text"
+              name="lastName"
+              value={formData.lastName}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              placeholder="Doe"
+            />
           </div>
         </div>
 
-        <div style={labelStyle}>
-          <span style={spanStyle}>GUC Email</span>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">GUC Email</label>
           <input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             required
-            style={inputStyle}
+            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            placeholder="name@guc.edu.eg"
           />
         </div>
 
-        <div style={labelStyle}>
-          <span style={spanStyle}>Password</span>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             required
-            style={inputStyle}
+            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            placeholder="••••••••"
           />
         </div>
 
-        {/* Role Dropdown */}
-        <div style={labelStyle}>
-          <span style={spanStyle}>Role</span>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Role</label>
           <select
             name="role"
             value={formData.role}
             onChange={handleChange}
             required
-            style={selectStyle}
+            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all appearance-none cursor-pointer"
           >
-            <option value="">Select a role</option>
-            <option value="professor">Professor</option>
-            <option value="ta">TA</option>
-            <option value="staff">Staff</option>
-            {/** Event Office removed from public signup */}
+            <option value="" className="bg-slate-800 text-slate-400">Select a role</option>
+            <option value="professor" className="bg-slate-800">Professor</option>
+            <option value="ta" className="bg-slate-800">TA</option>
+            <option value="staff" className="bg-slate-800">Staff</option>
           </select>
         </div>
 
-        <div style={labelStyle}>
-          <span style={spanStyle}>Staff ID</span>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Staff ID</label>
           <input
             type="text"
             name="staffId"
             value={formData.staffId}
             onChange={handleChange}
             required
-            style={inputStyle}
+            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            placeholder="XX-XXXX"
           />
         </div>
 
-        <button 
-          onClick={handleSubmit}
-          style={buttonStyle}
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 6px 20px rgba(212, 175, 55, 0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.3)';
-          }}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed mt-4"
         >
-          Sign Up
+          {loading ? "Signing up..." : "Sign Up"}
         </button>
 
         {message && (
-          <p
-            style={{
-              marginTop: "15px",
-              color: message.includes("failed") ? "#dc2626" : "#d4af37",
-              textAlign: "center",
-              fontWeight: '500'
-            }}
-          >
+          <div className={`p-4 rounded-xl text-center text-sm font-medium ${message.includes("failed") ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
             {message}
-          </p>
+          </div>
         )}
 
-        <p style={{
-          marginTop: '20px',
-          textAlign: 'center',
-          fontSize: '0.95rem',
-          color: '#6b7280'
-        }}>
+        <p className="text-center text-slate-400 text-sm mt-4">
           Already have an account?{" "}
-          <button 
-            onClick={() => navigate('/login')} 
-            style={{
-              color: '#d4af37',
-              fontWeight: '600',
-              textDecoration: 'none',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              transition: 'all 0.2s',
-              padding: 0
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.textDecoration = 'none';
-            }}
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors hover:underline"
           >
             Login
           </button>
         </p>
-      </div>
+      </form>
     </div>
   );
 }
-
-const labelStyle = {
-  display: 'block',
-  marginBottom: '20px'
-};
-
-const spanStyle = {
-  display: 'block',
-  marginBottom: '8px',
-  fontSize: '0.9rem',
-  fontWeight: '600',
-  color: '#003366'
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '12px 16px',
-  border: '2px solid #e5e7eb',
-  borderRadius: '10px',
-  fontSize: '1rem',
-  outline: 'none',
-  transition: 'all 0.2s',
-  backgroundColor: 'white',
-  boxSizing: 'border-box'
-};
-
-const selectStyle = {
-  ...inputStyle,
-  cursor: 'pointer'
-};
-
-const buttonStyle = {
-  width: '100%',
-  padding: '14px',
-  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-  color: '#003366',
-  border: 'none',
-  borderRadius: '10px',
-  fontSize: '1.05rem',
-  fontWeight: '700',
-  cursor: 'pointer',
-  transition: 'all 0.3s',
-  boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)',
-  marginTop: '10px'
-};
 
 export default SignupStaff;

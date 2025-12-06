@@ -1,5 +1,4 @@
 import React from "react";
-import { colors, spacing, borderRadius, typography, shadows } from "../../utils/designSystem";
 
 export default function PaymentActions({
   disabled = false,
@@ -9,25 +8,15 @@ export default function PaymentActions({
   paying = false,
 }) {
   return (
-    <div style={{ display: "flex", gap: spacing.sm, flexDirection: "column", width: "100%" }}>
+    <div className="flex flex-col gap-2 w-full">
       <button
         type="button"
         onClick={onPayCard}
         disabled={paying || disabled}
-        style={{
-          width: "100%",
-          background: disabled ? colors.gray200 : `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-          color: colors.primary,
-          border: "none",
-          padding: `${spacing.sm} ${spacing.md}`,
-          borderRadius: borderRadius.md,
-          fontSize: typography.fontSize.sm,
-          fontWeight: typography.fontWeight.bold,
-          cursor: paying || disabled ? "not-allowed" : "pointer",
-          transition: "all 0.2s ease",
-          opacity: paying || disabled ? 0.7 : 1,
-          boxShadow: shadows.md,
-        }}
+        className={`btn btn-sm w-full border-none shadow-md text-slate-900 font-bold ${disabled
+            ? "bg-slate-200 cursor-not-allowed opacity-70"
+            : "bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700"
+          }`}
       >
         {paying ? "Processing..." : "💳 Pay by Card"}
       </button>
@@ -35,23 +24,13 @@ export default function PaymentActions({
         type="button"
         onClick={onPayWallet}
         disabled={paying || walletDisabled}
-        style={{
-          width: "100%",
-          background: walletDisabled ? colors.gray100 : colors.infoLight,
-          color: walletDisabled ? colors.gray500 : colors.info,
-          border: walletDisabled ? `1px solid ${colors.gray200}` : `1px solid ${colors.info}`,
-          padding: `${spacing.sm} ${spacing.md}`,
-          borderRadius: borderRadius.md,
-          fontSize: typography.fontSize.sm,
-          fontWeight: typography.fontWeight.bold,
-          cursor: paying || walletDisabled ? "not-allowed" : "pointer",
-          transition: "all 0.2s ease",
-        }}
+        className={`btn btn-sm w-full font-bold ${walletDisabled
+            ? "btn-disabled bg-slate-100 text-slate-400 border-slate-200"
+            : "btn-outline btn-info hover:bg-info hover:text-white"
+          }`}
       >
         {paying ? "Processing..." : "💼 Pay from Wallet"}
       </button>
     </div>
   );
 }
-
-

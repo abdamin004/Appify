@@ -15,7 +15,7 @@ function CompanyDocumentsUpload() {
     try {
       const token = localStorage.getItem("token");
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-      
+
       // Get vendor data from login response stored in localStorage
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
@@ -28,7 +28,7 @@ function CompanyDocumentsUpload() {
           });
         }
       }
-      
+
       // Also try to get from backend if there's a profile endpoint
       // The upload response will also update this, so this is just for initial load
     } catch (err) {
@@ -74,7 +74,7 @@ function CompanyDocumentsUpload() {
     try {
       const token = localStorage.getItem("token");
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-      
+
       const formData = new FormData();
       if (taxCardFile) {
         formData.append('taxCard', taxCardFile);
@@ -102,14 +102,14 @@ function CompanyDocumentsUpload() {
         const logoInput = document.getElementById('logoInput');
         if (taxCardInput) taxCardInput.value = '';
         if (logoInput) logoInput.value = '';
-        
+
         // Update vendor data from response
         if (data.vendor) {
           setVendorData({
             taxCardUrl: data.vendor.taxCardUrl,
             logoUrl: data.vendor.logoUrl,
           });
-          
+
           // Also update localStorage user object
           const storedUser = localStorage.getItem("user");
           if (storedUser) {
@@ -143,83 +143,59 @@ function CompanyDocumentsUpload() {
 
   return (
     <div>
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Company Documents</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Company Documents</h2>
+        <p className="text-slate-500">
           Upload your tax card and company logo to prove company validity
         </p>
       </div>
 
       {message.text && (
-        <div style={{
-          padding: '15px',
-          marginBottom: '20px',
-          borderRadius: '10px',
-          background: message.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          border: `2px solid ${message.type === 'success' ? '#10b981' : '#ef4444'}`,
-          color: message.type === 'success' ? '#065f46' : '#991b1b',
-        }}>
-          {message.text}
+        <div className={`p-4 mb-6 rounded-xl border flex items-center gap-3 ${message.type === 'success'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+          <span className="text-xl">{message.type === 'success' ? '✅' : '⚠️'}</span>
+          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '30px',
-        borderRadius: '15px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        marginBottom: '30px',
-      }}>
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8">
         {/* Tax Card Upload */}
-        <div style={{ marginBottom: '30px' }}>
-          <label style={{ display: 'block', marginBottom: '10px', color: '#003366', fontWeight: 600, fontSize: '1.1rem' }}>
-            📄 Tax Card *
+        <div className="mb-10">
+          <label className="block mb-2 text-slate-900 font-bold text-lg flex items-center gap-2">
+            📄 Tax Card <span className="text-red-500">*</span>
           </label>
-          <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '15px' }}>
+          <p className="text-slate-500 text-sm mb-6">
             Upload your company tax card (PDF, PNG, JPG, or JPEG - Max 5MB)
           </p>
-          
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
+
+          <div className="flex gap-8 flex-wrap items-start">
+            <div className="flex-1 min-w-[300px]">
               <input
                 id="taxCardInput"
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg"
                 onChange={(e) => handleFileChange('taxCard', e)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '2px dashed #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                }}
+                className="file-input file-input-bordered file-input-primary w-full bg-slate-50 focus:bg-white transition-colors"
               />
               {taxCardFile && (
-                <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#6b7280' }}>
+                <div className="mt-3 text-sm text-slate-600 font-medium flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
+                  <span>📎</span>
                   Selected: {taxCardFile.name} ({(taxCardFile.size / 1024).toFixed(2)} KB)
                 </div>
               )}
             </div>
-            
+
             {vendorData.taxCardUrl && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Current Tax Card:</div>
+              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Current Tax Card</div>
                 {vendorData.taxCardUrl.endsWith('.pdf') || vendorData.taxCardUrl.includes('.pdf') ? (
                   <a
                     href={`${baseUrl}${vendorData.taxCardUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      padding: '10px 20px',
-                      background: 'rgba(212, 175, 55, 0.15)',
-                      color: '#003366',
-                      borderRadius: '8px',
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                   >
                     📄 View PDF
                   </a>
@@ -227,145 +203,125 @@ function CompanyDocumentsUpload() {
                   <img
                     src={`${baseUrl}${vendorData.taxCardUrl}`}
                     alt="Tax Card"
-                    style={{
-                      maxWidth: '200px',
-                      maxHeight: '150px',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '8px',
-                      padding: '8px',
-                      background: 'white',
-                    }}
+                    className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
                   />
                 )}
               </div>
             )}
-            
+
             {taxCardFile && getFilePreview(taxCardFile) && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</div>
+              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Preview</div>
                 <img
                   src={getFilePreview(taxCardFile)}
                   alt="Tax Card Preview"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                  }}
+                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
                 />
               </div>
             )}
           </div>
         </div>
 
+        <div className="divider"></div>
+
         {/* Logo Upload */}
-        <div style={{ marginBottom: '30px' }}>
-          <label style={{ display: 'block', marginBottom: '10px', color: '#003366', fontWeight: 600, fontSize: '1.1rem' }}>
-            🏢 Company Logo *
+        <div className="mb-10">
+          <label className="block mb-2 text-slate-900 font-bold text-lg flex items-center gap-2">
+            🏢 Company Logo <span className="text-red-500">*</span>
           </label>
-          <p style={{ color: '#6b7280', fontSize: '0.85rem', marginBottom: '15px' }}>
+          <p className="text-slate-500 text-sm mb-6">
             Upload your company logo (PNG, JPG, or JPEG - Max 5MB)
           </p>
-          
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
+
+          <div className="flex gap-8 flex-wrap items-start">
+            <div className="flex-1 min-w-[300px]">
               <input
                 id="logoInput"
                 type="file"
                 accept=".png,.jpg,.jpeg"
                 onChange={(e) => handleFileChange('logo', e)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '2px dashed #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                }}
+                className="file-input file-input-bordered file-input-primary w-full bg-slate-50 focus:bg-white transition-colors"
               />
               {logoFile && (
-                <div style={{ marginTop: '10px', fontSize: '0.85rem', color: '#6b7280' }}>
+                <div className="mt-3 text-sm text-slate-600 font-medium flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
+                  <span>📎</span>
                   Selected: {logoFile.name} ({(logoFile.size / 1024).toFixed(2)} KB)
                 </div>
               )}
             </div>
-            
+
             {vendorData.logoUrl && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Current Logo:</div>
+              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Current Logo</div>
                 <img
                   src={`${baseUrl}${vendorData.logoUrl}`}
                   alt="Company Logo"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                    objectFit: 'contain',
-                  }}
+                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
                 />
               </div>
             )}
-            
+
             {logoFile && getFilePreview(logoFile) && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</div>
+              <div className="text-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Preview</div>
                 <img
                   src={getFilePreview(logoFile)}
                   alt="Logo Preview"
-                  style={{
-                    maxWidth: '200px',
-                    maxHeight: '150px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    background: 'white',
-                    objectFit: 'contain',
-                  }}
+                  className="max-w-[200px] max-h-[150px] border border-slate-200 rounded-lg bg-white shadow-sm object-contain"
                 />
               </div>
             )}
           </div>
         </div>
 
-        <button
-          onClick={handleUpload}
-          disabled={uploading || (!taxCardFile && !logoFile)}
-          style={{
-            padding: '14px 28px',
-            background: (uploading || (!taxCardFile && !logoFile))
-              ? '#9ca3af'
-              : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-            color: '#003366',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '1rem',
-            fontWeight: 700,
-            cursor: (uploading || (!taxCardFile && !logoFile)) ? 'not-allowed' : 'pointer',
-            transition: 'all 0.3s',
-          }}
-        >
-          {uploading ? 'Uploading...' : '📤 Upload Documents'}
-        </button>
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={handleUpload}
+            disabled={uploading || (!taxCardFile && !logoFile)}
+            className={`px-8 py-3 rounded-xl font-bold text-lg transition-all shadow-sm ${uploading || (!taxCardFile && !logoFile)
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-lg hover:-translate-y-0.5'
+              }`}
+          >
+            {uploading ? (
+              <span className="flex items-center gap-2">
+                <span className="loading loading-spinner loading-sm"></span>
+                Uploading...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span>📤</span> Upload Documents
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '20px',
-        borderRadius: '15px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      }}>
-        <h3 style={{ color: '#003366', marginBottom: '15px', fontSize: '1.1rem' }}>📋 Requirements</h3>
-        <ul style={{ color: '#6b7280', fontSize: '0.9rem', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
-          <li>Tax card must be a valid PDF or image file</li>
-          <li>Company logo must be a PNG, JPG, or JPEG image</li>
-          <li>Maximum file size: 5MB per file</li>
-          <li>Both documents are required to prove company validity</li>
-          <li>You can update your documents at any time</li>
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <span>📋</span> Requirements
+        </h3>
+        <ul className="space-y-3 text-slate-600">
+          <li className="flex items-start gap-3">
+            <span className="text-emerald-500 mt-1">✓</span>
+            <span>Tax card must be a valid PDF or image file</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-emerald-500 mt-1">✓</span>
+            <span>Company logo must be a PNG, JPG, or JPEG image</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-emerald-500 mt-1">✓</span>
+            <span>Maximum file size: 5MB per file</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-emerald-500 mt-1">✓</span>
+            <span>Both documents are required to prove company validity</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-emerald-500 mt-1">✓</span>
+            <span>You can update your documents at any time</span>
+          </li>
         </ul>
       </div>
     </div>
@@ -373,4 +329,3 @@ function CompanyDocumentsUpload() {
 }
 
 export default CompanyDocumentsUpload;
-

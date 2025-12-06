@@ -6,7 +6,7 @@ import { FaStar } from "react-icons/fa";
 import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance, getEventPrice } from "../../services/paymentService";
 import PaymentActions from "../Payments/PaymentActions";
 import { showToast, confirmDialog } from "../../utils/toast";
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
+
 
 // Per-user ratings storage key (frontend-only persistence)
 const ratingsStorageKeyForUser = () => {
@@ -47,9 +47,9 @@ function RatingStars({ value = 0, onChange, disabled = false }) {
   const stars = [1, 2, 3, 4, 5];
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div className="flex items-center gap-2">
       <div
-        style={{ display: "flex", alignItems: "center" }}
+        className="flex items-center"
         role="radiogroup"
         aria-label="Rate event"
       >
@@ -64,19 +64,14 @@ function RatingStars({ value = 0, onChange, disabled = false }) {
             aria-checked={active === s}
             role="radio"
             disabled={disabled}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: disabled ? "not-allowed" : "pointer",
-              padding: 4,
-            }}
+            className={`p-1 bg-transparent border-none ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:scale-110 transition-transform"}`}
           >
-            <FaStar size={22} color={s <= active ? "#fbbf24" : "#e5e7eb"} />
+            <FaStar size={20} color={s <= active ? "#fbbf24" : "#e2e8f0"} />
           </button>
         ))}
       </div>
       {value > 0 && (
-        <span style={{ color: "#6b7280", fontSize: 13 }}>You rated {value}/5</span>
+        <span className="text-slate-500 text-xs font-semibold">You rated {value}/5</span>
       )}
     </div>
   );
@@ -200,6 +195,28 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
     return evt?.event?.fundingSource || evt?.fundingSource || '';
   };
 
+  const getEventColor = (type) => {
+    switch (type) {
+      case 'Workshop': return 'from-violet-500 to-purple-600';
+      case 'Bazaar': return 'from-amber-400 to-orange-500';
+      case 'Booth': return 'from-pink-500 to-rose-600';
+      case 'Competition': return 'from-red-500 to-rose-600';
+      case 'Speaker': return 'from-blue-500 to-indigo-600';
+      default: return 'from-emerald-400 to-teal-600';
+    }
+  };
+
+  const getEventIcon = (type) => {
+    switch (type) {
+      case 'Workshop': return '🛠️';
+      case 'Bazaar': return '🏪';
+      case 'Booth': return '🛒';
+      case 'Competition': return '🏆';
+      case 'Speaker': return '🎤';
+      default: return '📅';
+    }
+  };
+
   const handleCardPay = async (evt) => {
     const eventId = getEventId(evt);
     if (!eventId) {
@@ -240,11 +257,11 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
         // Use balance from response if available
         const newBalance = res.balance !== undefined ? res.balance : walletBalance;
         try {
-          window.dispatchEvent(new CustomEvent('wallet:updated', { 
-            detail: { reason: 'wallet-pay', eventId, balance: newBalance, amount: price } 
+          window.dispatchEvent(new CustomEvent('wallet:updated', {
+            detail: { reason: 'wallet-pay', eventId, balance: newBalance, amount: price }
           }));
           window.dispatchEvent(new CustomEvent('payment:success', { detail: { method: 'Wallet', amount: price } }));
-        } catch (_) {}
+        } catch (_) { }
         // Update wallet balance immediately
         if (newBalance !== undefined) {
           setWalletBalance(newBalance);
@@ -273,13 +290,13 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       try {
         const detail = { reason: 'refund', eventId, balance: res?.balance, amount: res?.refunded };
         window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
-      } catch (_) {}
+      } catch (_) { }
       showToast.success(msg);
       // Locally mark refunded so Pay Now appears again immediately
       try {
         setRefundedSet(prev => new Set(prev).add(String(eventId)));
         setPaidLocal(prev => { const next = new Set(prev); next.delete(String(eventId)); return next; });
-      } catch (_) {}
+      } catch (_) { }
       // Refresh events list to remove from registered events
       if (onRefresh) {
         onRefresh();
@@ -287,7 +304,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       // Also dispatch event for parent components to refresh
       try {
         window.dispatchEvent(new CustomEvent('event:unregistered', { detail: { eventId } }));
-      } catch (_) {}
+      } catch (_) { }
     } catch (e) {
       showToast.error(e?.message || 'Refund failed');
     }
@@ -300,7 +317,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       saveRatings(next);
       return next;
     });
-    
+
     // Send to backend
     try {
       await rateEvent(eventId, value);
@@ -341,7 +358,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       const user = JSON.parse(raw);
       const userId = user && (user._id || user.id);
       if (!userId) return false;
-      
+
       // Check registeredUsers array in event
       const registeredUsers = evt?.registeredUsers || evt?.event?.registeredUsers || [];
       return Array.isArray(registeredUsers) && registeredUsers.some(u => {
@@ -398,40 +415,20 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
   // Loading / empty states
   if (!events || !Array.isArray(events)) {
     return (
-      <div
-        style={{
-          background: "rgba(255,255,255,0.95)",
-          padding: "60px 40px",
-          borderRadius: "20px",
-          textAlign: "center",
-          boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-        }}
-      >
-        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>⏳</div>
-        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>
-          Loading...
-        </h3>
-        <p style={{ color: "#6b7280" }}>Please wait while we fetch your events.</p>
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
+        <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">Loading events...</h3>
+        <p className="text-slate-500">Please wait while we fetch your events.</p>
       </div>
     );
   }
 
   if (events.length === 0) {
     return (
-      <div
-        style={{
-          background: "rgba(255,255,255,0.95)",
-          padding: "60px 40px",
-          borderRadius: "20px",
-          textAlign: "center",
-          boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-        }}
-      >
-        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>📭</div>
-        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>
-          No events found
-        </h3>
-        <p style={{ color: "#6b7280" }}>
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
+        <div className="text-6xl mb-6 opacity-50">📭</div>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">No events found</h3>
+        <p className="text-slate-500">
           You don't have any events in this category yet.
         </p>
       </div>
@@ -439,13 +436,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-        gap: spacing['2xl'],
-      }}
-    >
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {events.map((evt) => {
         const id = getEventId(evt);
         const type = getType(evt);
@@ -464,7 +455,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
         const isPaid = (serverPaid && !refundedSet.has(String(id))) || paidLocal.has(String(id));
         // For workshops: only show payment if funding is Internal (Grant/Sponsor/External are free)
         // For other events: show payment if price > 0
-        const requiresPayment = eventType === 'Workshop' 
+        const requiresPayment = eventType === 'Workshop'
           ? (price > 0 && ['Internal'].includes(fundingSource))
           : (price > 0);
         const isPayable = isRegistered(evt) && requiresPayment && !isPaid && !hasEventEnded(evt);
@@ -488,58 +479,24 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
         return (
           <div
             key={id}
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              borderRadius: "20px",
-              overflow: "hidden",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              transition: "all 0.3s",
-            }}
+            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-all duration-300 flex flex-col group"
           >
             <div
-              style={{
-                height: "200px",
-                background: `linear-gradient(135deg, ${getEventColor(type)} 0%, ${getEventColorDark(type)} 100%)`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "4rem",
-              }}
+              className={`h-48 flex items-center justify-center text-6xl bg-gradient-to-br ${getEventColor(type)}`}
             >
-              {getEventIcon(type)}
+              <span className="transform group-hover:scale-110 transition-transform duration-300 drop-shadow-lg">
+                {getEventIcon(type)}
+              </span>
             </div>
-            <div style={{ padding: "25px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "12px",
-                }}
-              >
-                <span
-                  style={{
-                    padding: "6px 12px",
-                    background: "rgba(212, 175, 55, 0.15)",
-                    color: "#d4af37",
-                    borderRadius: "8px",
-                    fontSize: "0.75rem",
-                    fontWeight: "700",
-                  }}
-                >
+            <div className="p-6 flex-1 flex flex-col">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold uppercase tracking-wider">
                   {type}
                 </span>
                 {isPayable && price > 0 && (
                   <span
                     title="Payment required"
-                    style={{
-                      padding: "6px 12px",
-                      background: "rgba(239,68,68,0.12)",
-                      color: "#ef4444",
-                      borderRadius: 8,
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                    }}
+                    className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold tracking-wide"
                   >
                     Due: {price} {eventPrices[getEventId(evt)]?.currency?.toUpperCase() || 'EGP'}
                   </span>
@@ -548,157 +505,87 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
                 {eventType === 'Workshop' && price === 0 && isRegistered(evt) && (
                   <span
                     title={`This workshop is funded by ${fundingSource || 'external sources'}`}
-                    style={{
-                      padding: "6px 12px",
-                      background: "rgba(34,197,94,0.12)",
-                      color: "#22c55e",
-                      borderRadius: 8,
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
+                    className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold flex items-center gap-1 tracking-wide"
                   >
                     <span>✓</span>
                     <span>FREE {fundingSource ? `(${fundingSource} Funded)` : ''}</span>
                   </span>
                 )}
               </div>
-              <h3
-                style={{
-                  fontSize: "1.3rem",
-                  fontWeight: "bold",
-                  color: "#003366",
-                  marginBottom: "12px",
-                }}
-              >
+              <h3 className="text-xl font-bold text-slate-900 mb-2 line-clamp-1 group-hover:text-emerald-600 transition-colors">
                 {title}
               </h3>
-              <p
-                style={{
-                  color: "#6b7280",
-                  fontSize: "0.9rem",
-                  marginBottom: "15px",
-                  lineHeight: "1.5",
-                }}
-              >
-                {(desc || "No description available").substring(0, 100)}...
+              <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">
+                {desc || "No description available"}
               </p>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "8px",
-                  fontSize: "0.85rem",
-                  color: "#6b7280",
-                }}
-              >
+              <div className="flex flex-col gap-2 text-sm text-slate-500 mb-6">
                 {start && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div className="flex items-center gap-2">
                     <span>📅</span>
-                    <span>{new Date(start).toLocaleDateString()}</span>
+                    <span className="font-medium">{new Date(start).toLocaleDateString()}</span>
                   </div>
                 )}
                 {location && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div className="flex items-center gap-2">
                     <span>📍</span>
-                    <span>{location}</span>
+                    <span className="font-medium">{location}</span>
                   </div>
                 )}
                 {capacity && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div className="flex items-center gap-2">
                     <span>👥</span>
-                    <span>{evt.registeredCount || 0}/{capacity}</span>
+                    <span className="font-medium">{evt.registeredCount || 0}/{capacity}</span>
                   </div>
                 )}
               </div>
 
               {/* View Details Button - Always visible */}
-              <div style={{ marginTop: 16, marginBottom: 12 }}>
+              <div className="mt-auto mb-4">
                 <button
                   onClick={() => navigate(`/events/${id}`)}
-                  style={{
-                    width: '100%',
-                    padding: `${spacing.sm} ${spacing.md}`,
-                    background: 'transparent',
-                    color: colors.primary,
-                    border: `1.5px solid ${colors.primary}`,
-                    borderRadius: borderRadius.lg,
-                    fontWeight: typography.fontWeight.semibold,
-                    fontSize: typography.fontSize.sm,
-                    cursor: 'pointer',
-                    transition: transitions.fast,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: spacing.xs,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.background = colors.primary;
-                    e.target.style.color = colors.white;
-                    e.target.style.transform = 'translateY(-1px)';
-                    e.target.style.boxShadow = `0 4px 8px rgba(0, 51, 102, 0.2)`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.background = 'transparent';
-                    e.target.style.color = colors.primary;
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = 'none';
-                  }}
+                  className="w-full btn btn-outline btn-sm hover:bg-slate-900 hover:text-white transition-all"
                 >
                   View Details
                 </button>
               </div>
 
               {/* Rating + Comments (frontend-only rating; comments fetched from API) */}
-              <div
-                style={{
-                  marginTop: 16,
-                  paddingTop: 12,
-                  borderTop: "1px solid #e5e7eb",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ color: "#003366", fontWeight: 600 }}>Your rating</div>
-                <RatingStars
-                  value={current}
-                  onChange={(v) => setEventRating(id, v)}
-                  disabled={!allowed}
-                />
+              <div className="pt-4 border-t border-slate-100 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-bold text-slate-700">Your rating</div>
+                  <RatingStars
+                    value={current}
+                    onChange={(v) => setEventRating(id, v)}
+                    disabled={!allowed}
+                  />
+                </div>
+
                 {!allowed && (
-                  <span style={{ color: "#9ca3af", fontSize: 12 }}>
-                    {!hasEventEnded(evt) 
-                      ? 'Rating available after event ends' 
+                  <div className="text-xs text-slate-400 text-right italic">
+                    {!hasEventEnded(evt)
+                      ? 'Rating available after event ends'
                       : !isRegistered(evt)
-                      ? 'Register to rate this event'
-                      : 'Rating available'}
-                  </span>
+                        ? 'Register to rate this event'
+                        : 'Rating available'}
+                  </div>
                 )}
+
                 {/* Show "Mark Attended" button only after event has ended */}
                 {hasEventEnded(evt) && isRegistered(evt) && (
                   <button
                     type="button"
                     onClick={() => toggleAttendedLocal(id)}
-                    style={{
-                      padding: '6px 10px',
-                      background: attendedSet.has(String(id)) ? 'rgba(34,197,94,0.15)' : 'rgba(212,175,55,0.15)',
-                      color: attendedSet.has(String(id)) ? '#16a34a' : '#b8941f',
-                      border: attendedSet.has(String(id)) ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(212,175,55,0.3)',
-                      borderRadius: 8,
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
+                    className={`w-full py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${attendedSet.has(String(id))
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100'
+                      }`}
                   >
                     {attendedSet.has(String(id)) ? '✓ Attended' : 'Mark Attended'}
                   </button>
                 )}
+
                 {isPayable && (
-                  <div style={{ width: '100%', marginTop: spacing.sm }}>
+                  <div className="w-full">
                     <PaymentActions
                       paying={payingId === id}
                       disabled={false}
@@ -708,87 +595,47 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
                     />
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => toggleComments(id)}
-                  style={{
-                    marginLeft: 'auto',
-                    padding: '8px 12px',
-                    background: 'rgba(212, 175, 55, 0.15)',
-                    color: '#b8941f',
-                    border: '1px solid rgba(212, 175, 55, 0.3)',
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {openComments[id] ? 'Hide Comments' : 'Show Comments'}
-                </button>
-                {canRefund && (
+
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => handleRefundAndCancel(id)}
-                    style={{
-                      padding: '8px 12px',
-                      background: 'rgba(239,68,68,0.12)',
-                      color: '#b91c1c',
-                      border: '1px solid rgba(239,68,68,0.35)',
-                      borderRadius: 8,
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
+                    onClick={() => toggleComments(id)}
+                    className="flex-1 btn btn-ghost btn-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                   >
-                    Cancel & Refund
+                    {openComments[id] ? 'Hide Comments' : 'Show Comments'}
                   </button>
-                )}
+
+                  {canRefund && (
+                    <button
+                      type="button"
+                      onClick={() => handleRefundAndCancel(id)}
+                      className="flex-1 btn btn-ghost btn-xs text-red-500 hover:bg-red-50"
+                    >
+                      Cancel & Refund
+                    </button>
+                  )}
+                </div>
+
                 {showRefundButton && isPaid && !canRefund && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
+                  <div className="flex flex-col gap-1 w-full">
                     <button
                       type="button"
                       disabled
-                      style={{
-                        padding: '8px 12px',
-                        background: colors.gray100,
-                        color: colors.gray400,
-                        border: `1px solid ${colors.gray200}`,
-                        borderRadius: 8,
-                        fontWeight: 800,
-                        cursor: 'not-allowed'
-                      }}
+                      className="w-full btn btn-disabled btn-xs opacity-50"
                     >
                       Cancel & Refund (window closed)
                     </button>
-                    <span style={{ color: '#9ca3af', fontSize: 12, fontStyle: 'italic' }}>
+                    <span className="text-xs text-slate-400 italic text-center">
                       Cancellation only available ≥ 14 days before start.
                     </span>
                   </div>
                 )}
+
                 {canEditWorkshop(evt) && (
                   <button
                     type="button"
                     onClick={() => navigate(`/professor/workshops?edit=${id}`)}
-                    style={{
-                      padding: '8px 12px',
-                      background: colors.warning,
-                      color: colors.white,
-                      border: 'none',
-                      borderRadius: borderRadius.lg,
-                      fontWeight: typography.fontWeight.bold,
-                      fontSize: typography.fontSize.sm,
-                      cursor: 'pointer',
-                      transition: transitions.normal,
-                      boxShadow: shadows.sm,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = shadows.md;
-                      e.target.style.opacity = 0.9;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = shadows.sm;
-                      e.target.style.opacity = 1;
-                    }}
+                    className="w-full btn btn-warning btn-sm text-white mt-2"
                   >
                     ✏️ Edit Workshop
                   </button>
@@ -796,57 +643,67 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
               </div>
 
               {openComments[id] && (
-                <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
+                <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2 fade-in duration-200">
                   {commentsLoading[id] && (
-                    <div style={{ color: '#6b7280' }}>Loading comments…</div>
-                  )}
-                  {commentsError[id] && (
-                    <div style={{ color: '#dc2626' }}>{commentsError[id]}</div>
-                  )}
-                  {Array.isArray(commentsByEvent[id]) && commentsByEvent[id].length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {commentsByEvent[id].map(c => (
-                        <div key={c._id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
-                          <div style={{ fontWeight: 600, color: '#003366' }}>
-                            {(c.user && (c.user.firstName || c.user.lastName)) ? `${c.user.firstName||''} ${c.user.lastName||''}`.trim() : (c.user?.email || 'User')}
-                            <span style={{ marginLeft: 8, color: '#9ca3af', fontWeight: 400, fontSize: 12 }}>{new Date(c.createdAt).toLocaleString()}</span>
-                          </div>
-                          <div style={{ color: '#374151' }}>{c.content}</div>
-                        </div>
-                      ))}
+                    <div className="flex justify-center py-4">
+                      <span className="loading loading-spinner loading-sm text-emerald-500"></span>
                     </div>
-                  ) : (!commentsLoading[id] && !commentsError[id]) ? (
-                    <div style={{ color: '#6b7280' }}>No comments yet.</div>
-                  ) : null}
+                  )}
 
-                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                    <input
-                      type="text"
-                      value={newCommentByEvent[id] || ''}
-                      onChange={(e) => setNewCommentByEvent(prev => ({ ...prev, [id]: e.target.value }))}
-                      placeholder={canComment ? 'Write a comment…' : 'You must be registered for this event to comment'}
-                      disabled={!canComment}
-                      style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb' }}
-                    />
-                    <button
-                      onClick={() => submitComment(id)}
-                      disabled={!canComment || !String(newCommentByEvent[id] || '').trim() || !!commentsLoading[id]}
-                      style={{
-                        padding: '10px 14px',
-                        background: (!canComment || commentsLoading[id]) ? '#e5e7eb' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                        color: '#003366',
-                        border: 'none',
-                        borderRadius: 10,
-                        fontWeight: 800,
-                        cursor: (!canComment || commentsLoading[id]) ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      Post
-                    </button>
-                  </div>
-                  {!canComment && (
-                    <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 6 }}>
-                      You must be registered for this event to comment.
+                  {!commentsLoading[id] && commentsError[id] && (
+                    <div className="alert alert-error text-xs py-2 mb-2 rounded-lg">
+                      <span>{commentsError[id]}</span>
+                    </div>
+                  )}
+
+                  {!commentsLoading[id] && !commentsError[id] && (
+                    <div className="space-y-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                      {(!commentsByEvent[id] || commentsByEvent[id].length === 0) ? (
+                        <p className="text-center text-slate-400 text-xs py-4 bg-slate-50 rounded-lg">No comments yet.</p>
+                      ) : (
+                        commentsByEvent[id].map((c, i) => (
+                          <div key={i} className="bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-bold text-slate-800 text-xs">
+                                {c.user?.firstName || 'User'} {c.user?.lastName || ''}
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                {new Date(c.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-slate-600 text-xs leading-relaxed">{c.comment}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {canComment ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add a comment..."
+                        value={newCommentByEvent[id] || ""}
+                        onChange={(e) => setNewCommentByEvent(prev => ({ ...prev, [id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            submitComment(id);
+                          }
+                        }}
+                        className="input input-bordered input-sm flex-1 text-xs rounded-lg focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        onClick={() => submitComment(id)}
+                        disabled={!newCommentByEvent[id]?.trim() || commentsLoading[id]}
+                        className="btn btn-primary btn-sm btn-square rounded-lg bg-slate-900 hover:bg-emerald-600 border-none text-white"
+                      >
+                        ➤
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center text-xs text-slate-400 italic py-3 bg-slate-50 rounded-xl border border-slate-100">
+                      Only registered users can comment
                     </div>
                   )}
                 </div>
@@ -857,39 +714,6 @@ function MyEventsList({ events, showRefundButton = false, onRefresh }) {
       })}
     </div>
   );
-}
-
-function getEventIcon(type) {
-  const icons = {
-    Workshop: "🛠️",
-    Trip: "🧭",
-    Bazaar: "🛍️",
-    Booth: "🧺",
-    Conference: "🎤",
-  };
-  return icons[type] || "🎫";
-}
-
-function getEventColor(type) {
-  const colors = {
-    Workshop: "#3b82f6",
-    Trip: "#10b981",
-    Bazaar: "#f59e0b",
-    Booth: "#ec4899",
-    Conference: "#8b5cf6",
-  };
-  return colors[type] || "#6b7280";
-}
-
-function getEventColorDark(type) {
-  const colors = {
-    Workshop: "#1e40af",
-    Trip: "#047857",
-    Bazaar: "#d97706",
-    Booth: "#be185d",
-    Conference: "#6d28d9",
-  };
-  return colors[type] || "#4b5563";
 }
 
 export default MyEventsList;

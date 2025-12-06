@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerForEvent } from '../services/eventService';
 import { showToast } from '../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../utils/designSystem';
+
 
 const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchive, hasEventPassed }) => {
   const navigate = useNavigate();
   const [registering, setRegistering] = useState(false);
-  
+
   // Check if user is logged in
   const isLoggedIn = (() => {
     try {
@@ -43,7 +43,7 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
       const role = (u.role || '').toLowerCase();
       const userId = String(u._id || u.id || '');
       const now = new Date();
-      
+
       // EventOffice can edit events with time restrictions
       if (role === 'eventoffice') {
         // Workshops: EventOffice CANNOT edit workshops (they can only accept/reject/request edits)
@@ -61,13 +61,13 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
         // Conferences and Gym Sessions: can edit
         return true;
       }
-      
+
       // Professor can only edit their own workshops
       if (role === 'professor' && event.type === 'Workshop') {
         const eventCreatorId = String(event.createdBy || event.createdByUser || event.professor || '');
         return eventCreatorId && userId && eventCreatorId === userId;
       }
-      
+
       return false;
     } catch {
       return false;
@@ -169,7 +169,7 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
 
   const handleRegisterClick = async (e) => {
     e.stopPropagation();
-    
+
     const eventId = event?._id || event?.id;
     if (!eventId) {
       showToast.error('Unable to determine event id for registration.');
@@ -262,218 +262,145 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
     : (Array.isArray(event.vendors) ? event.vendors.length : 0);
 
   return (
-    <div className="event-card">
+    <div
+      className="group bg-white rounded-2xl shadow-md overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 flex flex-col h-full border border-transparent hover:border-emerald-500/30 cursor-pointer"
+      onClick={handleViewDetails}
+    >
       {/* Image */}
-      <div className="event-image" style={{ background: event.imageUrl ? `url(${event.imageUrl}) center/cover` : 'linear-gradient(135deg, #003366 0%, #001a33 100%)' }}>
-        {!event.imageUrl && <span className="event-icon">{icons[event.type] || '📅'}</span>}
-        {isArchived && <div className="archived-badge">ARCHIVED</div>}
-        {event.status === 'cancelled' && <div className="cancelled-badge">CANCELLED</div>}
+      <div
+        className="h-48 relative bg-slate-900 flex items-center justify-center overflow-hidden"
+        style={{ background: event.imageUrl ? `url(${event.imageUrl}) center/cover` : undefined }}
+      >
+        {!event.imageUrl && (
+          <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+            <span className="text-6xl">{icons[event.type] || '📅'}</span>
+          </div>
+        )}
+        {isArchived && (
+          <div className="absolute top-4 left-4 px-2 py-1 bg-slate-600 text-white rounded-md text-xs font-bold z-10 shadow-sm">
+            ARCHIVED
+          </div>
+        )}
+        {event.status === 'cancelled' && (
+          <div className="absolute top-4 right-4 px-2 py-1 bg-red-600 text-white rounded-md text-xs font-bold z-10 shadow-sm">
+            CANCELLED
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="event-content">
-        <div className="event-header">
-          <span className="type-badge" style={{ background: color.bg, color: color.text }}>{event.type === 'GymSession' ? 'Gym Session' : event.type}</span>
-          {event.price > 0 && <span className="price">{event.price} EGP</span>}
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="flex justify-between items-center mb-3">
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${event.type === 'Workshop' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+            event.type === 'Trip' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+              event.type === 'Bazaar' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                event.type === 'Booth' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
+                  'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}>
+            {event.type === 'GymSession' ? 'Gym Session' : event.type}
+          </span>
+          {event.price > 0 && (
+            <span className="text-lg font-bold text-emerald-600">{event.price} EGP</span>
+          )}
         </div>
 
-        <h3 className="event-title">{event.title}</h3>
-        <p className="event-description">{event.shortDescription || event.description || 'No description available'}</p>
+        <h3 className="text-xl font-bold text-slate-900 mb-2 line-clamp-2 min-h-[3.5rem]">
+          {event.title}
+        </h3>
+        <p className="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
+          {event.shortDescription || event.description || 'No description available'}
+        </p>
 
-        <div className="event-details">
-          <div className="detail-row">
+        <div className="border-t border-slate-100 pt-4 mt-auto space-y-2">
+          <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
             <span>📅</span>
             <span>{formatDate(event.startDate)} • {formatTime(event.startDate)}</span>
           </div>
-          <div className="detail-row">
+          <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
             <span>📍</span>
             <span>{event.location}</span>
           </div>
 
           {event.capacity > 0 && (
-            <div className="detail-row" style={{ color: isFull ? '#dc2626' : isAlmostFull ? '#d97706' : '#003366' }}>
+            <div className={`flex items-center gap-2 text-sm font-medium ${isFull ? 'text-red-600' : isAlmostFull ? 'text-amber-600' : 'text-emerald-600'
+              }`}>
               <span>👥</span>
               <span>{isFull ? 'Full' : isAlmostFull ? `Only ${spotsLeft} spots left!` : `${event.registeredCount || 0} / ${event.capacity} registered`}</span>
             </div>
           )}
 
-          {false && (event.type === 'Bazaar' || event.type === 'Booth') && event.vendors?.length > 0 && (
-            <div className="vendor-info">
-              🏪 {event.vendors.length} Vendor{event.vendors.length > 1 ? 's' : ''} Participating
-            </div>
-          )}
-
           {(event.type === 'Bazaar' || event.type === 'Booth') && vendorCount > 0 && (
-            <div className="vendor-info">
-              Vendors Participating: {vendorCount}
-              {Array.isArray(event.participants) && event.participants.length > 0 && (
-                <div style={{ marginTop: 4, fontSize: '0.8rem', color: '#6b7280' }}>
-                  {(() => {
-                    const names = (event.participants || [])
-                      .map(p => (p && (p.organization || p.vendorCompany || p.vendorEmail)) || null)
-                      .filter(Boolean);
-                    const shown = names.slice(0, 3);
-                    const extra = Math.max(0, names.length - shown.length);
-                    return `${shown.join(', ')}${extra > 0 ? ` and ${extra} more` : ''}`;
-                  })()}
-                </div>
-              )}
+            <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100 text-xs text-slate-600 font-medium">
+              🏪 {vendorCount} Vendor{vendorCount !== 1 ? 's' : ''} Participating
             </div>
           )}
 
           {event.registrationDeadline && new Date(event.registrationDeadline) > new Date() && (
-            <div className="deadline-info">⏰ Register by {formatDate(event.registrationDeadline)}</div>
+            <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100 text-xs text-amber-800 font-medium">
+              ⏰ Register by {formatDate(event.registrationDeadline)}
+            </div>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
-          <div style={{ display: 'flex', gap: spacing.sm, flexDirection: 'column' }}>
-            {/* Edit Button - Only for EventOffice (with time restrictions) and Professor (own workshops)
-                Requirements: 
-                - Req 32: Bazaars can only be edited if bazaar hasn't started yet
-                - Req 34: Trips can only be edited if trip start date hasn't passed yet
-                - Req 36: Professor can edit their own workshops
-                - Req 48: Admin cannot edit events (only delete) */}
-            {(() => {
-              const canEditNow = canEdit && getEditRoute();
-              const isEventOfficeUser = (() => {
-                try {
-                  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-                  if (!raw) return false;
-                  const u = JSON.parse(raw);
-                  return (u.role || '').toLowerCase() === 'eventoffice';
-                } catch {
-                  return false;
-                }
-              })();
-              
-              // Check if event has started (for bazaars/trips)
-              const eventStarted = isEventOfficeUser && event.startDate && new Date(event.startDate) <= new Date();
-              const isRestrictedType = event.type === 'Bazaar' || event.type === 'Trip';
-              
-              if (canEditNow) {
-                return (
-                  <button
-                    onClick={handleEdit}
-                    style={{
-                      width: '100%',
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      background: colors.warning,
-                      color: colors.white,
-                      border: 'none',
-                      borderRadius: borderRadius.lg,
-                      fontWeight: typography.fontWeight.semibold,
-                      fontSize: typography.fontSize.sm,
-                      cursor: 'pointer',
-                      transition: transitions.fast,
-                      boxShadow: '0 2px 4px rgba(245, 158, 11, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: spacing.xs,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-1px)';
-                      e.target.style.boxShadow = '0 4px 8px rgba(245, 158, 11, 0.3)';
-                      e.target.style.background = '#d97706';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 2px 4px rgba(245, 158, 11, 0.2)';
-                      e.target.style.background = colors.warning;
-                    }}
-                  >
-                    <span>✏️</span> Edit Event
-                  </button>
-                );
-              } else if (isEventOfficeUser && isRestrictedType && eventStarted) {
-                // Show disabled button with message for started bazaars/trips
-                return (
-                  <button
-                    disabled
-                    style={{
-                      width: '100%',
-                      padding: spacing.md,
-                      background: colors.gray400,
-                      color: colors.white,
-                      border: 'none',
-                      borderRadius: borderRadius.xl,
-                      fontWeight: typography.fontWeight.bold,
-                      fontSize: typography.fontSize.sm,
-                      cursor: 'not-allowed',
-                      opacity: 0.6,
-                    }}
-                    title={event.type === 'Bazaar' 
-                      ? 'Cannot edit bazaar after it has started' 
-                      : 'Cannot edit trip after start date has passed'}
-                  >
-                    ⏰ Edit Not Available
-                  </button>
-                );
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
+          {/* Edit Button */}
+          {(() => {
+            const canEditNow = canEdit && getEditRoute();
+            const isEventOfficeUser = (() => {
+              try {
+                const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
+                if (!raw) return false;
+                const u = JSON.parse(raw);
+                return (u.role || '').toLowerCase() === 'eventoffice';
+              } catch {
+                return false;
               }
-              return null;
-            })()}
-            {/* View Details Button - Always visible */}
-            <button
-              onClick={handleViewDetails}
-              style={{
-                width: '100%',
-                padding: `${spacing.sm} ${spacing.md}`,
-                background: 'transparent',
-                color: colors.primary,
-                border: `1.5px solid ${colors.primary}`,
-                borderRadius: borderRadius.lg,
-                fontWeight: typography.fontWeight.semibold,
-                fontSize: typography.fontSize.sm,
-                cursor: 'pointer',
-                transition: transitions.fast,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: spacing.xs,
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = colors.primary;
-                e.target.style.color = colors.white;
-                e.target.style.transform = 'translateY(-1px)';
-                e.target.style.boxShadow = `0 4px 8px rgba(0, 51, 102, 0.2)`;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'transparent';
-                e.target.style.color = colors.primary;
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              View Details
-            </button>
+            })();
 
-            {/* Registration Button - Only show if event is available for registration and user is not EventOffice/Admin */}
-            {/* Students/Staff/TA/Professor cannot register for Booths or Bazaars - only vendors can apply */}
-            {!isEventOffice && event.type !== 'Booth' && event.type !== 'Bazaar' && event.status !== 'cancelled' && event.status !== 'completed' && 
-             (!event.registrationDeadline || new Date(event.registrationDeadline) > new Date()) &&
-             (!event.capacity || !isFull) && (
+            const eventStarted = isEventOfficeUser && event.startDate && new Date(event.startDate) <= new Date();
+            const isRestrictedType = event.type === 'Bazaar' || event.type === 'Trip';
+
+            if (canEditNow) {
+              return (
+                <button
+                  onClick={handleEdit}
+                  className="w-full py-2 px-4 bg-amber-500 text-white rounded-lg font-semibold text-sm hover:bg-amber-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span>✏️</span> Edit Event
+                </button>
+              );
+            } else if (isEventOfficeUser && isRestrictedType && eventStarted) {
+              return (
+                <button
+                  disabled
+                  className="w-full py-2 px-4 bg-slate-300 text-white rounded-lg font-bold text-sm cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
+                  title={event.type === 'Bazaar' ? 'Cannot edit bazaar after start' : 'Cannot edit trip after start'}
+                >
+                  ⏰ Edit Not Available
+                </button>
+              );
+            }
+            return null;
+          })()}
+
+          {/* View Details Button */}
+          <button
+            onClick={handleViewDetails}
+            className="w-full py-2 px-4 bg-white text-emerald-600 border border-emerald-600 rounded-lg font-semibold text-sm hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2"
+          >
+            View Details
+          </button>
+
+          {/* Registration Button */}
+          {!isEventOffice && event.type !== 'Booth' && event.type !== 'Bazaar' && event.status !== 'cancelled' && event.status !== 'completed' &&
+            (!event.registrationDeadline || new Date(event.registrationDeadline) > new Date()) &&
+            (!event.capacity || !isFull) && (
               <>
                 {isRegistered ? (
                   <button
                     disabled
-                    style={{
-                      width: '100%',
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      background: colors.success,
-                      color: colors.white,
-                      border: 'none',
-                      borderRadius: borderRadius.lg,
-                      fontWeight: typography.fontWeight.semibold,
-                      fontSize: typography.fontSize.sm,
-                      cursor: 'not-allowed',
-                      opacity: 0.85,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: spacing.xs,
-                    }}
+                    className="w-full py-2 px-4 bg-emerald-500 text-white rounded-lg font-semibold text-sm cursor-not-allowed opacity-90 flex items-center justify-center gap-2"
                   >
                     <span>✓</span> Registered
                   </button>
@@ -481,37 +408,10 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
                   <button
                     onClick={handleRegisterClick}
                     disabled={registering}
-                    style={{
-                      width: '100%',
-                      padding: `${spacing.sm} ${spacing.md}`,
-                      background: registering 
-                        ? colors.gray400 
-                        : `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-                      color: colors.primary,
-                      border: 'none',
-                      borderRadius: borderRadius.lg,
-                      fontWeight: typography.fontWeight.bold,
-                      fontSize: typography.fontSize.sm,
-                      cursor: registering ? 'not-allowed' : 'pointer',
-                      transition: transitions.fast,
-                      boxShadow: registering ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: spacing.xs,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!registering) {
-                        e.target.style.transform = 'translateY(-1px)';
-                        e.target.style.boxShadow = '0 4px 12px rgba(212, 175, 55, 0.4)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!registering) {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 2px 8px rgba(212, 175, 55, 0.3)';
-                      }
-                    }}
+                    className={`w-full py-2 px-4 rounded-lg font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-2 ${registering
+                      ? 'bg-slate-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:from-emerald-700 hover:to-teal-600'
+                      }`}
                   >
                     <span>{registering ? '⏳' : '✅'}</span>
                     {registering ? 'Registering...' : isLoggedIn ? 'Register Now' : 'Log in to Register'}
@@ -519,249 +419,36 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
                 )}
               </>
             )}
-            {/* Delete Button - Only show for Admin/EventOffice users, if onDelete prop is provided, and no registrations */}
-            {canDelete && onDelete && !hasRegistrations && (
-              <button
-                onClick={handleDeleteClick}
-                style={{
-                  width: '100%',
-                  padding: `${spacing.sm} ${spacing.md}`,
-                  background: colors.error,
-                  color: colors.white,
-                  border: 'none',
-                  borderRadius: borderRadius.lg,
-                  fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
-                  cursor: 'pointer',
-                  transition: transitions.fast,
-                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-1px)';
-                  e.target.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)';
-                  e.target.style.background = '#b91c1c';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 2px 4px rgba(220, 38, 38, 0.2)';
-                  e.target.style.background = colors.error;
-                }}
-              >
-                <span>🗑️</span> Delete Event
-              </button>
-            )}
-            {/* Archive Button - Only show if onArchive prop is provided, user is EventOffice, event has passed, and not already archived
-                Requirement 47: Events Office can archive events that have already passed (applies to ALL kinds of events) */}
-            {canArchiveEvent && onArchive && eventHasPassed && !isArchived && (
-              <button
-                onClick={handleArchiveClick}
-                style={{
-                  width: '100%',
-                  padding: `${spacing.sm} ${spacing.md}`,
-                  background: colors.gray500,
-                  color: colors.white,
-                  border: 'none',
-                  borderRadius: borderRadius.lg,
-                  fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
-                  cursor: 'pointer',
-                  transition: transitions.fast,
-                  boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-1px)';
-                  e.target.style.boxShadow = '0 4px 8px rgba(107, 114, 128, 0.3)';
-                  e.target.style.background = colors.gray600;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 2px 4px rgba(107, 114, 128, 0.2)';
-                  e.target.style.background = colors.gray500;
-                }}
-              >
-                <span>📦</span> Archive Event
-              </button>
-            )}
-            {/* Unarchive Button - Show when user is EventOffice, event is archived and onUnarchive prop is provided */}
-            {canArchiveEvent && onUnarchive && isArchived && (
-              <button
-                onClick={handleUnarchiveClick}
-                style={{
-                  width: '100%',
-                  padding: `${spacing.sm} ${spacing.md}`,
-                  background: colors.accent,
-                  color: colors.primary,
-                  border: 'none',
-                  borderRadius: borderRadius.lg,
-                  fontWeight: typography.fontWeight.semibold,
-                  fontSize: typography.fontSize.sm,
-                  cursor: 'pointer',
-                  transition: transitions.fast,
-                  boxShadow: '0 2px 4px rgba(212, 175, 55, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-1px)';
-                  e.target.style.boxShadow = '0 4px 8px rgba(212, 175, 55, 0.3)';
-                  e.target.style.background = colors.accentDark;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 2px 4px rgba(212, 175, 55, 0.2)';
-                  e.target.style.background = colors.accent;
-                }}
-              >
-                <span>📤</span> Unarchive Event
-              </button>
-            )}
-          </div>
+
+          {/* Delete Button */}
+          {canDelete && onDelete && !hasRegistrations && (
+            <button
+              onClick={handleDeleteClick}
+              className="w-full py-2 px-4 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>🗑️</span> Delete Event
+            </button>
+          )}
+
+          {/* Archive/Unarchive Buttons */}
+          {canArchiveEvent && onArchive && eventHasPassed && !isArchived && (
+            <button
+              onClick={handleArchiveClick}
+              className="w-full py-2 px-4 bg-slate-500 text-white rounded-lg font-semibold text-sm hover:bg-slate-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>📦</span> Archive Event
+            </button>
+          )}
+          {canArchiveEvent && onUnarchive && isArchived && (
+            <button
+              onClick={handleUnarchiveClick}
+              className="w-full py-2 px-4 bg-amber-500 text-white rounded-lg font-semibold text-sm hover:bg-amber-600 transition-colors shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>📤</span> Unarchive Event
+            </button>
+          )}
         </div>
       </div>
-
-      <style>{`
-        .event-card {
-          background: ${colors.white};
-          border-radius: ${borderRadius['2xl']};
-          box-shadow: ${shadows.md};
-          overflow: hidden;
-          transition: ${transitions.normal};
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          border: 2px solid transparent;
-        }
-        .event-card:hover {
-          transform: translateY(-5px);
-          box-shadow: ${shadows.xl};
-          border: 2px solid rgba(212, 175, 55, 0.3);
-        }
-        .event-image {
-          height: 180px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-        }
-        .event-icon {
-          font-size: 4rem;
-        }
-        .cancelled-badge {
-          position: absolute;
-          top: ${spacing.md};
-          right: ${spacing.md};
-          padding: ${spacing.xs} ${spacing.sm};
-          background: ${colors.error};
-          color: ${colors.white};
-          border-radius: ${borderRadius.md};
-          font-size: 0.75rem;
-          font-weight: bold;
-          z-index: 10;
-        }
-        .archived-badge {
-          position: absolute;
-          top: ${spacing.md};
-          left: ${spacing.md};
-          padding: ${spacing.xs} ${spacing.sm};
-          background: ${colors.gray500};
-          color: ${colors.white};
-          border-radius: ${borderRadius.md};
-          font-size: 0.75rem;
-          font-weight: bold;
-          z-index: 10;
-        }
-        .event-content {
-          padding: ${spacing.xl};
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-        .event-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: ${spacing.md};
-        }
-        .type-badge {
-          padding: ${spacing.xs} ${spacing.lg};
-          border-radius: ${borderRadius.full};
-          font-size: ${typography.fontSize.sm};
-          font-weight: ${typography.fontWeight.semibold};
-          border: 1px solid rgba(212, 175, 55, 0.2);
-        }
-        .price {
-          font-size: ${typography.fontSize.lg};
-          font-weight: ${typography.fontWeight.bold};
-          color: ${colors.accent};
-        }
-        .event-title {
-          font-size: ${typography.fontSize.xl};
-          font-weight: ${typography.fontWeight.bold};
-          color: ${colors.primary};
-          margin-bottom: ${spacing.md};
-          line-height: ${typography.lineHeight.tight};
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          min-height: 2.6rem;
-        }
-        .event-description {
-          font-size: ${typography.fontSize.sm};
-          color: ${colors.gray500};
-          margin-bottom: ${spacing.lg};
-          line-height: ${typography.lineHeight.normal};
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          flex: 1;
-        }
-        .event-details {
-          border-top: 2px solid rgba(212, 175, 55, 0.2);
-          padding-top: ${spacing.lg};
-          margin-top: auto;
-        }
-        .detail-row {
-          display: flex;
-          align-items: center;
-          gap: ${spacing.sm};
-          margin-bottom: ${spacing.md};
-          font-size: ${typography.fontSize.sm};
-          color: ${colors.primary};
-          font-weight: ${typography.fontWeight.medium};
-        }
-        .vendor-info {
-          margin-top: ${spacing.md};
-          padding: ${spacing.md} ${spacing.md};
-          background: rgba(212, 175, 55, 0.1);
-          border-radius: ${borderRadius.md};
-          border: 1px solid rgba(212, 175, 55, 0.3);
-          font-size: ${typography.fontSize.xs};
-          color: ${colors.accentDark};
-          font-weight: ${typography.fontWeight.semibold};
-        }
-        .deadline-info {
-          margin-top: ${spacing.md};
-          padding: ${spacing.sm} ${spacing.md};
-          background: rgba(212, 175, 55, 0.15);
-          border-radius: ${borderRadius.md};
-          font-size: ${typography.fontSize.xs};
-          color: ${colors.primary};
-          font-weight: ${typography.fontWeight.medium};
-          border: 1px solid rgba(212, 175, 55, 0.25);
-        }
-      `}</style>
     </div>
   );
 };

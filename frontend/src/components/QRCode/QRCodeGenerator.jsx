@@ -13,18 +13,18 @@ function QRCodeGenerator({ event, onClose }) {
     // Check if there's a stored public URL
     const stored = localStorage.getItem('qrCodePublicUrl');
     if (stored) return stored;
-    
+
     // Check environment variable
     const envUrl = import.meta.env.VITE_PUBLIC_URL;
     if (envUrl) return envUrl;
-    
+
     // If on localhost, we need a public URL
     const origin = window.location.origin;
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
       // Return empty to show input field
       return '';
     }
-    
+
     // Otherwise use the current origin (production)
     return origin;
   };
@@ -32,7 +32,7 @@ function QRCodeGenerator({ event, onClose }) {
   // Generate QR code URL using a QR code API service
   const generateQRCode = () => {
     if (!event) return;
-    
+
     const eventId = event._id || event.id;
     if (!eventId) return;
 
@@ -41,7 +41,7 @@ function QRCodeGenerator({ event, onClose }) {
 
     // Create a registration URL for external visitors
     const registrationUrl = `${baseUrl}/register-events?eventId=${eventId}&type=${event.type || 'Bazaar'}`;
-    
+
     // Use QR Server API (free, no API key needed)
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(registrationUrl)}`;
     setQrUrl(qrCodeUrl);
@@ -76,7 +76,7 @@ function QRCodeGenerator({ event, onClose }) {
 
   const downloadQRCode = async () => {
     if (!qrUrl) return;
-    
+
     setDownloading(true);
     try {
       const response = await fetch(qrUrl);
@@ -99,22 +99,22 @@ function QRCodeGenerator({ event, onClose }) {
 
   const printQRCode = async () => {
     if (!qrUrl) return;
-    
+
     try {
       // Fetch the QR code image and convert to base64 data URL
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const reader = new FileReader();
-      
+
       reader.onloadend = () => {
         const base64Image = reader.result;
         const printWindow = window.open('', '_blank');
-        
+
         if (!printWindow) {
           showToast.warning('Please allow popups to print the QR code');
           return;
         }
-        
+
         printWindow.document.write(`
           <html>
             <head>
@@ -170,7 +170,7 @@ function QRCodeGenerator({ event, onClose }) {
           </html>
         `);
         printWindow.document.close();
-        
+
         // Wait for the image to load before printing
         printWindow.onload = () => {
           setTimeout(() => {
@@ -178,7 +178,7 @@ function QRCodeGenerator({ event, onClose }) {
           }, 250);
         };
       };
-      
+
       reader.readAsDataURL(blob);
     } catch (err) {
       console.error('Error printing QR code:', err);
@@ -194,162 +194,95 @@ function QRCodeGenerator({ event, onClose }) {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        padding: '20px',
-      }}
+      className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[10000] p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        style={{
-          background: 'white',
-          borderRadius: '20px',
-          padding: '30px',
-          maxWidth: '500px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
-        }}
+        className="bg-white rounded-2xl p-8 max-w-[500px] w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ color: '#003366', margin: 0 }}>QR Code for External Visitors</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-900 m-0">QR Code for External Visitors</h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#6b7280',
-              padding: '0',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition-colors"
           >
             ×
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h3 style={{ color: '#003366', marginBottom: '10px' }}>{event.title || 'Event'}</h3>
-          <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '20px' }}>
+        <div className="text-center mb-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-2">{event.title || 'Event'}</h3>
+          <p className="text-slate-500 text-sm mb-4">
             {event.type || 'Event'} • {event.location || 'Location TBA'}
           </p>
         </div>
 
         {qrUrl ? (
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div className="text-center mb-6">
             <img
               src={qrUrl}
               alt="QR Code"
-              style={{
-                width: '300px',
-                height: '300px',
-                border: '2px solid #e5e7eb',
-                borderRadius: '10px',
-                padding: '10px',
-                background: 'white',
-              }}
+              className="w-[300px] h-[300px] border border-slate-200 rounded-xl p-2 bg-white mx-auto shadow-sm"
             />
-            <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '15px' }}>
+            <p className="text-slate-500 text-sm mt-4">
               Scan this QR code to register for the event
             </p>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-            Generating QR code...
+          <div className="text-center p-10 text-slate-500">
+            <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+            <p>Generating QR code...</p>
           </div>
         )}
 
         {registrationUrl && (
-          <div style={{ marginBottom: '20px', padding: '15px', background: '#f3f4f6', borderRadius: '10px' }}>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: '0 0 8px 0', fontWeight: 600 }}>
+          <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-sm text-slate-500 mb-2 font-bold">
               Registration URL:
             </p>
-            <input
-              type="text"
-              value={registrationUrl}
-              readOnly
-              onClick={(e) => e.target.select()}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.85rem',
-                color: '#003366',
-                background: 'white',
-              }}
-            />
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(registrationUrl).then(() => {
-                  showToast.success('URL copied to clipboard!');
-                }).catch(() => {
-                  showToast.error('Failed to copy URL to clipboard');
-                });
-              }}
-              style={{
-                marginTop: '8px',
-                padding: '6px 12px',
-                background: '#e5e7eb',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                color: '#003366',
-              }}
-            >
-              Copy URL
-            </button>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={registrationUrl}
+                readOnly
+                onClick={(e) => e.target.select()}
+                className="w-full p-3 border border-slate-300 rounded-xl text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(registrationUrl).then(() => {
+                    showToast.success('URL copied to clipboard!');
+                  }).catch(() => {
+                    showToast.error('Failed to copy URL to clipboard');
+                  });
+                }}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+              >
+                Copy
+              </button>
+            </div>
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px', marginBottom: '10px' }}>
+        <div className="flex gap-3 justify-center mt-6">
           <button
             onClick={downloadQRCode}
             disabled={!qrUrl || downloading}
-            style={{
-              padding: '12px 24px',
-              background: downloading ? '#9ca3af' : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-              color: '#003366',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              cursor: downloading ? 'not-allowed' : 'pointer',
-              fontSize: '0.95rem',
-              boxShadow: downloading ? 'none' : '0 2px 8px rgba(212, 175, 55, 0.3)',
-            }}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2 ${downloading
+              ? 'bg-slate-400 text-white cursor-not-allowed'
+              : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-md hover:-translate-y-0.5'
+              }`}
           >
             {downloading ? 'Downloading...' : '📥 Download QR Code'}
           </button>
           <button
             onClick={printQRCode}
             disabled={!qrUrl}
-            style={{
-              padding: '12px 24px',
-              background: !qrUrl ? '#9ca3af' : 'rgba(212, 175, 55, 0.15)',
-              color: '#003366',
-              border: '2px solid rgba(212, 175, 55, 0.3)',
-              borderRadius: '10px',
-              fontWeight: 700,
-              cursor: !qrUrl ? 'not-allowed' : 'pointer',
-              fontSize: '0.95rem',
-            }}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border ${!qrUrl
+              ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+              }`}
           >
             🖨️ Print
           </button>
@@ -360,4 +293,3 @@ function QRCodeGenerator({ event, onClose }) {
 }
 
 export default QRCodeGenerator;
-

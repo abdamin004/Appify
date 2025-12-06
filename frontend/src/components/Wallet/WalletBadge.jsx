@@ -1,54 +1,30 @@
 import React from "react";
-import { colors, spacing, borderRadius, shadows, typography } from "../../utils/designSystem";
 
 export default function WalletBadge({
   balance,
   onTopUp,
   currency = "EGP",
   label = "Wallet Balance",
-  style,
+  className = "",
 }) {
   const display = typeof balance === "number" ? balance.toFixed(2) : "—";
 
   return (
-    <div
-      style={{
-        background: colors.bgCard,
-        padding: `${spacing.md} ${spacing.xl}`,
-        borderRadius: borderRadius.xl,
-        border: `1px solid ${colors.gray200}`,
-        display: "flex",
-        alignItems: "center",
-        gap: spacing.md,
-        boxShadow: shadows.sm,
-        ...style,
-      }}
-    >
+    <div className={`bg-white py-2 px-4 rounded-xl border border-slate-200 flex items-center gap-3 shadow-sm ${className}`}>
       <div>
-        <div style={{ fontSize: typography.fontSize.xs, color: colors.gray500, marginBottom: spacing.xs }}>
+        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-none mb-1">
           {label}
         </div>
-        <div style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.primary }}>
-          {display} {currency}
+        <div className="text-lg font-bold text-slate-800 leading-none">
+          {display} <span className="text-xs text-slate-500 font-normal">{currency}</span>
         </div>
       </div>
       <button
         onClick={onTopUp}
-        style={{
-          padding: `${spacing.sm} ${spacing.md}`,
-          background: colors.accent,
-          color: colors.primary,
-          border: 'none',
-          borderRadius: borderRadius.md,
-          fontWeight: typography.fontWeight.bold,
-          fontSize: typography.fontSize.sm,
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-        }}
+        className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 text-white rounded-lg text-xs font-bold hover:shadow-md hover:-translate-y-0.5 transition-all active:translate-y-0"
       >
         + Top Up
       </button>
     </div>
   );
 }
-

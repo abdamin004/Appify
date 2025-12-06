@@ -5,20 +5,18 @@ import MyEventsList from "../Functions/MyEventsList";
 import VisitorQRCodeManager from "../Vendor/VisitorQRCodeManager";
 import CompanyDocumentsUpload from "../Vendor/CompanyDocumentsUpload";
 import AttendeeIDUpload from "../Vendor/AttendeeIDUpload";
-import Navbar from "../Navbar";
+import DashboardLayout from "../Layout/DashboardLayout";
 import vendorService from "../../services/vendorService";
 import LoyaltyProgramForm from "../Vendor/LoyaltyProgramForm";
 import LoyaltyApplicationsList from "../Vendor/LoyaltyApplicationsList";
 import { showToast, confirmDialog } from "../../utils/toast";
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from "../../utils/designSystem";
-import { headerContainerStyle, statCardBase, statValueStyle, statLabelStyle, getTabButtonStyle, tabRowStyle } from "./dashboardStyles";
-import { payApplicationWithWallet, getWalletBalance, createCheckoutSession, confirmStripeReceipt } from "../../services/paymentService";
+import { payApplicationWithWallet, getWalletBalance, confirmStripeReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
 import WalletBadge from "../Wallet/WalletBadge";
 
 function VendorDashboard() {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState("browse");
+  const [activeTab, setActiveTab] = useState("home");
   const [activeApplicationTab, setActiveApplicationTab] = useState("all");
   const [activeUpcomingTab, setActiveUpcomingTab] = useState("bazaars");
   const [upcomingBazaars, setUpcomingBazaars] = useState([]);
@@ -32,10 +30,10 @@ function VendorDashboard() {
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
   const paymentProcessedRef = useRef(new Set());
-  const [user, setUser] = useState({ 
-    companyName: "", 
+  const [user, setUser] = useState({
+    companyName: "",
     firstName: "Vendor",
-    email: "" 
+    email: ""
   });
 
   const totalApplications = applications.length;
@@ -47,6 +45,17 @@ function VendorDashboard() {
     { label: "Total Applications", value: totalApplications },
     { label: "Pending Payments", value: pendingPaymentCount },
     { label: "Upcoming Events", value: upcomingEventsCount },
+  ];
+
+  const menuItems = [
+    { label: "Home", icon: "🏠", onClick: () => setActiveTab("home") },
+    { label: "Browse Bazaars", icon: "🏪", onClick: () => setActiveTab("browse") },
+    { label: "Upcoming Events", icon: "📅", onClick: () => setActiveTab("upcoming") },
+    { label: "My Applications", icon: "📋", onClick: () => setActiveTab("my-applications"), badge: pendingPaymentCount > 0 ? pendingPaymentCount : undefined },
+    { label: "Loyalty Program", icon: "⭐", onClick: () => setActiveTab("loyalty") },
+    { label: "Visitor QR Codes", icon: "📧", onClick: () => setActiveTab("visitor-qrcodes") },
+    { label: "Company Docs", icon: "📄", onClick: () => setActiveTab("company-documents") },
+    { label: "Attendee IDs", icon: "🆔", onClick: () => setActiveTab("attendee-ids") },
   ];
 
   useEffect(() => {
@@ -62,8 +71,7 @@ function VendorDashboard() {
       }
     };
     loadUser();
-    
-    // Load wallet balance
+
     const loadWalletBalance = async () => {
       try {
         const balanceData = await getWalletBalance();
@@ -74,10 +82,8 @@ function VendorDashboard() {
       }
     };
     loadWalletBalance();
-    
-    // Listen to wallet updates
+
     const handleWalletUpdate = (e) => {
-      // Use balance from event detail if available (faster), otherwise fetch
       if (e?.detail?.balance !== undefined && typeof e.detail.balance === 'number') {
         setWalletBalance(e.detail.balance);
       } else {
@@ -90,7 +96,6 @@ function VendorDashboard() {
     };
   }, []);
 
-  // Handle Stripe redirect after card payment - check on mount and URL changes
   useEffect(() => {
     const processPayment = async () => {
       try {
@@ -99,64 +104,46 @@ function VendorDashboard() {
         const status = params.get('status');
         const applicationId = params.get('applicationId');
         const mock = params.get('mock');
-        
-        console.log('Payment redirect handler - URL params:', { sessionId, status, applicationId, mock });
-        
-        // Only process if we have payment-related parameters
+
         if (!sessionId && !(status === 'success' && applicationId)) {
-          console.log('No payment parameters found, skipping');
           return;
         }
-        
-        // Check if already processed for this specific payment
+
         const paymentKey = `${sessionId || 'mock'}-${applicationId}`;
         const processedKey = `payment_processed_${paymentKey}`;
         if (sessionStorage.getItem(processedKey)) {
-          console.log('Payment already processed, skipping');
           return;
         }
-        
-        // Mark as processed
+
         sessionStorage.setItem(processedKey, 'true');
-        
-        console.log('Processing payment...');
-        
+
         if (sessionId) {
-          // Card payment via Stripe
           try {
             await confirmStripeReceipt(sessionId);
           } catch (err) {
             console.error('Error confirming receipt:', err);
           }
-          // Refresh applications to show paid status
           try {
             await fetchApplications(activeApplicationTab);
           } catch (err) {
             console.error('Error refreshing applications:', err);
           }
-          // Show success message
           const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
           setBannerMsg(`Payment successful.${email}`);
           setTimeout(() => setBannerMsg(''), 6000);
-          // Clean URL
           const url = new URL(window.location.href);
           url.searchParams.delete('session_id');
           url.searchParams.delete('applicationId');
           url.searchParams.delete('mock');
           window.history.replaceState({}, document.title, url.toString());
         } else if (status === 'success' && applicationId) {
-          console.log('Processing mock payment for application:', applicationId);
-          // Ensure we're on the applications tab to see the update
           if (activeTab !== 'my-applications') {
             setActiveTab('my-applications');
           }
-          // Mock payment or manual success - mark as paid
           if (mock === '1') {
-            // Mock payment - call backend to mark as paid
             try {
               const token = localStorage.getItem("token");
               const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-              console.log('Calling manual receipt endpoint with applicationId:', applicationId);
               const response = await fetch(`${API_BASE}/payments/receipt/manual`, {
                 method: 'POST',
                 headers: {
@@ -165,41 +152,32 @@ function VendorDashboard() {
                 },
                 body: JSON.stringify({ applicationId }),
               });
-              
+
               if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error('Manual receipt error response:', errorData);
                 throw new Error(errorData.message || `HTTP ${response.status}`);
               }
-              
-              const result = await response.json();
-              console.log('Mock payment processed successfully:', result);
+
               showToast.success('Payment processed successfully!');
             } catch (err) {
               console.error('Error marking mock payment:', err);
               showToast.error(err.message || 'Failed to process mock payment');
-              // Remove processed flag to allow retry
               sessionStorage.removeItem(processedKey);
-              return; // Don't continue if payment failed
+              return;
             }
           }
-          // Show success message immediately
           const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
-          setBannerMsg(mock === '1' 
-            ? `Payment successful (mock mode - Stripe not configured).${email}` 
+          setBannerMsg(mock === '1'
+            ? `Payment successful (mock mode - Stripe not configured).${email}`
             : `Payment successful.${email}`);
           setTimeout(() => setBannerMsg(''), 6000);
-          // Refresh applications to show paid status - wait a bit for backend to process
           setTimeout(async () => {
             try {
-              console.log('Refreshing applications after payment, activeTab:', activeTab, 'activeApplicationTab:', activeApplicationTab);
               await fetchApplications(activeApplicationTab || 'all');
-              console.log('Applications refreshed');
             } catch (err) {
               console.error('Error refreshing applications:', err);
             }
-          }, 1500); // Increased delay to ensure backend has processed
-          // Clean URL
+          }, 1500);
           const url = new URL(window.location.href);
           url.searchParams.delete('status');
           url.searchParams.delete('applicationId');
@@ -210,7 +188,6 @@ function VendorDashboard() {
       } catch (err) {
         console.error('Error handling payment redirect:', err);
         showToast.error('Error processing payment. Please refresh the page.');
-        // Remove processed flag on error to allow retry
         const params = new URLSearchParams(location.search || '');
         const sessionId = params.get('session_id');
         const applicationId = params.get('applicationId');
@@ -218,11 +195,10 @@ function VendorDashboard() {
         sessionStorage.removeItem(`payment_processed_${paymentKey}`);
       }
     };
-    
-    // Process immediately when location.search changes
+
     processPayment();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]); // Run when URL search params change
+  }, [location.search]);
 
   useEffect(() => {
     if (activeTab === "upcoming") {
@@ -246,15 +222,13 @@ function VendorDashboard() {
         },
       });
       const data = await res.json();
-      console.log("Upcoming Bazaars Response:", data);
-      
+
       if (data.success && Array.isArray(data.bazaars)) {
         setUpcomingBazaars(data.bazaars);
       } else if (Array.isArray(data)) {
         setUpcomingBazaars(data);
       } else {
         setUpcomingBazaars([]);
-        console.warn("No upcoming bazaars found");
       }
     } catch (err) {
       console.error("Error fetching upcoming bazaars:", err);
@@ -272,15 +246,13 @@ function VendorDashboard() {
         },
       });
       const data = await res.json();
-      console.log("Upcoming Booths Response:", data);
-      
+
       if (data.success && Array.isArray(data.booths)) {
         setUpcomingBooths(data.booths);
       } else if (Array.isArray(data)) {
         setUpcomingBooths(data);
       } else {
         setUpcomingBooths([]);
-        console.warn("No upcoming booths found");
       }
     } catch (err) {
       console.error("Error fetching upcoming booths:", err);
@@ -295,7 +267,6 @@ function VendorDashboard() {
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       let endpoint = "";
 
-      // Endpoints + local filtering by status where needed
       switch (type) {
         case "all":
           endpoint = `${API_BASE}/vendor/applications/mine`;
@@ -310,29 +281,24 @@ function VendorDashboard() {
           endpoint = `${API_BASE}/vendor/applications/requests/upcoming`;
           break;
         case "cancelled":
-          // No dedicated endpoint; fetch all and filter locally
           endpoint = `${API_BASE}/vendor/applications/mine`;
           break;
         default:
           endpoint = `${API_BASE}/vendor/applications/mine`;
       }
 
-      console.log(`Fetching ${type} applications from:`, endpoint);
-      
       const res = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
+
       const data = await res.json();
-      console.log(`Applications (${type}) Response:`, data);
-      
-      // Normalize array from various shapes
+
       let applicationsData = [];
       if (data && data.success) {
         applicationsData = data.applications || data.requests || data.data || [];
@@ -344,7 +310,6 @@ function VendorDashboard() {
         applicationsData = data.requests;
       }
 
-      // Local filter by status for pending/rejected/cancelled
       if (type === 'pending') {
         applicationsData = applicationsData.filter(a => (a.status || '').toLowerCase() === 'pending');
       } else if (type === 'rejected') {
@@ -354,10 +319,6 @@ function VendorDashboard() {
       }
 
       setApplications(applicationsData);
-      
-      if (applicationsData.length === 0) {
-        console.warn(`No ${type} applications found in response`);
-      }
     } catch (err) {
       console.error(`Error fetching ${type} applications:`, err);
       setApplications([]);
@@ -407,13 +368,11 @@ function VendorDashboard() {
     }
 
     const fee = app.participationFee || 0;
-    
+
     if (paymentMethod === 'card') {
-      // Card payment - direct API call (no Stripe redirect)
       try {
         setPayingApplicationId(applicationId);
-        
-        // Confirm payment
+
         const confirmed = await confirmDialog(
           `Pay $${fee.toFixed(2)} for participation fee by card?`,
           'Confirm Card Payment'
@@ -423,7 +382,6 @@ function VendorDashboard() {
           return;
         }
 
-        // Call backend to mark as paid
         const token = localStorage.getItem("token");
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
         const response = await fetch(`${API_BASE}/payments/receipt/manual`, {
@@ -434,24 +392,19 @@ function VendorDashboard() {
           },
           body: JSON.stringify({ applicationId }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.message || `HTTP ${response.status}`);
         }
-        
-        const result = await response.json();
-        console.log('Card payment processed successfully:', result);
-        
-        // Show success messages
+
         showToast.success('Payment processed successfully!');
         const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
         setBannerMsg(`Payment successful.${email}`);
         setTimeout(() => setBannerMsg(''), 6000);
-        
-        // Refresh applications to show paid status
+
         await fetchApplications(activeApplicationTab);
-        
+
       } catch (err) {
         console.error('Error processing card payment:', err);
         showToast.error(err.message || 'Payment failed. Please try again.');
@@ -461,15 +414,12 @@ function VendorDashboard() {
       return;
     }
 
-    // Wallet payment
     try {
-      // Check wallet balance first
       const balanceData = await getWalletBalance();
       const balance = balanceData.balance || 0;
       setWalletBalance(balance);
-      
+
       if (balance < fee) {
-        // Show option to use card payment instead
         const useCard = await confirmDialog(
           `Insufficient wallet balance. You need $${fee.toFixed(2)} but have $${balance.toFixed(2)}.\n\nWould you like to pay by card instead?`,
           'Insufficient Balance'
@@ -489,17 +439,13 @@ function VendorDashboard() {
       setPayingApplicationId(applicationId);
       await payApplicationWithWallet(applicationId);
       showToast.success('Payment completed successfully!');
-      // Show success banner
       const email = user?.email ? ` Receipt emailed to ${user.email}.` : '';
       setBannerMsg(`Payment successful.${email}`);
       setTimeout(() => setBannerMsg(''), 6000);
-      // Refresh applications to show paid status
       await fetchApplications(activeApplicationTab);
-      // Refresh wallet balance
       const newBalance = await getWalletBalance();
       setWalletBalance(newBalance.balance || 0);
     } catch (err) {
-      // If wallet payment fails, offer card payment as fallback
       if (err.message && err.message.includes('user account')) {
         const useCard = await confirmDialog(
           `Wallet payment requires a user account. Would you like to pay by card instead?`,
@@ -519,769 +465,383 @@ function VendorDashboard() {
   const displayName = user.companyName || user.firstName || "Vendor";
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #003366 0%, #000d1a 100%)",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <Navbar />
-
-      {/* Success Banner */}
-      {bannerMsg && (
-        <div
-          style={{
-            position: "fixed",
-            top: "80px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10000,
-            background: colors.success,
-            color: colors.white,
-            padding: `${spacing.md} ${spacing.xl}`,
-            borderRadius: borderRadius.xl,
-            boxShadow: shadows.lg,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.semibold,
-            maxWidth: "90%",
-            textAlign: "center",
-          }}
-        >
+    <DashboardLayout menuItems={menuItems}>
+      {Boolean(bannerMsg) && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-emerald-500 text-white rounded-lg px-6 py-3 shadow-xl z-[9999] font-bold text-sm tracking-wide">
           {bannerMsg}
         </div>
       )}
 
-      <div
-        style={{
-          paddingTop: "120px",
-          padding: "120px 40px 80px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header + Stats */}
-          <div
-            style={{
-              background: colors.bgCard,
-              padding: `${spacing['3xl']} ${spacing['2xl']}`,
-              borderRadius: borderRadius['2xl'],
-              boxShadow: shadows.lg,
-              marginBottom: spacing['2xl'],
-              display: "flex",
-              flexDirection: "column",
-              gap: spacing.lg,
-              border: `1px solid ${colors.gray200}`,
-            }}
-          >
-            <div style={headerContainerStyle}>
-              <div style={{ flex: "1 1 520px", minWidth: 320 }}>
-                <h1
-                  style={{
-                    fontSize: typography.fontSize['3xl'],
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.primary,
-                    marginBottom: spacing.sm,
-                  }}
-                >
+      {topUpOpen && (
+        <TopUpDialog
+          isOpen={topUpOpen}
+          onClose={() => setTopUpOpen(false)}
+          onSuccess={(amount) => {
+            setTopUpOpen(false);
+            showToast.success(`Successfully topped up $${amount}!`);
+            getWalletBalance().then(res => setWalletBalance(res.balance));
+          }}
+        />
+      )}
+
+      {activeTab === "home" && (
+        <div className="space-y-8">
+          <div className="bg-slate-100 p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+              {/* Left Side: Welcome Text */}
+              <div className="flex-1 min-w-[300px]">
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
                   Welcome back, {displayName}! 👋
                 </h1>
-                <p
-                  style={{
-                    fontSize: typography.fontSize.lg,
-                    color: colors.gray500,
-                    margin: 0,
-                  }}
-                >
-                  View and manage bazaars and booths
+                <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
+                  View and manage your bazaars and booths.
                 </p>
-                <div style={{ height: spacing.md }} />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: spacing.md,
-                  alignItems: "center",
-                  flexShrink: 0,
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: spacing.md,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
+
+              {/* Right Side: Stats & Wallet */}
+              <div className="flex flex-col gap-4 items-end flex-shrink-0 w-full md:w-auto">
+                {/* Wallet Badge - Top Right */}
+                <div className="w-full md:w-auto flex justify-end gap-3">
                   <button
                     onClick={handleRequestBooth}
-                    style={{
-                      ...buttonStyles.primary,
-                      padding: `${spacing.md} ${spacing['2xl']}`,
-                      minWidth: 220,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow = shadows.accentHover;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow = shadows.accent;
-                    }}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-sm"
                   >
-                    + Request Booth/Bazaar
+                    <span>➕</span> Request Booth
                   </button>
-                  {vendorStatCards.map((stat) => (
+                  <WalletBadge
+                    balance={walletBalance}
+                    currency="USD"
+                    onTopUp={() => setTopUpOpen(true)}
+                    className="w-full md:w-auto justify-between md:justify-start"
+                  />
+                </div>
+
+                {/* Stats Cards */}
+                <div className="flex gap-3 flex-wrap justify-end w-full md:w-auto">
+                  {vendorStatCards.map((card) => (
                     <div
-                      key={stat.label}
-                      style={statCardBase}
+                      key={card.label}
+                      className="bg-white border border-slate-200 rounded-xl p-4 min-w-[140px] flex-1 md:flex-none text-center hover:shadow-md transition-shadow duration-300"
                     >
-                      <div style={statValueStyle}>
-                        {stat.value}
-                      </div>
-                      <div style={statLabelStyle}>
-                        {stat.label}
-                      </div>
+                      <div className="text-2xl font-bold text-slate-900 mb-1">{card.value}</div>
+                      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{card.label}</div>
                     </div>
                   ))}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    width: "100%",
-                    position: "relative",
-                  }}
-                >
-                  <div
-                    style={{
-                      transform: "translateX(60px)",
-                    }}
-                  >
-                    <WalletBadge
-                      balance={walletBalance}
-                      currency="USD"
-                      onTopUp={() => setTopUpOpen(true)}
-                      label="Wallet Balance"
-                      style={{ width: "auto" }}
-                    />
-                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          {(() => {
-            const tabButtons = [
-              { key: "browse", label: "🏪 Browse Bazaars & Booths", onClick: () => setActiveTab("browse") },
-              { key: "upcoming", label: "📅 Upcoming Events", onClick: () => setActiveTab("upcoming") },
-              { key: "my-applications", label: "📋 My Applications", onClick: () => setActiveTab("my-applications") },
-              { key: "loyalty", label: "⭐ Loyalty Program", onClick: () => setActiveTab("loyalty") },
-              { key: "visitor-qrcodes", label: "📧 Visitor QR Codes", onClick: () => setActiveTab("visitor-qrcodes"), variant: "gold" },
-              { key: "company-documents", label: "📄 Company Documents", onClick: () => setActiveTab("company-documents"), variant: "gold" },
-              { key: "attendee-ids", label: "🆔 Attendee IDs", onClick: () => setActiveTab("attendee-ids"), variant: "gold" },
-            ];
-
-            const firstRowCount = Math.ceil(tabButtons.length / 2);
-            const tabRows = [tabButtons.slice(0, firstRowCount), tabButtons.slice(firstRowCount)];
-
-            const renderTabButton = (tab) => {
-              const isActive = activeTab === tab.key;
-              const style = getTabButtonStyle(isActive, tab.variant);
-              return (
-                <button key={tab.key} onClick={tab.onClick} style={style}>
-                  {tab.label}
-                  {tab.badgeCount > 0 && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: spacing.sm,
-                        right: spacing.sm,
-                        background: colors.error,
-                        color: colors.white,
-                        borderRadius: borderRadius.full,
-                        width: "20px",
-                        height: "20px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: typography.fontSize.xs,
-                        fontWeight: typography.fontWeight.bold,
-                      }}
-                    >
-                      {tab.badgeCount}
-                    </span>
-                  )}
+          {/* Bottom Section: Quick Access & Chatbot */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Quick Access */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <span>⚡</span> Quick Access
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleRequestBooth}
+                  className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">➕</div>
+                  <div className="font-bold text-slate-700 group-hover:text-emerald-700">Request Booth</div>
+                  <div className="text-xs text-slate-500">Apply for events</div>
                 </button>
-              );
-            };
-
-            return (
-              <div
-                style={{
-                  background: colors.bgCard,
-                  padding: spacing.md,
-                  borderRadius: borderRadius['2xl'],
-                  boxShadow: shadows.lg,
-                  marginBottom: spacing['2xl'],
-                  border: `1px solid ${colors.gray200}`,
-                }}
-              >
-                {tabRows.map((row, idx) => (
-                  <div key={idx} style={tabRowStyle}>
-                    {row.map(renderTabButton)}
-                  </div>
-                ))}
+                <button
+                  onClick={() => setActiveTab('my-applications')}
+                  className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📋</div>
+                  <div className="font-bold text-slate-700 group-hover:text-blue-700">My Applications</div>
+                  <div className="text-xs text-slate-500">Check status</div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('upcoming')}
+                  className="p-4 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">📅</div>
+                  <div className="font-bold text-slate-700 group-hover:text-amber-700">Upcoming Events</div>
+                  <div className="text-xs text-slate-500">View schedule</div>
+                </button>
+                <button
+                  onClick={() => setTopUpOpen(true)}
+                  className="p-4 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-200 rounded-xl transition-all text-left group"
+                >
+                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">💳</div>
+                  <div className="font-bold text-slate-700 group-hover:text-purple-700">Top Up Wallet</div>
+                  <div className="text-xs text-slate-500">Add funds</div>
+                </button>
               </div>
-            );
-          })()}
+            </div>
 
-          {/* Upcoming Events Sub-Tabs */}
-          {activeTab === "upcoming" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing.md,
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                marginBottom: spacing['2xl'],
-                display: "flex",
-                gap: spacing.md,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
+            {/* Chatbot Placeholder */}
+            <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center min-h-[200px] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-3xl mb-4 mx-auto">
+                  🤖
+                </div>
+                <h3 className="text-lg font-bold text-slate-700 mb-1">AI Assistant</h3>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto">
+                  Coming soon! A smart chatbot to help you navigate events and answer your questions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8">
+        {activeTab === "upcoming" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">Upcoming Events</h2>
+              <p className="text-slate-500">View upcoming bazaars and booths</p>
+            </div>
+            <div className="flex gap-4 mb-8 border-b border-slate-200 pb-1">
               <button
                 onClick={() => setActiveUpcomingTab("bazaars")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeUpcomingTab === "bazaars"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeUpcomingTab === "bazaars" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
+                className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "bazaars"
+                  ? "border-emerald-500 text-emerald-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
               >
                 🗓️ Bazaars
               </button>
               <button
                 onClick={() => setActiveUpcomingTab("booths")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeUpcomingTab === "booths"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeUpcomingTab === "booths" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
+                className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${activeUpcomingTab === "booths"
+                  ? "border-emerald-500 text-emerald-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
               >
                 🛒 Booths
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Application Sub-Tabs */}
-          {activeTab === "my-applications" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing.md,
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                marginBottom: spacing['2xl'],
-                display: "flex",
-                gap: spacing.md,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <button
-                onClick={() => setActiveApplicationTab("all")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeApplicationTab === "all"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeApplicationTab === "all" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                All Applications
-              </button>
-              <button
-                onClick={() => setActiveApplicationTab("approved")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeApplicationTab === "approved"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeApplicationTab === "approved" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                Approved
-              </button>
-              <button
-                onClick={() => setActiveApplicationTab("pending")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeApplicationTab === "pending"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeApplicationTab === "pending" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                Pending
-              </button>
-              <button
-                onClick={() => setActiveApplicationTab("rejected")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeApplicationTab === "rejected"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeApplicationTab === "rejected" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                Rejected
-              </button>
-              <button
-                onClick={() => setActiveApplicationTab("cancelled")}
-                style={{
-                  flex: 1,
-                  padding: `${spacing.md} ${spacing['2xl']}`,
-                  background:
-                    activeApplicationTab === "cancelled"
-                      ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`
-                      : "transparent",
-                  color: activeApplicationTab === "cancelled" ? colors.primary : colors.gray500,
-                  border: "none",
-                  borderRadius: borderRadius.xl,
-                  fontSize: typography.fontSize.base,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.normal,
-                }}
-              >
-                Cancelled
-              </button>
+        {activeTab === "my-applications" && (
+          <div className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-2xl font-bold text-slate-900">My Applications</h2>
+              <p className="text-slate-500">Track the status of your applications</p>
             </div>
-          )}
+            <div className="flex gap-2 mb-8 overflow-x-auto pb-2 border-b border-slate-200">
+              {[
+                { id: "all", label: "All Applications" },
+                { id: "approved", label: "Approved" },
+                { id: "pending", label: "Pending" },
+                { id: "rejected", label: "Rejected" },
+                { id: "cancelled", label: "Cancelled" }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveApplicationTab(tab.id)}
+                  className={`py-2 px-4 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeApplicationTab === tab.id
+                    ? "bg-slate-900 text-white shadow-md"
+                    : "text-slate-500 hover:bg-slate-100"
+                    }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-          {/* Content */}
-          {activeTab === "browse" && (
-            <EventsList filterByTypes={["Bazaar", "Booth"]}/>
-          )}
-          {activeTab === "upcoming" && activeUpcomingTab === "bazaars" && (
-            <MyEventsList
-              events={(upcomingBazaars || []).map(e => ({ ...e, date: e.startDate }))}
-              title="Upcoming Bazaars"
-            />
-          )}
-          {activeTab === "upcoming" && activeUpcomingTab === "booths" && (
-            <MyEventsList
-              events={(upcomingBooths || []).map(e => ({ ...e, date: e.startDate }))}
-              title="Upcoming Booths"
-            />
-          )}
-          {activeTab === "my-applications" && (
-            <div>
-              {loadingApplications ? (
-                <div style={{ 
-                  background: colors.bgCard, 
-                  padding: `${spacing['6xl']} ${spacing.xl}`, 
-                  borderRadius: borderRadius['2xl'], 
-                  textAlign: "center", 
-                  boxShadow: shadows.lg,
-                  border: `1px solid ${colors.gray200}`,
-                }}>
-                  <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>⏳</div>
-                  <h3 style={{ 
-                    fontSize: typography.fontSize['2xl'], 
-                    color: colors.primary, 
-                    marginBottom: spacing.sm,
-                    fontWeight: typography.fontWeight.bold,
-                  }}>Loading Applications...</h3>
-                  <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>Please wait while we fetch your {activeApplicationTab} applications.</p>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ 
-                    background: colors.bgCard, 
-                    padding: spacing['3xl'], 
-                    borderRadius: borderRadius['2xl'], 
-                    boxShadow: shadows.lg,
-                    marginBottom: spacing['2xl'],
-                    border: `1px solid ${colors.gray200}`,
-                  }}>
-                    {applications.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: `${spacing['6xl']} ${spacing.xl}` }}>
-                        <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.xl }}>📭</div>
-                        <h3 style={{ 
-                          fontSize: typography.fontSize['2xl'], 
-                          color: colors.primary, 
-                          marginBottom: spacing.sm,
-                          fontWeight: typography.fontWeight.bold,
-                        }}>No Applications</h3>
-                        <p style={{ color: colors.gray500, fontSize: typography.fontSize.base }}>You don't have any {activeApplicationTab} applications yet.</p>
-                      </div>
-                    ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: spacing['2xl'] }}>
-                        {applications.map((app) => (
-                          <div key={app._id} style={{ 
-                            background: colors.white, 
-                            borderRadius: borderRadius.xl, 
-                            padding: spacing.xl,
-                            border: `1px solid ${colors.gray200}`,
-                            boxShadow: shadows.md,
-                          }}>
-                            <div style={{ marginBottom: spacing.lg }}>
-                              <h4 style={{ 
-                                fontSize: typography.fontSize.lg, 
-                                color: colors.primary, 
-                                marginBottom: spacing.md,
-                                fontWeight: typography.fontWeight.bold,
-                              }}>
-                                {app.event?.title || "Event"}
-                              </h4>
-                              <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.md }}>
-                                <span style={{
-                                  padding: `${spacing.sm} ${spacing.md}`,
-                                  background: app.status === "approved" ? colors.successLight : 
-                                             app.status === "pending" ? colors.warningLight :
-                                             app.status === "cancelled" ? colors.gray100 :
-                                             colors.errorLight,
-                                  color: app.status === "approved" ? colors.success : 
-                                         app.status === "pending" ? colors.warning :
-                                         app.status === "cancelled" ? colors.gray600 :
-                                         colors.error,
-                                  borderRadius: borderRadius.md,
-                                  fontSize: typography.fontSize.sm,
-                                  fontWeight: typography.fontWeight.semibold,
-                                  textTransform: "capitalize"
-                                }}>
-                                  {app.status}
-                                </span>
-                                {app.paid && (
-                                  <span style={{
-                                    padding: `${spacing.sm} ${spacing.md}`,
-                                    background: colors.infoLight,
-                                    color: colors.info,
-                                    borderRadius: borderRadius.md,
-                                    fontSize: typography.fontSize.sm,
-                                    fontWeight: typography.fontWeight.semibold
-                                  }}>
-                                    Paid
-                                  </span>
-                                )}
-                              </div>
-                              {app.event?.startDate && (
-                                <p style={{ color: colors.gray600, fontSize: typography.fontSize.sm }}>
-                                  📅 {new Date(app.event.startDate).toLocaleDateString()}
-                                </p>
-                              )}
-                              {/* Payment Information for Approved Applications */}
-                              {app.status === "approved" && !app.paid && (
-                                <div style={{
-                                  background: colors.warningLight,
-                                  border: `1px solid ${colors.warning}`,
-                                  borderRadius: borderRadius.md,
-                                  padding: spacing.md,
-                                  marginTop: spacing.md,
-                                  marginBottom: spacing.md,
-                                }}>
-                                  <p style={{ 
-                                    color: colors.warning, 
-                                    fontSize: typography.fontSize.sm,
-                                    fontWeight: typography.fontWeight.bold,
-                                    marginBottom: spacing.xs,
-                                  }}>
-                                    💳 Payment Required
-                                  </p>
-                                  <p style={{ color: colors.gray700, fontSize: typography.fontSize.sm, marginBottom: spacing.xs }}>
-                                    Participation Fee: <strong>${(app.participationFee || 0).toFixed(2)}</strong>
-                                  </p>
-                                  {app.paymentDeadline && (
-                                    <p style={{ color: colors.gray700, fontSize: typography.fontSize.sm, marginBottom: spacing.sm }}>
-                                      Payment Deadline: <strong>{new Date(app.paymentDeadline).toLocaleDateString()}</strong>
-                                      {new Date(app.paymentDeadline) < new Date() && (
-                                        <span style={{ color: colors.error, marginLeft: spacing.xs }}>(Overdue)</span>
-                                      )}
-                                    </p>
-                                  )}
-                                  <div style={{ display: 'flex', gap: spacing.sm, flexDirection: 'column' }}>
-                                    <button
-                                      onClick={() => handlePayApplication(app._id, 'card')}
-                                      disabled={payingApplicationId === app._id}
-                                      style={{
-                                        width: "100%",
-                                        background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-                                        color: colors.primary,
-                                        border: 'none',
-                                        padding: spacing.sm,
-                                        borderRadius: borderRadius.md,
-                                        fontSize: typography.fontSize.sm,
-                                        fontWeight: typography.fontWeight.bold,
-                                        opacity: payingApplicationId === app._id ? 0.7 : 1,
-                                        cursor: payingApplicationId === app._id ? 'not-allowed' : 'pointer',
-                                        transition: transitions.fast,
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        if (payingApplicationId !== app._id) {
-                                          e.target.style.transform = 'translateY(-1px)';
-                                          e.target.style.boxShadow = shadows.md;
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.target.style.transform = 'translateY(0)';
-                                        e.target.style.boxShadow = 'none';
-                                      }}
-                                    >
-                                      💳 Pay by Card
-                                    </button>
-                                    <button
-                                      onClick={() => handlePayApplication(app._id, 'wallet')}
-                                      disabled={payingApplicationId === app._id}
-                                      style={{
-                                        width: "100%",
-                                        ...buttonStyles.primary,
-                                        padding: spacing.sm,
-                                        fontSize: typography.fontSize.sm,
-                                        opacity: payingApplicationId === app._id ? 0.7 : 1,
-                                        cursor: payingApplicationId === app._id ? 'not-allowed' : 'pointer',
-                                      }}
-                                    >
-                                      {payingApplicationId === app._id ? 'Processing...' : '💵 Pay from Wallet'}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              {app.status === "approved" && app.paid && app.paidAt && (
-                                <div style={{
-                                  background: colors.successLight,
-                                  border: `1px solid ${colors.success}`,
-                                  borderRadius: borderRadius.md,
-                                  padding: spacing.md,
-                                  marginTop: spacing.md,
-                                  marginBottom: spacing.md,
-                                }}>
-                                  <p style={{ color: colors.success, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold }}>
-                                    ✓ Payment Completed
-                                  </p>
-                                  <p style={{ color: colors.gray700, fontSize: typography.fontSize.xs, marginTop: spacing.xs }}>
-                                    Paid on {new Date(app.paidAt).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                            {app.status === "pending" && !app.paid && (
-                              <button
-                                onClick={() => handleCancelApplication(app._id)}
-                                style={{
-                                  width: "100%",
-                                  ...buttonStyles.outline,
-                                  padding: spacing.md,
-                                  fontSize: typography.fontSize.sm,
-                                  color: colors.error,
-                                  borderColor: colors.error,
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.background = colors.errorLight;
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.background = "transparent";
-                                }}
-                              >
-                                Cancel Application
-                              </button>
-                            )}
+        {activeTab === "browse" && (
+          <div className="space-y-6">
+            <EventsList filterByTypes={["Bazaar", "Booth"]} />
+          </div>
+        )}
+        {activeTab === "upcoming" && activeUpcomingTab === "bazaars" && (
+          <MyEventsList
+            events={(upcomingBazaars || []).map(e => ({ ...e, date: e.startDate }))}
+            title="Upcoming Bazaars"
+          />
+        )}
+        {activeTab === "upcoming" && activeUpcomingTab === "booths" && (
+          <MyEventsList
+            events={(upcomingBooths || []).map(e => ({ ...e, date: e.startDate }))}
+            title="Upcoming Booths"
+          />
+        )}
+        {activeTab === "my-applications" && (
+          <div>
+            {loadingApplications ? (
+              <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+                <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Loading Applications...</h3>
+                <p className="text-slate-500">Please wait while we fetch your {activeApplicationTab} applications.</p>
+              </div>
+            ) : (
+              <div>
+                {applications.length === 0 ? (
+                  <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+                    <div className="text-6xl mb-6 opacity-50">📭</div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">No Applications</h3>
+                    <p className="text-slate-500">You don't have any {activeApplicationTab} applications yet.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {applications.map((app) => (
+                      <div key={app._id} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="mb-6">
+                          <h4 className="text-lg font-bold text-slate-900 mb-3 group-hover:text-emerald-600 transition-colors">
+                            {app.event?.title || "Event"}
+                          </h4>
+                          <div className="flex gap-2 flex-wrap mb-4">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize tracking-wide ${app.status === "approved" ? "bg-emerald-100 text-emerald-700" :
+                              app.status === "pending" ? "bg-amber-100 text-amber-700" :
+                                app.status === "cancelled" ? "bg-slate-100 text-slate-500" :
+                                  "bg-red-100 text-red-700"
+                              }`}>
+                              {app.status}
+                            </span>
                             {app.paid && (
-                              <p style={{ color: colors.gray500, fontSize: typography.fontSize.sm, fontStyle: "italic" }}>
-                                Cannot cancel: Payment completed
-                              </p>
-                            )}
-                            {app.status === "cancelled" && (
-                              <button
-                                onClick={() => handleDeleteApplication(app._id)}
-                                style={{
-                                  width: "100%",
-                                  ...buttonStyles.outline,
-                                  padding: spacing.md,
-                                  fontSize: typography.fontSize.sm,
-                                  color: colors.gray700,
-                                  borderColor: colors.gray300,
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.target.style.background = colors.gray100;
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.target.style.background = "transparent";
-                                }}
-                              >
-                                Delete Application
-                              </button>
+                              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold tracking-wide">
+                                Paid
+                              </span>
                             )}
                           </div>
-                        ))}
+                          {app.event?.startDate && (
+                            <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                              📅 {new Date(app.event.startDate).toLocaleDateString()}
+                            </p>
+                          )}
+
+                          {app.status === "approved" && !app.paid && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 mt-5 mb-2">
+                              <p className="text-amber-800 text-sm font-bold mb-2 flex items-center gap-2">
+                                💳 Payment Required
+                              </p>
+                              <p className="text-slate-700 text-sm mb-1">
+                                Fee: <strong className="text-slate-900">${(app.participationFee || 0).toFixed(2)}</strong>
+                              </p>
+                              {app.paymentDeadline && (
+                                <p className="text-slate-600 text-sm mb-4">
+                                  Deadline: <strong>{new Date(app.paymentDeadline).toLocaleDateString()}</strong>
+                                  {new Date(app.paymentDeadline) < new Date() && (
+                                    <span className="text-red-500 ml-1 font-bold">(Overdue)</span>
+                                  )}
+                                </p>
+                              )}
+                              <div className="flex flex-col gap-3">
+                                <button
+                                  onClick={() => handlePayApplication(app._id, 'card')}
+                                  disabled={payingApplicationId === app._id}
+                                  className="w-full py-2.5 px-4 bg-slate-900 text-white font-bold rounded-lg shadow-sm hover:bg-emerald-600 hover:shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                                >
+                                  Pay by Card
+                                </button>
+                                <button
+                                  onClick={() => handlePayApplication(app._id, 'wallet')}
+                                  disabled={payingApplicationId === app._id}
+                                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                                >
+                                  {payingApplicationId === app._id ? 'Processing...' : 'Pay from Wallet'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {app.status === "approved" && app.paid && app.paidAt && (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mt-5 mb-2">
+                              <p className="text-emerald-700 text-sm font-bold flex items-center gap-2">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                Payment Completed
+                              </p>
+                              <p className="text-emerald-600/80 text-xs mt-1 pl-4">
+                                Paid on {new Date(app.paidAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                          {app.status === "pending" && (
+                            <button
+                              onClick={() => handleCancelApplication(app._id)}
+                              className="text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Cancel Application
+                            </button>
+                          )}
+                          {app.status === "cancelled" && (
+                            <button
+                              onClick={() => handleDeleteApplication(app._id)}
+                              className="text-sm font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
+                          {app.status === "approved" && !app.paid && (
+                            <button
+                              onClick={() => handleCancelApplication(app._id)}
+                              className="text-xs font-medium text-slate-400 hover:text-red-500 hover:underline transition-colors"
+                            >
+                              Cancel Application
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "loyalty" && (
+          <div className="space-y-6">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-bold text-slate-800">Your Programs</h3>
+                <button
+                  onClick={() => setShowLoyaltyForm(!showLoyaltyForm)}
+                  className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors"
+                >
+                  {showLoyaltyForm ? "Cancel" : "Create New Program"}
+                </button>
+              </div>
+
+              {showLoyaltyForm && (
+                <div className="mb-8 p-6 bg-slate-50 rounded-xl border border-slate-200">
+                  <LoyaltyProgramForm
+                    onSuccess={() => {
+                      setShowLoyaltyForm(false);
+                      setLoyaltyRefreshKey(prev => prev + 1);
+                    }}
+                  />
                 </div>
               )}
+
+              <LoyaltyApplicationsList key={loyaltyRefreshKey} />
             </div>
-          )}
-          {activeTab === "loyalty" && (
-            <div>
-              {showLoyaltyForm ? (
-                <LoyaltyProgramForm
-                  onSuccess={() => {
-                    setShowLoyaltyForm(false);
-                    setLoyaltyRefreshKey(prev => prev + 1); // Trigger refresh
-                    showToast.success('Loyalty program application submitted successfully!');
-                  }}
-                  onCancel={() => setShowLoyaltyForm(false)}
-                />
-              ) : (
-                <div>
-                  <div style={{
-                    background: colors.bgCard,
-                    padding: spacing['3xl'],
-                    borderRadius: borderRadius['2xl'],
-                    boxShadow: shadows.lg,
-                    marginBottom: spacing['2xl'],
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    border: `1px solid ${colors.gray200}`,
-                  }}>
-                    <div>
-                      <h3 style={{ 
-                        fontSize: typography.fontSize.xl, 
-                        color: colors.primary, 
-                        marginBottom: spacing.sm,
-                        fontWeight: typography.fontWeight.bold,
-                      }}>
-                        GUC Loyalty Program
-                      </h3>
-                      <p style={{ 
-                        color: colors.gray500,
-                        fontSize: typography.fontSize.base,
-                      }}>
-                        Apply to join the GUC loyalty program and offer discounts to students
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowLoyaltyForm(true)}
-                      style={{
-                        ...buttonStyles.primary,
-                        padding: `${spacing.md} ${spacing['2xl']}`,
-                      }}
-                    >
-                      + Apply to Loyalty Program
-                    </button>
-                  </div>
-                  <LoyaltyApplicationsList key={loyaltyRefreshKey} />
-                </div>
-              )}
-            </div>
-          )}
-          {activeTab === "visitor-qrcodes" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <VisitorQRCodeManager />
-            </div>
-          )}
-          {activeTab === "company-documents" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <CompanyDocumentsUpload />
-            </div>
-          )}
-          {activeTab === "attendee-ids" && (
-            <div
-              style={{
-                background: colors.bgCard,
-                padding: spacing['3xl'],
-                borderRadius: borderRadius['2xl'],
-                boxShadow: shadows.lg,
-                border: `1px solid ${colors.gray200}`,
-              }}
-            >
-              <AttendeeIDUpload />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {activeTab === "visitor-qrcodes" && (
+          <div className="space-y-6">
+            <VisitorQRCodeManager />
+          </div>
+        )}
+
+        {activeTab === "company-documents" && (
+          <div className="space-y-6">
+            <CompanyDocumentsUpload />
+          </div>
+        )}
+
+        {activeTab === "attendee-ids" && (
+          <div className="space-y-6">
+            <AttendeeIDUpload />
+          </div>
+        )}
       </div>
-      {topUpOpen && (
-        <TopUpDialog
-          open={topUpOpen}
-          onClose={() => setTopUpOpen(false)}
-          onSuccess={(res) => {
-            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
-            if (typeof next === 'number') setWalletBalance(next);
-          }}
-        />
-      )}
-    </div>
+    </DashboardLayout>
   );
 }
 

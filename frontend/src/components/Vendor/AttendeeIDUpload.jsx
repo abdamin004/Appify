@@ -111,7 +111,7 @@ function AttendeeIDUpload() {
       if (res.ok) {
         const data = await res.json();
         const idUrl = data.idUrl || data.idDocumentUrl || `/uploads/attendees/${file.name}`;
-        
+
         // Update local state
         setUploadedIds(prev => ({
           ...prev,
@@ -145,7 +145,7 @@ function AttendeeIDUpload() {
       } else {
         // If backend endpoint doesn't exist, simulate upload
         const idUrl = `/uploads/attendees/${Date.now()}_${file.name}`;
-        
+
         setUploadedIds(prev => ({
           ...prev,
           [applicationId]: {
@@ -215,101 +215,72 @@ function AttendeeIDUpload() {
 
   return (
     <div>
-      <div style={{ 
-        marginBottom: '30px'
-      }}>
-        <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Upload Attendee IDs</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Upload Attendee IDs</h2>
+        <p className="text-slate-500">
           Upload ID documents for individuals attending for the entire duration of bazaar or booth setup.
         </p>
       </div>
 
       {message.text && (
-        <div style={{
-          padding: '12px 20px',
-          marginBottom: '20px',
-          borderRadius: '8px',
-          background: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          color: message.type === 'success' ? '#22c55e' : '#ef4444',
-          border: `1px solid ${message.type === 'success' ? '#22c55e' : '#ef4444'}`,
-        }}>
-          {message.text}
+        <div className={`p-4 mb-6 rounded-xl border flex items-center gap-3 ${message.type === 'success'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+          <span className="text-xl">{message.type === 'success' ? '✅' : '⚠️'}</span>
+          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
       {approvedApplications.length === 0 ? (
-        <div style={{
-          background: 'rgba(255,255,255,0.95)',
-          padding: '60px 40px',
-          borderRadius: '15px',
-          textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📋</div>
-          <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '10px' }}>
+        <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+          <div className="text-6xl mb-6 opacity-50">📋</div>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
             No Approved Applications
           </h3>
-          <p style={{ color: '#6b7280' }}>
+          <p className="text-slate-500">
             You don't have any approved applications yet. Once your application is approved, you can upload attendee IDs here.
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+        <div className="flex flex-col gap-8">
           {approvedApplications.map((app) => (
             <div
               key={app._id}
-              style={{
-                background: 'rgba(255,255,255,0.95)',
-                padding: '25px',
-                borderRadius: '15px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              }}
+              className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100"
             >
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ color: '#003366', margin: 0, marginBottom: '8px', fontSize: '1.3rem' }}>
+              <div className="mb-8 pb-6 border-b border-slate-100">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">
                   {app.event?.title || 'Event'}
                 </h3>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  <span style={{
-                    padding: '4px 12px',
-                    background: 'rgba(34, 197, 94, 0.15)',
-                    color: '#22c55e',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                  }}>
+                <div className="flex gap-3 flex-wrap mb-3">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wide border border-emerald-100">
                     {app.event?.type || 'Event'}
                   </span>
                   {app.event?.startDate && (
-                    <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                    <span className="text-slate-500 text-sm flex items-center gap-2 font-medium bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                       📅 {new Date(app.event.startDate).toLocaleDateString()}
                     </span>
                   )}
                   {app.organization && (
-                    <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                    <span className="text-slate-500 text-sm flex items-center gap-2 font-medium bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                       🏢 {app.organization}
                     </span>
                   )}
                 </div>
                 {app.event?.type === 'Booth' && app.setupDurationWeeks && (
-                  <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
-                    Duration: {app.setupDurationWeeks} week(s) | Location: {app.setupLocation || 'TBA'}
+                  <p className="text-slate-500 text-sm mt-2">
+                    Duration: <span className="font-medium text-slate-700">{app.setupDurationWeeks} week(s)</span> | Location: <span className="font-medium text-slate-700">{app.setupLocation || 'TBA'}</span>
                   </p>
                 )}
               </div>
 
               {(!app.attendees || app.attendees.length === 0) ? (
-                <div style={{
-                  padding: '20px',
-                  background: '#f9fafb',
-                  borderRadius: '8px',
-                  textAlign: 'center',
-                  color: '#6b7280',
-                }}>
+                <div className="p-8 bg-slate-50 rounded-xl text-center text-slate-500 border border-slate-100 border-dashed">
                   No attendees registered for this application.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {app.attendees.map((attendee, idx) => {
                     const attendeeId = attendee._id || attendee.id || `attendee_${idx}`;
                     const idUrl = getAttendeeIdUrl(app._id, attendeeId);
@@ -319,150 +290,90 @@ function AttendeeIDUpload() {
                     return (
                       <div
                         key={attendeeId}
-                        style={{
-                          padding: '20px',
-                          background: '#f9fafb',
-                          borderRadius: '10px',
-                          border: '1px solid #e5e7eb',
-                        }}
+                        className="p-6 bg-slate-50 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors"
                       >
-                        <div style={{ marginBottom: '15px' }}>
-                          <h4 style={{ color: '#003366', margin: 0, marginBottom: '8px' }}>
+                        <div className="mb-4 pb-4 border-b border-slate-200">
+                          <h4 className="font-bold text-slate-900 mb-2 text-lg">
                             {attendee.name || `Attendee ${idx + 1}`}
                           </h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.9rem', color: '#6b7280' }}>
-                            <span>📧 {attendee.email || 'No email'}</span>
-                            <span>🆔 ID Number: {attendee.idNumber || 'Not provided'}</span>
+                          <div className="flex flex-col gap-1 text-sm text-slate-600">
+                            <span className="flex items-center gap-2">📧 {attendee.email || 'No email'}</span>
+                            <span className="flex items-center gap-2">🆔 ID: <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">{attendee.idNumber || 'Not provided'}</span></span>
                           </div>
                         </div>
 
                         {idUrl ? (
-                          <div style={{ marginBottom: '15px' }}>
-                            <div style={{
-                              padding: '12px',
-                              background: 'rgba(34, 197, 94, 0.1)',
-                              borderRadius: '8px',
-                              marginBottom: '10px',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}>
-                              <span style={{ color: '#22c55e', fontWeight: 600, fontSize: '0.9rem' }}>
-                                ✓ ID Document Uploaded
+                          <div>
+                            <div className="p-3 bg-emerald-50 rounded-lg mb-4 flex justify-between items-center border border-emerald-100">
+                              <span className="text-emerald-700 font-bold text-sm flex items-center gap-2">
+                                <span className="bg-emerald-200 text-emerald-700 rounded-full w-5 h-5 flex items-center justify-center text-xs">✓</span>
+                                ID Document Uploaded
                               </span>
                               <button
                                 onClick={() => handleRemoveId(app._id, attendeeId, attendee.name)}
-                                style={{
-                                  padding: '6px 12px',
-                                  background: '#fee2e2',
-                                  color: '#dc2626',
-                                  border: '1px solid #fecaca',
-                                  borderRadius: '6px',
-                                  fontSize: '0.85rem',
-                                  fontWeight: '600',
-                                  cursor: 'pointer',
-                                }}
+                                className="px-3 py-1.5 bg-white text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-50 transition-colors shadow-sm"
                               >
                                 Remove
                               </button>
                             </div>
-                            {idUrl.endsWith('.pdf') || idUrl.includes('.pdf') ? (
-                              <a
-                                href={`${baseUrl}${idUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-block',
-                                  padding: '8px 16px',
-                                  background: 'rgba(59, 130, 246, 0.1)',
-                                  color: '#3b82f6',
-                                  borderRadius: '6px',
-                                  textDecoration: 'none',
-                                  fontWeight: 600,
-                                  fontSize: '0.9rem',
-                                }}
-                              >
-                                📄 View PDF
-                              </a>
-                            ) : (
-                              <img
-                                src={`${baseUrl}${idUrl}`}
-                                alt={`ID for ${attendee.name}`}
-                                style={{
-                                  maxWidth: '200px',
-                                  maxHeight: '150px',
-                                  border: '2px solid #e5e7eb',
-                                  borderRadius: '8px',
-                                  padding: '8px',
-                                  background: 'white',
-                                }}
-                              />
-                            )}
+                            <div className="flex justify-center bg-white p-4 rounded-lg border border-slate-200">
+                              {idUrl.endsWith('.pdf') || idUrl.includes('.pdf') ? (
+                                <a
+                                  href={`${baseUrl}${idUrl}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold text-sm hover:bg-blue-100 transition-colors"
+                                >
+                                  📄 View PDF
+                                </a>
+                              ) : (
+                                <img
+                                  src={`${baseUrl}${idUrl}`}
+                                  alt={`ID for ${attendee.name}`}
+                                  className="max-w-full max-h-[150px] object-contain rounded"
+                                />
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <div>
                             {preview && (
-                              <div style={{ marginBottom: '15px' }}>
-                                <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</p>
+                              <div className="mb-4 bg-white p-4 rounded-lg border border-slate-200 text-center">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Preview</p>
                                 <img
                                   src={preview}
                                   alt="Preview"
-                                  style={{
-                                    maxWidth: '200px',
-                                    maxHeight: '150px',
-                                    border: '2px solid #e5e7eb',
-                                    borderRadius: '8px',
-                                    padding: '8px',
-                                    background: 'white',
-                                  }}
+                                  className="max-w-full max-h-[150px] object-contain mx-auto rounded"
                                 />
                               </div>
                             )}
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <label
-                                style={{
-                                  padding: '10px 20px',
-                                  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                                  color: '#003366',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontWeight: '600',
-                                  fontSize: '0.9rem',
-                                  display: 'inline-block',
-                                }}
-                              >
-                                📎 {hasFile ? 'Change File' : 'Select ID Document'}
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/jpg,application/pdf"
-                                  onChange={(e) => handleFileSelect(attendeeId, e)}
-                                  style={{ display: 'none' }}
-                                />
-                              </label>
+                            <div className="flex flex-col gap-3">
+                              <div className="flex gap-2">
+                                <label className={`flex-1 btn btn-sm ${hasFile ? 'btn-outline' : 'btn-primary bg-slate-900 border-slate-900 hover:bg-slate-800'} text-white`}>
+                                  {hasFile ? 'Change File' : 'Select ID Document'}
+                                  <input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/jpg,application/pdf"
+                                    onChange={(e) => handleFileSelect(attendeeId, e)}
+                                    className="hidden"
+                                  />
+                                </label>
+                                {hasFile && (
+                                  <button
+                                    onClick={() => handleUpload(app._id, attendeeId, attendee)}
+                                    disabled={loading}
+                                    className="btn btn-success btn-sm text-white"
+                                  >
+                                    {loading ? 'Uploading...' : '📤 Upload'}
+                                  </button>
+                                )}
+                              </div>
                               {hasFile && (
-                                <button
-                                  onClick={() => handleUpload(app._id, attendeeId, attendee)}
-                                  disabled={loading}
-                                  style={{
-                                    padding: '10px 20px',
-                                    background: loading ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                    fontWeight: '600',
-                                    fontSize: '0.9rem',
-                                  }}
-                                >
-                                  {loading ? 'Uploading...' : '📤 Upload ID'}
-                                </button>
+                                <p className="text-xs text-slate-500 text-center bg-white py-1 px-2 rounded border border-slate-200 truncate">
+                                  Selected: {attendeeFiles[attendeeId]?.name}
+                                </p>
                               )}
                             </div>
-                            {hasFile && (
-                              <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '8px', margin: 0 }}>
-                                Selected: {attendeeFiles[attendeeId]?.name}
-                              </p>
-                            )}
                           </div>
                         )}
                       </div>
@@ -479,4 +390,3 @@ function AttendeeIDUpload() {
 }
 
 export default AttendeeIDUpload;
-
