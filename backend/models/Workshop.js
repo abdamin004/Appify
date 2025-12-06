@@ -23,6 +23,25 @@ const workshopSchema = new mongoose.Schema({
             resolved: { type: Boolean, default: false }
         }
     ],
+    // Resources uploaded by the professor for this workshop (PDFs, slides, materials)
+    resources: [
+        {
+            filename: { type: String, required: true },
+            originalName: { type: String, required: true },
+            mimeType: { type: String, required: true },
+            size: { type: Number, required: true },
+            url: { type: String, required: true },
+            uploadedAt: { type: Date, default: Date.now }
+        }
+    ],
+
+    // Participants who actually attended this workshop
+    attendedParticipants: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }
+    ],
     status: {
         type: String,
         enum: ['pending', 'draft', 'published', 'rejected', 'archived'],

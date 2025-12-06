@@ -2,6 +2,7 @@ const express = require('express');
 const eventController = require('../controllers/eventController');
 const auth = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
+const uploadWorkshopResources = require('../middleware/workshopResourcesUpload');
 const router = express.Router();
 
 // Create event
@@ -25,6 +26,13 @@ router.get('/workshops/mine', auth, roleCheck('Professor'), eventController.getM
 
 // GET /events/workshops/registrations
 router.get('/workshops/registrations', auth, roleCheck('Professor'), eventController.getWorkshopRegistrations);
+
+// Professor uploads workshop resources (PDFs, slides, materials)
+// Form-data field for files: "files"
+router.post('/workshops/:id/resources',auth,roleCheck('Professor'),uploadWorkshopResources,eventController.uploadWorkshopResources);
+
+// Participants who attended can access workshop resources
+router.get('/workshops/:id/resources',auth,roleCheck('Student', 'Staff', 'TA', 'Professor'),eventController.getWorkshopResources);
 
 // Comment routes
 router.post('/comment/:eventId', auth, eventController.addComment);
@@ -76,7 +84,11 @@ router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor'
 router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
 
 // Add a rating on an event (ONLY after event has ended)
-router.post('/:id/ratings',auth,roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.addEventRating);
+router.post('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.addEventRating);
+
+// Request disability accommodations for an event
+router.post('/:id/accommodations',auth,roleCheck('Student', 'Staff', 'TA', 'Professor'),eventController.requestDisabilityAccommodation);
+
 
 // Add event to favorites
 router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
