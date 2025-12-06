@@ -44,7 +44,7 @@ const ParticleBackground = () => {
                 this.y = Math.random() * canvas.height;
                 this.vx = (Math.random() - 0.5) * 1.0; // Slower natural movement
                 this.vy = (Math.random() - 0.5) * 1.0;
-                this.baseSize = Math.random() * 2 + 1.5; // Smaller (1.5-3.5px)
+                this.baseSize = Math.random() * 2 + 1.1; // Smaller (1.5-3.5px)
                 this.size = this.baseSize;
                 this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
                 this.angle = Math.random() * Math.PI * 2;
@@ -74,8 +74,8 @@ const ParticleBackground = () => {
                         const force = (MOUSE_RADIUS - distance) / MOUSE_RADIUS;
 
                         // Very subtle attraction (0.15)
-                        const directionX = forceDirectionX * force * 0.15;
-                        const directionY = forceDirectionY * force * 0.15;
+                        const directionX = forceDirectionX * force * 0.10;
+                        const directionY = forceDirectionY * force * 0.10;
 
                         this.vx += directionX;
                         this.vy += directionY;
@@ -85,7 +85,7 @@ const ParticleBackground = () => {
 
                         // Low Max Speed
                         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                        const maxSpeed = 3;
+                        const maxSpeed = 2.7;
                         if (speed > maxSpeed) {
                             this.vx = (this.vx / speed) * maxSpeed;
                             this.vy = (this.vy / speed) * maxSpeed;
