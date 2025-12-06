@@ -12,6 +12,7 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
+const AccommodationRequest = require('../models/AccommodationRequest');
 const {
     sendGymSessionCancellationEmail,
     sendGymSessionUpdateEmail,
@@ -1492,6 +1493,99 @@ module.exports = {
         } catch (error) {
             console.error('generateVendorAttendeePasses error:', error);
             res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
+        }
+    },
+    // POST /events/:id/accommodations
+    // Allows Student/Staff/TA/Professor to request disability accommodations for an event
+    async requestDisabilityAccommodation(req, res) {
+        try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+
+            const {
+                needsWheelchairAccess = false,
+                needsSpecialSeating = false,
+                otherRequests
+            } = req.body;
+
+            // Ensure the event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // Only these roles are allowed to make such a request
+            const allowedRoles = ['Student', 'Staff', 'TA', 'Professor'];
+            if (!allowedRoles.includes(req.user.role)) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'Only students, staff, TAs and professors can request disability accommodations for events'
+                });
+            }
+
+            // Optional: enforce that the user is registered for this event
+            if (
+                !event.registeredUsers ||
+                !event.registeredUsers.some(
+                    (u) => u.toString() === userId.toString()
+                )
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'You must be registered for this event to request disability accommodations'
+                });
+            }
+
+            // Upsert: update existing request if present, otherwise create a new one
+            let request = await AccommodationRequest.findOne({
+                event: eventId,
+                user: userId
+            });
+
+            if (!request) {
+                request = new AccommodationRequest({
+                    event: eventId,
+                    user: userId,
+                    roleAtEvent: req.user.role,
+                    needsWheelchairAccess: Boolean(needsWheelchairAccess),
+                    needsSpecialSeating: Boolean(needsSpecialSeating),
+                    otherRequests: otherRequests || '',
+                    status: 'pending'
+                });
+            } else {
+                request.needsWheelchairAccess = Boolean(needsWheelchairAccess);
+                request.needsSpecialSeating = Boolean(needsSpecialSeating);
+                request.otherRequests =
+                    typeof otherRequests === 'string'
+                        ? otherRequests
+                        : request.otherRequests;
+                request.status = 'pending'; // reset to pending if user changed it
+            }
+
+            await request.save();
+
+            return res.status(201).json({
+                success: true,
+                message:
+                    'Disability accommodation request saved successfully',
+                data: request
+            });
+        } catch (err) {
+            console.error(
+                'Error in requestDisabilityAccommodation:',
+                err
+            );
+            return res.status(500).json({
+                success: false,
+                message:
+                    'Failed to save disability accommodation request',
+                error: err.message
+            });
         }
     }
 
