@@ -12,6 +12,7 @@ const Comment = require('../models/Comment');
 const Rating = require('../models/Rating');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
+const BlackoutDate = require('../models/BlackoutDate');
 const AccommodationRequest = require('../models/AccommodationRequest');
 const {
     sendGymSessionCancellationEmail,
@@ -118,7 +119,27 @@ function parseAllowedRoles(input) {
     }
 
     return normalized;
+} 
+// Check if a given event date range falls inside any active blackout date
+async function checkBlackoutForEventRange(startDate, endDate) {
+    if (!startDate) {
+        return null;
+    }
+
+    const eventStart = new Date(startDate);
+    const eventEnd = endDate ? new Date(endDate) : new Date(startDate);
+
+    // Find any active blackout where ranges overlap:
+    // blackout.startDate <= eventEnd AND blackout.endDate >= eventStart
+    const blackout = await BlackoutDate.findOne({
+        active: true,
+        startDate: { $lte: eventEnd },
+        endDate: { $gte: eventStart }
+    });
+
+    return blackout;
 }
+
 
 module.exports = {
     // GET /events/:id - Get a single event by id
@@ -182,6 +203,21 @@ module.exports = {
                         error: 'An event with the same title, location, and start date already exists'
                     });
                 }
+            }
+            // Enforce blackout dates before creating the event
+            const blackout = await checkBlackoutForEventRange(startDate, endDate || startDate);
+            if (blackout) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot create event during a system-wide blackout period.',
+                    blackout: {
+                        id: blackout._id,
+                        name: blackout.name,
+                        startDate: blackout.startDate,
+                        endDate: blackout.endDate,
+                        reason: blackout.reason
+                    }
+                });
             }
 
             const eventData = {
@@ -757,8 +793,28 @@ module.exports = {
                     break;
             }
 
+            // Enforce blackout dates on updated event dates
+            const updatedStart = startDate || event.startDate;
+            const updatedEnd = endDate || event.endDate || updatedStart;
+
+            const blackoutUpdate = await checkBlackoutForEventRange(updatedStart, updatedEnd);
+            if (blackoutUpdate) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot move or update this event into a system-wide blackout period.',
+                    blackout: {
+                        id: blackoutUpdate._id,
+                        name: blackoutUpdate.name,
+                        startDate: blackoutUpdate.startDate,
+                        endDate: blackoutUpdate.endDate,
+                        reason: blackoutUpdate.reason
+                    }
+                });
+            }
+
             const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true })
                 .populate({ path: 'vendors', options: { strictPopulate: false } });
+
 
             // Check if workshop was updated after edit requests were made
             if (event.type === 'Workshop' && description !== undefined) {

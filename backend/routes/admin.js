@@ -130,4 +130,33 @@ router.get(
   adminController.exportEventRegistrations
 );
 
+router.post(
+    '/blackout-dates',
+    auth,
+    roleCheck('Admin'),
+    adminController.createBlackoutDate
+);
+
+router.get(
+    '/blackout-dates',
+    auth,
+    roleCheck('Admin'),
+    adminController.getBlackoutDates
+);
+
+router.put(
+    '/blackout-dates/:id',
+    auth,
+    roleCheck('Admin'),
+    adminController.updateBlackoutDate
+);
+
+router.delete(
+    '/blackout-dates/:id',
+    auth,
+    roleCheck('Admin'),
+    adminController.deleteBlackoutDate
+);
+
+
 module.exports = router;
