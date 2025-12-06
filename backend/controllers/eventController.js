@@ -650,6 +650,14 @@ module.exports = {
             );
             await user.save();
 
+            // Cleanup any accommodation requests
+            try {
+                await AccommodationRequest.deleteOne({ user: userId, event: eventId });
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup accommodation request:', cleanupErr);
+                // Non-critical, just log
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Successfully unregistered from the event'
