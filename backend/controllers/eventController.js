@@ -1617,7 +1617,110 @@ module.exports = {
                 error: err.message
             });
         }
+    },
+
+    // POST /events/workshops/:id/resources
+    // Professor uploads resources (PDFs, slides, materials) for a workshop
+    async uploadWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+
+            const workshop = await Workshop.findById(workshopId);
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            // Role is already enforced via route-level roleCheck('Professor')
+
+            const files = req.files || [];
+            if (!files.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No files uploaded'
+                });
+            }
+
+            const newResources = files.map(file => ({
+                filename: file.filename,
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                url: `/uploads/workshop-resources/${file.filename}`,
+                uploadedAt: new Date()
+            }));
+
+            if (!Array.isArray(workshop.resources)) {
+                workshop.resources = [];
+            }
+            workshop.resources.push(...newResources);
+
+            await workshop.save();
+
+            return res.status(201).json({
+                success: true,
+                message: 'Workshop resources uploaded successfully',
+                data: workshop.resources
+            });
+        } catch (err) {
+            console.error('Error in uploadWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to upload workshop resources',
+                error: err.message
+            });
+        }
+    },
+
+    // GET /events/workshops/:id/resources
+    // Only participants who attended can access the list of resources
+    async getWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+            const userId = req.user._id;
+
+            const workshop = await Workshop.findById(workshopId).populate(
+                'attendedParticipants',
+                '_id firstName lastName email'
+            );
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            const attendedList = Array.isArray(workshop.attendedParticipants)
+                ? workshop.attendedParticipants
+                : [];
+
+            const hasAttended = attendedList.some(
+                (u) => u && u._id && u._id.toString() === userId.toString()
+            );
+
+            if (!hasAttended) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only participants who attended this workshop can access its resources'
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: workshop.resources || []
+            });
+        } catch (err) {
+            console.error('Error in getWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve workshop resources',
+                error: err.message
+            });
+        }
     }
+
 
 
 };
