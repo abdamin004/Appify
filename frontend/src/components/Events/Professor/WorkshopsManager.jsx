@@ -280,6 +280,13 @@ function WorkshopsManager({ editOnly = false }) {
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
       };
       await updateEvent(id, payload);
+
+      // Handle pending file uploads if any
+      if (filesToUpload.length > 0) {
+        await handleUploadsForNewWorkshop(id, filesToUpload);
+        setFilesToUpload([]);
+      }
+
       setEditData({});
       // Reset form
       setForm({
@@ -430,7 +437,14 @@ function WorkshopsManager({ editOnly = false }) {
                         <span className="text-2xl">📄</span>
                         <div className="flex flex-col min-w-0">
                           <span className="font-medium text-slate-700 truncate">{res.name}</span>
-                          <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">View File</a>
+                          <a
+                            href={res.url && res.url.startsWith('http') ? res.url : `http://localhost:5001${res.url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View File
+                          </a>
                         </div>
                       </div>
                     </div>
