@@ -513,18 +513,35 @@ exports.uploadVendorDocuments = async (req, res, next) => {
 // List all loyalty program partners with discount info, all parties are able to view
 exports.listLoyaltyPartners = async (req, res, next) => {
   try {
+    console.log('📋 listLoyaltyPartners called');
+    
+    // Check if LoyaltyApplication model is available
+    if (!LoyaltyApplication) {
+      console.error('❌ LoyaltyApplication model not found');
+      return res.status(500).json({
+        success: false,
+        message: 'LoyaltyApplication model not available',
+        error: 'Model not loaded'
+      });
+    }
+
     const apps = await LoyaltyApplication.find({ status: 'approved' })
       .populate('vendorUser', 'companyName email') // adjust fields based on Vendor model
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean(); // Use lean() for better performance
+
+    console.log(`✅ Found ${apps.length} approved loyalty applications`);
 
     const partners = apps.map(app => ({
       loyaltyApplicationId: app._id,
       vendorId: app.vendorUser ? app.vendorUser._id : undefined,
-      vendorName: app.vendorUser?.companyName || app.organization,
-      discountRate: app.discountRate,
-      promoCode: app.promoCode,
-      termsAndConditions: app.termsAndConditions
+      vendorName: app.vendorUser?.companyName || app.organization || 'Unknown Vendor',
+      discountRate: app.discountRate || 0,
+      promoCode: app.promoCode || 'N/A',
+      termsAndConditions: app.termsAndConditions || ''
     }));
+
+    console.log(`✅ Returning ${partners.length} partners`);
 
     return res.status(200).json({
       success: true,
@@ -532,7 +549,8 @@ exports.listLoyaltyPartners = async (req, res, next) => {
       partners
     });
   } catch (err) {
-    console.error('listLoyaltyPartners error:', err);
+    console.error('❌ listLoyaltyPartners error:', err);
+    console.error('Error stack:', err.stack);
     return res.status(500).json({
       success: false,
       message: 'Error retrieving loyalty partners',
