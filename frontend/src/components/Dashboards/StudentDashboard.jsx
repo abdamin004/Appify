@@ -807,7 +807,7 @@ function StudentDashboard() {
               </div>
 
               {/* Chatbot */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200" data-inline-chat="true">
                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <span>🤖</span> AI Assistant
                 </h3>
