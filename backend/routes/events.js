@@ -87,6 +87,9 @@ router.post(
   roleCheck('Admin', 'EventOffice'),
   eventController.generateVendorAttendeePasses
 );
+// Get event recommendations (must be before /:id route)
+router.get('/recommendations', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getEventRecommendations);
+// Get single event by ID (must be LAST, after all specific routes like /recommendations, /favorites/mine, etc.)
 // Event Analytics
 router.get('/:id/analytics', auth, roleCheck('Professor', 'EventOffice', 'Admin'), eventController.getEventAnalytics);
 
@@ -110,11 +113,16 @@ router.post('/:id/accommodations', auth, roleCheck('Student', 'Staff', 'TA', 'Pr
 
 
 // Add event to favorites
-router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
+router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.addEventToFavorites);
+
+// Remove event from favorites
+router.delete('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.removeEventFromFavorites);
 
 // View my favorites list
-router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
+router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getMyFavoriteEvents);
 
+// Create LinkedIn post for an event
+router.post('/:id/linkedin-post', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.createLinkedInPost);
 // Export Registrations
 router.get('/:id/export/registrations', auth, eventController.exportEventRegistrations);
 

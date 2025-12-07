@@ -7,7 +7,8 @@ import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
-import { getFavouriteIds } from "../../services/favoritesService";
+import { getFavouriteIds, invalidateCache } from "../../services/favoritesService";
+import { getMyFavoriteEvents } from "../../services/eventService";
 import { showToast, confirmDialog } from "../../utils/toast";
 import {
   getTaNotifications,
@@ -665,50 +666,20 @@ function TADashboard() {
 
   const fetchFavourites = async () => {
     try {
-      const ids = getFavouriteIds().map(String);
-      if (!ids.length) { setFavouriteEvents([]); return; }
-
-      let list = [];
-
-      // Fetch published events
-      try {
-        const res = await fetch(`${API_BASE}/events`);
-        const data = await res.json();
-        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      } catch (e) {
-        console.error("Error fetching events for favorites:", e);
-      }
-
-      // Add frontend-approved workshops
-      try {
-        const approvedSet = getApprovedWorkshops();
-        if (approvedSet.size > 0) {
-          const sortRes = await fetch(`${API_BASE}/events/sort`);
-          const sortData = await sortRes.json();
-          if (Array.isArray(sortData)) {
-            const approvedWorkshops = sortData.filter(
-              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
-            );
-            // Mark as published for display
-            approvedWorkshops.forEach(w => { w.status = 'published'; });
-
-            // Merge avoiding duplicates
-            const existingIds = new Set(list.map(e => e._id));
-            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
-            list = [...list, ...newWorkshops];
-          }
-        }
-      } catch (e) {
-        console.log('Error adding approved workshops to favorites:', e);
-      }
-
-      const filtered = list.filter(ev => {
-        const eventId = ev._id || ev.id;
-        // Check if event is in favorites AND user has access
-        return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
-      });
+      // Fetch favorites directly from backend
+      const events = await getMyFavoriteEvents();
+      
+      // Filter events that user has access to
+      const filtered = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return canUserAccessEvent(eventId);
+          })
+        : [];
+      
       setFavouriteEvents(filtered);
-    } catch (_) {
+    } catch (e) {
+      console.error("Error fetching favorites:", e);
       setFavouriteEvents([]);
     }
   };

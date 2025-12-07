@@ -38,6 +38,7 @@ import EventDetails from "./components/EventDetails";
 import VendorDocuments from "./components/Admin/VendorDocuments";
 import AttendeesReport from "./components/Admin/AttendeesReport";
 import SalesReport from "./components/Admin/SalesReport";
+import ChatBot from "./components/ChatBot/ChatBot";
 
 
 function App() {

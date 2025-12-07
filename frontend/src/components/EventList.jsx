@@ -12,7 +12,7 @@ import { showToast, confirmDialog } from '../utils/toast';
 import { createCheckoutSession, payWithWallet, getWalletBalance, getEventPrice } from '../services/paymentService'; // Added payment services
 import { getAttendedIds } from '../services/attendanceService'; // Added attendance (optional but good for consistency)
 
-function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false, onDelete = null, onArchive = null, onUnarchive = null, headerAction = null, showArchivedOnly = false, hideArchived = false }) {
+function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false, onDelete = null, onArchive = null, onUnarchive = null, headerAction = null, showArchivedOnly = false, hideArchived = false, events: providedEvents = null, hideFilters = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [events, setEvents] = useState([]);
@@ -67,7 +67,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     upcomingOnly: false,
   });
 
-  const [favIds, setFavIds] = useState(() => new Set(favourites.getFavouriteIds().map(String)));
+  const [favIds, setFavIds] = useState(new Set());
   const [vendorAppsMap, setVendorAppsMap] = useState({});
 
   // Payment State
@@ -131,8 +131,43 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     } catch { return null; }
   };
 
+  // Load favorites on mount (only if favorites are enabled)
   useEffect(() => {
-    fetchEvents();
+    if (!enableFavorites) {
+      setFavIds(new Set());
+      return;
+    }
+    
+    const loadFavorites = async () => {
+      try {
+        const ids = await favourites.getFavouriteIds();
+        // Ensure ids is an array before mapping
+        if (Array.isArray(ids)) {
+          setFavIds(new Set(ids.map(String)));
+        } else {
+          setFavIds(new Set());
+        }
+      } catch (err) {
+        console.error('Error loading favorites:', err);
+        setFavIds(new Set());
+      }
+    };
+    loadFavorites();
+  }, [enableFavorites]);
+
+  // Update events when providedEvents prop changes
+  useEffect(() => {
+    if (providedEvents !== null) {
+      setEvents(Array.isArray(providedEvents) ? providedEvents : []);
+      setLoading(false);
+    }
+  }, [providedEvents]);
+
+  // Only fetch events if not using provided events
+  useEffect(() => {
+    if (providedEvents === null) {
+      fetchEvents();
+    }
   }, [filters]);
 
   useEffect(() => {
@@ -399,9 +434,21 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     return new Date(eventEndDate) < new Date();
   };
 
-  const toggleFav = (id) => {
-    const next = new Set(favourites.toggleFavourite(id).map(String));
-    setFavIds(next);
+  const toggleFav = async (id) => {
+    try {
+      const updatedIds = await favourites.toggleFavourite(id);
+      setFavIds(new Set(updatedIds.map(String)));
+      // Show toast feedback
+      const isFav = favIds.has(String(id));
+      if (isFav) {
+        showToast.success('Removed from favorites');
+      } else {
+        showToast.success('Added to favorites');
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      showToast.error(err.message || 'Failed to update favorite');
+    }
   };
 
   return (

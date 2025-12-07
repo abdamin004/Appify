@@ -303,6 +303,97 @@ export function deleteEventComment(commentId) {
   return http('DELETE', `${API_BASE}/events/comment/${commentId}`);
 }
 
+// Favorite events functions
+export function addEventToFavorites(eventId) {
+  return http('POST', `${API_BASE}/events/favorites/${eventId}`);
+}
+
+export function removeEventFromFavorites(eventId) {
+  return http('DELETE', `${API_BASE}/events/favorites/${eventId}`);
+}
+
+export async function getMyFavoriteEvents() {
+  const res = await http('GET', `${API_BASE}/events/favorites/mine`);
+  // Backend returns { success: true, count: X, events: [...] }
+  return Array.isArray(res) ? res : (res?.events || []);
+}
+
+export async function createLinkedInPost(eventId) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  if (!token) {
+    throw new Error('You must be logged in to create LinkedIn posts');
+  }
+
+  const response = await fetch(`${API_BASE}/events/${eventId}/linkedin-post`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || `Failed to create LinkedIn post (${response.status})`);
+  }
+
+  return data;
+}
+
+export async function getEventRecommendations() {
+  const res = await http('GET', `${API_BASE}/events/recommendations`);
+  
+  // Handle response - recommendations might be a JSON string that needs parsing
+  let eventIds = [];
+  
+  if (res.recommendations) {
+    try {
+      // If recommendations is a JSON string, parse it
+      if (typeof res.recommendations === 'string') {
+        eventIds = JSON.parse(res.recommendations);
+      } else if (Array.isArray(res.recommendations)) {
+        // If it's already an array, use it directly
+        eventIds = res.recommendations;
+      } else if (res.recommendations.output) {
+        // If wrapped in output property
+        const output = res.recommendations.output;
+        if (typeof output === 'string') {
+          eventIds = JSON.parse(output);
+        } else if (Array.isArray(output)) {
+          eventIds = output;
+        }
+      }
+    } catch (parseErr) {
+      console.error('Error parsing recommendations:', parseErr);
+      return [];
+    }
+  }
+  
+  // Fetch event details for each recommended event ID
+  if (eventIds.length === 0) {
+    return [];
+  }
+  
+  try {
+    const eventPromises = eventIds.map(async (eventId) => {
+      try {
+        return await getEventById(eventId);
+      } catch (err) {
+        console.error(`Error fetching event ${eventId}:`, err);
+        return null;
+      }
+    });
+    
+    const events = await Promise.all(eventPromises);
+    // Filter out any null values (events that couldn't be fetched)
+    return events.filter(event => event !== null);
+  } catch (err) {
+    console.error('Error fetching recommended events:', err);
+    return [];
+  }
+}
+
 // Workshop approval/rejection functions
 export async function listPendingWorkshops() {
   try {

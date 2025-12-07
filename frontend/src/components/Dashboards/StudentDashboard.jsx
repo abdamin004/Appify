@@ -3,12 +3,13 @@ import EventsList from "../EventList";
 import DashboardLayout from "../Layout/DashboardLayout";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
-import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops, getEventRecommendations } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
 import { confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
-import { getFavouriteIds } from "../../services/favoritesService";
+import { getFavouriteIds, invalidateCache } from "../../services/favoritesService";
+import { getMyFavoriteEvents } from "../../services/eventService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
 import {
@@ -37,6 +38,8 @@ function StudentDashboard() {
   const [courts, setCourts] = useState([]);
   const [presetType, setPresetType] = useState("");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
@@ -672,7 +675,11 @@ function StudentDashboard() {
       });
       setFavouriteEvents(filtered);
     } catch (e) {
-      setFavouriteEvents([]);
+      console.error("Error fetching recommendations:", e);
+      setRecommendedEvents([]);
+      showToast.error('Failed to load recommendations');
+    } finally {
+      setRecommendationsLoading(false);
     }
   };
 

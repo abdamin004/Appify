@@ -13,6 +13,10 @@ const Rating = require('../models/Rating'); // Legacy
 const Feedback = require('../models/Feedback');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
+const Favorite = require('../models/Favorite');
+const Recommendation = require('../models/Recommendation');
+const axios = require('axios');
+
 const checkSchedulingConflict = require('../utils/conflictChecker');
 const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin', 'Vendor'];
 
@@ -302,6 +306,32 @@ module.exports = {
                     // do NOT fail the request
                 }
             }
+            // Generate embedding and store in Qdrant (async, don't block response)
+            (async () => {
+                try {
+                    const { generateAndStoreEventEmbedding } = require('../utils/embeddings');
+                    const eventId = event._id.toString();
+                    
+                    // Prepare event data for embedding
+                    const eventForEmbedding = {
+                        title: event.title || '',
+                        description: event.description || event.shortDescription || '',
+                        tags: event.tags || [],
+                    };
+
+                    // Generate and store embedding in Qdrant
+                    const result = await generateAndStoreEventEmbedding(eventForEmbedding, eventId);
+                    if (result) {
+                        console.log(`✅ Embedding generated and stored for event: ${eventId}`);
+                    }
+                } catch (embedErr) {
+                    // Only log if it's an unexpected error (not just missing API key)
+                    if (embedErr.message && !embedErr.message.includes('OPENAI_API_KEY')) {
+                        console.error('Error generating/storing embedding:', embedErr.message);
+                    }
+                    // Don't fail the request if embedding fails
+                }
+            })();
 
             res.status(201).json({
                 success: true,
@@ -1528,7 +1558,7 @@ module.exports = {
             const { eventId } = req.params;
             const userId = req.user._id;
 
-            // 1) Ensure event exists and is published (optional but makes sense)
+            // 1) Ensure event exists
             const event = await Event.findById(eventId);
             if (!event) {
                 return res.status(404).json({
@@ -1537,31 +1567,39 @@ module.exports = {
                 });
             }
 
-            // 2) Load user
-            const user = await User.findById(userId);
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
+            // 2) Check if already favorited (using Favorite model)
+            const existingFavorite = await Favorite.findOne({
+                user: userId,
+                event: eventId
+            });
 
-            user.favoriteEvents = user.favoriteEvents || [];
-
-            // 3) Prevent duplicates
-            const alreadyFav = user.favoriteEvents.some(
-                (id) => id.toString() === eventId.toString()
-            );
-            if (alreadyFav) {
+            if (existingFavorite) {
                 return res.status(400).json({
                     success: false,
                     message: 'Event is already in your favorites list'
                 });
             }
 
-            // 4) Add to favorites and save
-            user.favoriteEvents.push(eventId);
-            await user.save();
+            // 3) Create new favorite entry
+            await Favorite.create({
+                user: userId,
+                event: eventId
+            });
+
+            // 4) Also update User model for backward compatibility (optional)
+            try {
+                const user = await User.findById(userId);
+                if (user) {
+                    user.favoriteEvents = user.favoriteEvents || [];
+                    if (!user.favoriteEvents.some(id => id.toString() === eventId.toString())) {
+                        user.favoriteEvents.push(eventId);
+                        await user.save();
+                    }
+                }
+            } catch (userErr) {
+                // Don't fail if User update fails, Favorite model is the source of truth
+                console.log('Note: Could not update User.favoriteEvents array:', userErr.message);
+            }
 
             return res.status(200).json({
                 success: true,
@@ -1575,6 +1613,13 @@ module.exports = {
                 }
             });
         } catch (err) {
+            // Handle duplicate key error (unique index violation)
+            if (err.code === 11000) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is already in your favorites list'
+                });
+            }
             return res.status(500).json({
                 success: false,
                 message: err.message
@@ -1586,12 +1631,18 @@ module.exports = {
         try {
             const userId = req.user._id;
 
-            const user = await User.findById(userId).populate({
-                path: 'favoriteEvents',
-                populate: { path: 'vendors', options: { strictPopulate: false } }
-            });
+            // Get favorites from Favorite model
+            const favorites = await Favorite.find({ user: userId })
+                .populate({
+                    path: 'event',
+                    populate: { path: 'vendors', options: { strictPopulate: false } }
+                })
+                .sort({ createdAt: -1 }); // Most recently favorited first
 
-            const events = Array.isArray(user?.favoriteEvents) ? user.favoriteEvents : [];
+            // Extract events from favorites
+            const events = favorites
+                .map(fav => fav.event)
+                .filter(event => event !== null && event !== undefined); // Filter out any null/undefined events
 
             if (events.length === 0) {
                 return res.status(200).json({
@@ -1616,6 +1667,302 @@ module.exports = {
         }
     },
 
+    async removeEventFromFavorites(req, res) {
+        try {
+            const { eventId } = req.params;
+            const userId = req.user._id;
+
+            // Find and delete favorite from Favorite model
+            const favorite = await Favorite.findOneAndDelete({
+                user: userId,
+                event: eventId
+            });
+
+            if (!favorite) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Event is not in your favorites list'
+                });
+            }
+
+            // Also update User model for backward compatibility (optional)
+            try {
+                const user = await User.findById(userId);
+                if (user && user.favoriteEvents) {
+                    user.favoriteEvents = user.favoriteEvents.filter(
+                        (id) => id.toString() !== eventId.toString()
+                    );
+                    await user.save();
+                }
+            } catch (userErr) {
+                // Don't fail if User update fails, Favorite model is the source of truth
+                console.log('Note: Could not update User.favoriteEvents array:', userErr.message);
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event removed from favorites successfully'
+            });
+        } catch (err) {
+            return res.status(500).json({
+                success: false,
+                message: err.message
+            });
+        }
+    },
+
+    async getEventRecommendations(req, res) {
+        try {
+            const userId = req.user._id;
+            
+            // Get user's registered events to filter them out from recommendations
+            const user = await User.findById(userId).select('registeredEvents').lean();
+            const registeredEventIds = Array.isArray(user?.registeredEvents) 
+                ? user.registeredEvents
+                    .filter(id => id != null)
+                    .map(id => String(id))
+                : [];
+            const registeredEventIdsSet = new Set(registeredEventIds);
+            
+            // Check if there's a recent recommendation (less than 1 day old)
+            const oneDayAgo = new Date();
+            oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+            
+            let existingRecommendation = await Recommendation.findOne({
+                user: userId,
+                createdAt: { $gte: oneDayAgo }
+            });
+            
+            // If we have a recent recommendation, filter out registered events and past events
+            if (existingRecommendation && existingRecommendation.eventIds && existingRecommendation.eventIds.length > 0) {
+                // Fetch event details to check start dates
+                const events = await Event.find({ 
+                    _id: { $in: existingRecommendation.eventIds } 
+                }).select('_id startDate').lean();
+                
+                const now = new Date();
+                // Filter out events user has already registered for AND past events
+                const filteredRecommendations = events
+                    .filter(event => {
+                        const eventIdStr = event._id.toString();
+                        // Exclude if user already registered
+                        if (registeredEventIdsSet.has(eventIdStr)) return false;
+                        // Exclude if event has already started
+                        if (event.startDate && new Date(event.startDate) <= now) return false;
+                        return true;
+                    })
+                    .map(event => event._id.toString());
+                
+                return res.status(200).json({
+                    success: true,
+                    recommendations: filteredRecommendations,
+                    cached: true
+                });
+            }
+            
+            // No recent recommendation, fetch new ones from Qdrant vector database
+            // Get favorite event IDs from Favorite model (only IDs, no details)
+            const favorites = await Favorite.find({ user: userId }).select('event -_id').lean();
+            const favoriteEventIds = favorites
+                .map(fav => fav.event)
+                .filter(id => id != null) // Filter out null/undefined
+                .map(id => String(id)); // Convert ObjectId to string
+            
+            // ===== QDRANT-BASED RECOMMENDATIONS =====
+            let qdrantRecommendations = [];
+            let qdrantLog = null;
+            
+            try {
+                const { getEventEmbeddings, searchSimilarEvents, generateEmbedding, prepareEventText, storeEventEmbedding } = require('../utils/embeddings');
+                
+                // Get embeddings for registered events and favorites
+                const sourceEventIds = [...registeredEventIds, ...favoriteEventIds];
+                console.log(`🔍 Qdrant: Searching with ${sourceEventIds.length} source events (${registeredEventIds.length} registered, ${favoriteEventIds.length} favorites)`);
+                
+                let sourceEmbeddings = await getEventEmbeddings(sourceEventIds);
+                console.log(`📊 Qdrant: Retrieved ${sourceEmbeddings.length} embeddings from Qdrant for source events`);
+                
+                // If some events don't have embeddings, generate them on-the-fly
+                if (sourceEmbeddings.length < sourceEventIds.length) {
+                    const foundEventIds = new Set(sourceEmbeddings.map(e => e.eventId.toString()));
+                    const missingEventIds = sourceEventIds.filter(id => !foundEventIds.has(id.toString()));
+                    
+                    console.log(`🔄 Qdrant: Generating embeddings for ${missingEventIds.length} missing events on-the-fly...`);
+                    
+                    // Fetch event data from MongoDB for missing events
+                    const missingEvents = await Event.find({
+                        _id: { $in: missingEventIds }
+                    }).select('title description tags type location startDate').lean();
+                    
+                    // Generate embeddings for missing events
+                    const generatedEmbeddings = [];
+                    for (const event of missingEvents) {
+                        try {
+                            const eventId = event._id.toString();
+                            const text = prepareEventText(event);
+                            
+                            if (text.trim()) {
+                                const embedding = await generateEmbedding(text);
+                                if (embedding) {
+                                    // Store in Qdrant for future use
+                                    const payload = {
+                                        title: event.title || '',
+                                        description: event.description || '',
+                                        tags: event.tags || [],
+                                        type: event.type || '',
+                                        location: event.location || '',
+                                        startDate: event.startDate ? new Date(event.startDate).toISOString() : null,
+                                    };
+                                    
+                                    await storeEventEmbedding(eventId, embedding, payload);
+                                    
+                                    generatedEmbeddings.push({
+                                        eventId: eventId,
+                                        embedding: embedding,
+                                        payload: payload
+                                    });
+                                    
+                                    console.log(`✅ Generated and stored embedding for event: ${eventId}`);
+                                }
+                            }
+                        } catch (genErr) {
+                            console.error(`❌ Error generating embedding for event ${event._id}:`, genErr.message);
+                        }
+                    }
+                    
+                    // Combine retrieved and generated embeddings
+                    sourceEmbeddings = [...sourceEmbeddings, ...generatedEmbeddings];
+                    console.log(`📊 Qdrant: Total embeddings available: ${sourceEmbeddings.length} (${sourceEmbeddings.length - generatedEmbeddings.length} from Qdrant, ${generatedEmbeddings.length} generated)`);
+                }
+                
+                if (sourceEmbeddings.length > 0) {
+                    // Extract embedding vectors
+                    const queryEmbeddings = sourceEmbeddings.map(item => item.embedding);
+                    
+                    // Search for similar events (exclude already registered/favorited events)
+                    const excludeSet = new Set([...registeredEventIds, ...favoriteEventIds]);
+                    const qdrantResults = await searchSimilarEvents(queryEmbeddings, 20, excludeSet);
+                    
+                    // Get event IDs from Qdrant results
+                    const recommendedEventIds = qdrantResults.map(result => result.eventId);
+                    
+                    // Fetch event details to check start dates and filter out past events
+                    const recommendedEvents = await Event.find({ 
+                        _id: { $in: recommendedEventIds } 
+                    }).select('_id startDate').lean();
+                    
+                    const now = new Date();
+                    // Filter out events user has already registered for AND past events
+                    const filteredRecommendations = recommendedEvents
+                        .filter(event => {
+                            const eventIdStr = event._id.toString();
+                            // Exclude if user already registered
+                            if (registeredEventIdsSet.has(eventIdStr)) return false;
+                            // Exclude if event has already started
+                            if (event.startDate && new Date(event.startDate) <= now) return false;
+                            return true;
+                        })
+                        .map(event => event._id.toString());
+                    
+                    qdrantRecommendations = filteredRecommendations;
+                    
+                    qdrantLog = {
+                        sourceEventsCount: sourceEventIds.length,
+                        embeddingsRetrieved: sourceEmbeddings.length,
+                        recommendationsFound: qdrantResults.length,
+                        recommendations: qdrantResults.map(r => ({
+                            eventId: r.eventId,
+                            score: r.score,
+                            title: r.payload?.title || 'N/A'
+                        })),
+                        recommendedEventIds: qdrantRecommendations,
+                        filteredCount: filteredRecommendations.length
+                    };
+                    
+                    console.log('✅ Qdrant Recommendations:', JSON.stringify(qdrantLog, null, 2));
+                    
+                    // Store Qdrant recommendations in database for caching
+                    await Recommendation.findOneAndUpdate(
+                        { user: userId },
+                        {
+                            user: userId,
+                            eventIds: filteredRecommendations.map(id => new ObjectId(id)),
+                            qdrantLog: qdrantLog // Store Qdrant log for debugging
+                        },
+                        { upsert: true, new: true }
+                    );
+                } else {
+                    console.log('⚠️  Qdrant: No embeddings available for source events, skipping Qdrant search');
+                    qdrantLog = {
+                        sourceEventsCount: sourceEventIds.length,
+                        embeddingsRetrieved: 0,
+                        message: 'No embeddings available for source events (generation may have failed)'
+                    };
+                }
+            } catch (qdrantErr) {
+                console.error('❌ Qdrant recommendation error:', qdrantErr.message);
+                qdrantLog = {
+                    error: qdrantErr.message,
+                    stack: qdrantErr.stack
+                };
+                
+                // Try to return cached recommendation even if Qdrant fails
+                try {
+                    const oldRecommendation = await Recommendation.findOne({ user: userId });
+                    if (oldRecommendation && oldRecommendation.eventIds && oldRecommendation.eventIds.length > 0) {
+                        // Fetch event details to check start dates
+                        const events = await Event.find({ 
+                            _id: { $in: oldRecommendation.eventIds } 
+                        }).select('_id startDate').lean();
+                        
+                        const now = new Date();
+                        // Filter out events user has already registered for AND past events
+                        const filteredRecommendations = events
+                            .filter(event => {
+                                const eventIdStr = event._id.toString();
+                                // Exclude if user already registered
+                                if (registeredEventIdsSet.has(eventIdStr)) return false;
+                                // Exclude if event has already started
+                                if (event.startDate && new Date(event.startDate) <= now) return false;
+                                return true;
+                            })
+                            .map(event => event._id.toString());
+                        
+                        return res.status(200).json({
+                            success: true,
+                            recommendations: filteredRecommendations,
+                            cached: true,
+                            message: 'Using cached recommendations (Qdrant service unavailable)',
+                            qdrantLog: qdrantLog
+                        });
+                    }
+                } catch (cacheErr) {
+                    console.error('Error fetching cached recommendations:', cacheErr);
+                }
+                
+                return res.status(500).json({
+                    success: false,
+                    message: 'Failed to get recommendations from vector database',
+                    error: qdrantErr.message,
+                    qdrantLog: qdrantLog
+                });
+            }
+
+            // Return Qdrant recommendations
+            return res.status(200).json({
+                success: true,
+                recommendations: qdrantRecommendations,
+                cached: false,
+                qdrantLog: qdrantLog
+            });
+        } catch (err) {
+            console.error('❌ Event recommendation error:', err.message);
+            return res.status(500).json({
+                success: false,
+                message: err.message || 'Failed to get recommendations'
+            });
+        }
+    },
     async getMyCreatedEvents(req, res) {
         try {
             const userId = req.user._id;
@@ -1807,6 +2154,111 @@ module.exports = {
         } catch (error) {
             console.error('generateVendorAttendeePasses error:', error);
             res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
+        }
+    },
+
+    async createLinkedInPost(req, res) {
+        try {
+            const { id } = req.params;
+            
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: 'Invalid event id' });
+            }
+
+            // Get event details
+            const event = await Event.findById(id).lean();
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
+
+            // Call n8n webhook to handle LinkedIn posting
+            const webhookUrl = process.env.N8N_WEBHOOK_URL || 'http://n8n:5678';
+            const n8nWebhookPath = '/webhook/post';
+            const fullWebhookUrl = `${webhookUrl}${n8nWebhookPath}`;
+            
+            // Construct event detail page URL
+            const frontendUrl = process.env.FRONTEND_URL 
+                ? process.env.FRONTEND_URL.replace(/\/$/, '')
+                : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
+            const eventUrl = `${frontendUrl}/events/${id}`;
+            
+            console.log(`📝 Calling n8n webhook to create LinkedIn post for event: ${id}`);
+            console.log(`🔗 Webhook URL: ${fullWebhookUrl}`);
+            console.log(`📋 Webhook Path: ${n8nWebhookPath}`);
+            console.log(`🔗 Event URL: ${eventUrl}`);
+            
+            try {
+                const payload = {
+                    eventId: id,
+                    title: event.title,
+                    description: event.description || event.shortDescription || '',
+                    type: event.type,
+                    location: event.location,
+                    startDate: event.startDate,
+                    endDate: event.endDate,
+                    tags: event.tags || [],
+                    price: event.price || 0,
+                    capacity: event.capacity || 0,
+                    registeredCount: event.registeredUsers?.length || 0,
+                    eventUrl: eventUrl
+                };
+
+                console.log(`📤 Sending payload to n8n:`, JSON.stringify(payload, null, 2));
+
+                const n8nResponse = await axios.post(
+                    fullWebhookUrl,
+                    payload,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        timeout: 30000
+                    }
+                );
+
+                console.log('✅ n8n webhook response:', n8nResponse.data);
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'LinkedIn post request sent to n8n successfully',
+                    response: n8nResponse.data
+                });
+
+            } catch (n8nErr) {
+                const errorDetails = {
+                    message: n8nErr.message,
+                    status: n8nErr.response?.status,
+                    statusText: n8nErr.response?.statusText,
+                    data: n8nErr.response?.data,
+                    url: fullWebhookUrl,
+                    code: n8nErr.code
+                };
+
+                console.error('❌ n8n webhook error:', JSON.stringify(errorDetails, null, 2));
+                
+                // Provide more helpful error messages
+                let errorMessage = 'Failed to create LinkedIn post via n8n';
+                if (n8nErr.response?.status === 404) {
+                    errorMessage = `Webhook not found (404). Please check:\n- Webhook URL: ${fullWebhookUrl}\n- Ensure the webhook path exists in n8n\n- Verify N8N_WEBHOOK_URL and N8N_LINKEDIN_WEBHOOK_PATH environment variables`;
+                } else if (n8nErr.code === 'ECONNREFUSED') {
+                    errorMessage = `Cannot connect to n8n. Please check:\n- n8n is running\n- Webhook URL: ${fullWebhookUrl}\n- Network connectivity`;
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    message: errorMessage,
+                    error: errorDetails
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ createLinkedInPost error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to create LinkedIn post',
+                error: error.message
+            });
         }
     },
     // POST /events/:id/accommodations
