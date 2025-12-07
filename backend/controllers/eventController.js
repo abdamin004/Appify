@@ -119,7 +119,7 @@ function parseAllowedRoles(input) {
     }
 
     return normalized;
-} 
+}
 // Check if a given event date range falls inside any active blackout date
 async function checkBlackoutForEventRange(startDate, endDate) {
     if (!startDate) {
@@ -209,7 +209,7 @@ module.exports = {
             if (blackout) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Cannot create event during a system-wide blackout period.',
+                    message: `Cannot create event during blackout period: ${blackout.name}`,
                     blackout: {
                         id: blackout._id,
                         name: blackout.name,
@@ -801,7 +801,7 @@ module.exports = {
             if (blackoutUpdate) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Cannot move or update this event into a system-wide blackout period.',
+                    message: `Cannot move or update this event into system-wide blackout period: ${blackoutUpdate.name}`,
                     blackout: {
                         id: blackoutUpdate._id,
                         name: blackoutUpdate.name,
@@ -1277,10 +1277,10 @@ module.exports = {
 
             const now = new Date();
 
-            if (!event.endDate || new Date(event.endDate) > now) {
+            if (event.startDate && new Date(event.startDate) > now) {
                 return res.status(400).json({
                     success: false,
-                    message: 'You can only rate this event after it has ended.'
+                    message: 'You can only rate this event after it has started.'
                 });
             }
 
@@ -1756,10 +1756,19 @@ module.exports = {
                 (u) => u && u._id && u._id.toString() === userId.toString()
             );
 
-            if (!hasAttended) {
+            // Allow access if user is attendee, OR if user has role Admin/EventOffice/Professor
+            // OR if user is simply registered (since attendance is self-marked on frontend currently)
+            const userRole = req.user.role;
+            const isStaff = ['Admin', 'EventOffice', 'Professor'].includes(userRole);
+
+            const isRegistered = workshop.registeredUsers && workshop.registeredUsers.some(
+                (u) => (u._id || u).toString() === userId.toString()
+            );
+
+            if (!hasAttended && !isStaff && !isRegistered) {
                 return res.status(403).json({
                     success: false,
-                    message: 'Only participants who attended this workshop can access its resources'
+                    message: 'Only registered participants who attended this workshop can access its resources'
                 });
             }
 
@@ -1775,8 +1784,50 @@ module.exports = {
                 error: err.message
             });
         }
-    }
+    },
 
 
+
+    // POST /events/:id/accommodations
+    async requestDisabilityAccommodation(req, res) {
+        try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+            const { needsWheelchairAccess, needsSpecialSeating, otherRequests } = req.body;
+
+            // Verify event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({ success: false, message: 'Event not found' });
+            }
+
+            // Upsert the accommodation request
+            // If one exists for this user+event, update it. Otherwise create new.
+            const request = await AccommodationRequest.findOneAndUpdate(
+                { user: userId, event: eventId },
+                {
+                    roleAtEvent: req.user.role,
+                    needsWheelchairAccess: !!needsWheelchairAccess,
+                    needsSpecialSeating: !!needsSpecialSeating,
+                    otherRequests: otherRequests || '',
+                    status: 'approved'
+                },
+                { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: 'Accommodation request updated successfully',
+                data: request
+            });
+
+        } catch (err) {
+            console.error('Error requesting accommodation:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to save accommodation request'
+            });
+        }
+    },
 
 };

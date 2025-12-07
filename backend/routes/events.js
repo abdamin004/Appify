@@ -6,7 +6,7 @@ const uploadWorkshopResources = require('../middleware/workshopResourcesUpload')
 const router = express.Router();
 
 // Create event
-router.post('/create', auth, roleCheck('Admin', 'EventOffice' , 'Professor'), eventController.createEvent);
+router.post('/create', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.createEvent);
 
 // Update event
 router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.updateEvent);
@@ -29,10 +29,18 @@ router.get('/workshops/registrations', auth, roleCheck('Professor'), eventContro
 
 // Professor uploads workshop resources (PDFs, slides, materials)
 // Form-data field for files: "files"
-router.post('/workshops/:id/resources',auth,roleCheck('Professor'),uploadWorkshopResources,eventController.uploadWorkshopResources);
+router.post('/workshops/:id/resources', auth, roleCheck('Professor'), (req, res, next) => {
+  uploadWorkshopResources(req, res, (err) => {
+    if (err) {
+      // Multer error or file type error
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+}, eventController.uploadWorkshopResources);
 
 // Participants who attended can access workshop resources
-router.get('/workshops/:id/resources',auth,roleCheck('Student', 'Staff', 'TA', 'Professor'),eventController.getWorkshopResources);
+router.get('/workshops/:id/resources', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getWorkshopResources);
 
 // Comment routes
 router.post('/comment/:eventId', auth, eventController.addComment);
@@ -79,15 +87,15 @@ router.post(
 // Get single event by ID (must be before /:id/comments and /:id/ratings)
 router.get('/:id', eventController.getEventById);
 
-router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventComments);
+router.get('/:id/comments', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.getEventComments);
 // View all ratings on an event
-router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
+router.get('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.getEventRatings);
 
 // Add a rating on an event (ONLY after event has ended)
 router.post('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.addEventRating);
 
 // Request disability accommodations for an event
-router.post('/:id/accommodations',auth,roleCheck('Student', 'Staff', 'TA', 'Professor'),eventController.requestDisabilityAccommodation);
+router.post('/:id/accommodations', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.requestDisabilityAccommodation);
 
 
 // Add event to favorites

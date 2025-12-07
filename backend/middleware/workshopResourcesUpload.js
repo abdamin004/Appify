@@ -30,13 +30,18 @@ function fileFilter(req, file, cb) {
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.oasis.opendocument.text',
-        'application/vnd.oasis.opendocument.presentation'
+        'application/vnd.oasis.opendocument.presentation',
+        'text/plain',
+        'image/jpeg',
+        'image/png',
+        'application/zip',
+        'application/x-zip-compressed'
     ];
 
     if (allowed.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Only document files (PDF, PowerPoint, Word, ODF) are allowed for workshop resources'));
+        cb(new Error(`File type ${file.mimetype} is not allowed. Only PDF, PowerPoint, Word, and ODF documents are accepted.`));
     }
 }
 

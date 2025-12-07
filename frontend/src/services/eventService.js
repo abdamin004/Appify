@@ -95,6 +95,11 @@ export function createConference(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Conference', createdBy: currentUserId() });
 }
 
+// Request disability accommodations for an event
+export function requestDisabilityAccommodation(eventId, payload) {
+  return http('POST', `${API_BASE}/events/${eventId}/accommodations`, payload);
+}
+
 // Update any event by id
 export function updateEvent(id, payload) {
   return http('PUT', `${API_BASE}/events/update/${id}`, payload);
@@ -144,8 +149,8 @@ export function publicRegisterForEvent(eventId, payload) {
 }
 
 // Authenticated registration (adds to registeredUsers/user.registeredEvents)
-export function registerForEvent(eventId) {
-  return http('POST', `${API_BASE}/events/register/${eventId}`);
+export function registerForEvent(eventId, payload) {
+  return http('POST', `${API_BASE}/events/register/${eventId}`, payload);
 }
 
 // Gym sessions
@@ -326,6 +331,29 @@ export function rejectWorkshop(workshopId) {
   return http('PUT', `${API_BASE}/events/workshops/${workshopId}/review`, { action: 'reject' });
 }
 
+// Workshop Resources
+export function uploadWorkshopResource(workshopId, formData) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  // Note: We do NOT set Content-Type header manually for FormData, fetch does it automatically with boundary
+  return fetch(`${API_BASE}/events/workshops/${workshopId}/resources`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData
+  }).then(async res => {
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `Upload failed (${res.status})`);
+    }
+    return res.json();
+  });
+}
+
+export function getWorkshopResources(workshopId) {
+  return http('GET', `${API_BASE}/events/workshops/${workshopId}/resources`);
+}
+
 // Archive event (mark as completed)
 export function archiveEvent(eventId) {
   return updateEvent(eventId, { status: 'completed' });
@@ -377,7 +405,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
       const adminService = await import('./adminService');
       const professors = await adminService.listAllUsers('Professor');
       const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-      
+
       // Create notification for each professor
       professorList.forEach(professor => {
         const professorId = String(professor._id || professor.id);

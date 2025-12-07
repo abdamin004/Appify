@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations } from '../services/eventService';
+import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations, getWorkshopResources } from '../services/eventService';
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
 import { showToast, confirmDialog } from '../utils/toast';
 import { FaStar } from 'react-icons/fa';
@@ -221,27 +221,24 @@ export default function EventDetails() {
     }
   }
 
+  const [workshopResources, setWorkshopResources] = useState([]);
+
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
-        // Always try to load event (no auth required)
         const e = await getEventById(id);
         setEvent(e);
 
-        // Only load comments/ratings if user is logged in (they require auth)
         if (tokenPresent) {
           try {
             const [cs, rs] = await Promise.all([
               getEventComments(id),
               getEventRatings(id)
             ]);
-            // getEventComments now returns array directly (handles backend format)
             setComments(Array.isArray(cs) ? cs : []);
-            // getEventRatings now returns { average, count, ratings, histogram } format
             setRatings(rs && typeof rs === 'object' ? rs : { average: 0, count: 0, ratings: [], histogram: {} });
 
-            // Check if user has already rated this event
             if (rs && Array.isArray(rs.ratings) && currentUserId) {
               const userRatingObj = rs.ratings.find(r => String(r.user?._id || r.user?.id || r.user) === String(currentUserId));
               if (userRatingObj) {
@@ -249,13 +246,11 @@ export default function EventDetails() {
               }
             }
           } catch (err) {
-            // If comments/ratings fail, just set empty arrays (user might not be logged in or not have permission)
             console.warn('Failed to load comments/ratings:', err);
             setComments([]);
             setRatings({ average: 0, count: 0, ratings: [], histogram: {} });
           }
         } else {
-          // User not logged in, set empty comments/ratings
           setComments([]);
           setRatings({ average: 0, count: 0, ratings: [], histogram: {} });
         }
@@ -264,11 +259,32 @@ export default function EventDetails() {
       } finally { setLoading(false); }
     }
     load();
+  }, [id, currentUserId, tokenPresent]);
+
+  // Separate effect for local attendance state to ensure it runs reliably
+  useEffect(() => {
     try {
       const ids = getAttendedIds().map(String);
-      if (ids.includes(String(id))) setAttended(true);
-    } catch (_) { }
-  }, [id, currentUserId, tokenPresent]);
+      setAttended(ids.includes(String(id)));
+    } catch (_) {
+      setAttended(false);
+    }
+  }, [id, currentUserId]); // Re-run if user or event changes
+
+  // Fetch workshop resources if attended OR registered (backend allows both)
+  useEffect(() => {
+    // Calculate isRegistered here or use the variable if available in scope (it's defined below, so we need to be careful with closure or order)
+    // We can rely on 'event' which is a dependency.
+    const userIsRegistered = event?.registeredUsers?.some(u =>
+      String(u._id || u.id || u) === String(currentUserId)
+    );
+
+    if (event?.type === 'Workshop' && (attended || userIsRegistered)) {
+      getWorkshopResources(id)
+        .then(res => setWorkshopResources(Array.isArray(res) ? res : []))
+        .catch(err => console.error('Failed to load workshop resources', err));
+    }
+  }, [event, attended, id, currentUserId]);
 
   // Check if user is registered - handle both populated objects and IDs
   const isRegistered = (() => {
@@ -282,7 +298,14 @@ export default function EventDetails() {
     });
   })();
 
-  async function handleRegister() {
+  const [showAccommodationModal, setShowAccommodationModal] = useState(false);
+  const [accommodationForm, setAccommodationForm] = useState({
+    needsWheelchairAccess: false,
+    needsSpecialSeating: false,
+    otherRequests: ''
+  });
+
+  function handleRegister() {
     if (!tokenPresent) {
       showToast.warning('Please log in to register for events');
       return;
@@ -293,15 +316,30 @@ export default function EventDetails() {
       return;
     }
 
+    // specific roles check? backend handles it, but we can just show modal
+    setShowAccommodationModal(true);
+  }
+
+  async function confirmRegistration() {
     setRegistering(true);
     try {
-      await registerForEvent(id);
-      showToast.success('Successfully registered for the event!');
+      if (isRegistered) {
+        // User is already registered, so this is an update to accommodations
+        // Dynamic import or assume it's imported (need to check imports)
+        const { requestDisabilityAccommodation } = await import('../services/eventService');
+        await requestDisabilityAccommodation(id, accommodationForm);
+        showToast.success('Accommodation request updated successfully!');
+      } else {
+        // New registration
+        await registerForEvent(id, accommodationForm);
+        showToast.success('Successfully registered for the event!');
+      }
+      setShowAccommodationModal(false);
       // Reload event data to update registration status
       const updatedEvent = await getEventById(id);
       setEvent(updatedEvent);
     } catch (err) {
-      showToast.error(err.message || 'Failed to register for event');
+      showToast.error(err.message || 'Failed to submit request');
     } finally {
       setRegistering(false);
     }
@@ -553,12 +591,33 @@ export default function EventDetails() {
                       (!event.capacity || (event.registeredUsers?.length || 0) < event.capacity) && (
                         <>
                           {isRegistered ? (
-                            <button
-                              disabled
-                              className="btn btn-success btn-sm text-white gap-2 opacity-70"
-                            >
-                              ✓ Registered
-                            </button>
+                            <>
+                              <button
+                                disabled
+                                className="btn btn-success btn-sm text-white gap-2 opacity-70"
+                              >
+                                ✓ Registered
+                              </button>
+
+                              {/* Mark Attended Button - Only if started */}
+                              {(event.startDate && new Date(event.startDate) <= new Date()) && (
+                                <button
+                                  onClick={toggleAttendedHere}
+                                  className={`btn btn-sm gap-2 ${attended
+                                    ? 'btn-accent text-white'
+                                    : 'btn-outline btn-accent'}`}
+                                >
+                                  {attended ? '✓ Attended' : '👁 Mark Attended'}
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => setShowAccommodationModal(true)}
+                                className="btn btn-outline btn-sm text-primary gap-2 hover:bg-primary hover:text-white"
+                              >
+                                ♿ Accommodations
+                              </button>
+                            </>
                           ) : (
                             <button
                               onClick={handleRegister}
@@ -652,6 +711,46 @@ export default function EventDetails() {
                     </div>
                   </div>
                 )}
+
+                {/* Workshop Resources (Only for Attendees or Registered Users) */}
+                {event.type === 'Workshop' && (attended || isRegistered) && (
+                  <div className="mb-8">
+                    <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <span>📚</span> Workshop Resources
+                    </h3>
+                    {workshopResources.length > 0 ? (
+                      <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
+                        <p className="text-emerald-800 mb-4 font-medium">
+                          Since you attended this workshop, you have access to the following resources:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {workshopResources.map((res, idx) => (
+                            <a
+                              key={idx}
+                              href={res.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-emerald-200 hover:shadow-md hover:border-emerald-300 transition-all group"
+                            >
+                              <div className="text-2xl group-hover:scale-110 transition-transform">📄</div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-slate-800 truncate group-hover:text-emerald-700">{res.name}</div>
+                                <div className="text-xs text-slate-500">Click to download</div>
+                              </div>
+                              <div className="text-emerald-500">⬇️</div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 p-8 rounded-xl border border-slate-100 text-center">
+                        <div className="text-4xl mb-3">📂</div>
+                        <h4 className="text-slate-700 font-bold mb-1">No Resources Available</h4>
+                        <p className="text-slate-500 text-sm">The professor hasn't uploaded any resources for this workshop yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -712,8 +811,8 @@ export default function EventDetails() {
                             <FaStar
                               size={28}
                               className={`transition-colors ${star <= (ratingHover || userRating)
-                                  ? "text-amber-400"
-                                  : "text-slate-200"
+                                ? "text-amber-400"
+                                : "text-slate-200"
                                 }`}
                             />
                           </button>
@@ -785,6 +884,65 @@ export default function EventDetails() {
                       ))
                     )}
                   </div>
+
+                  {/* Accommodation Modal */}
+                  {showAccommodationModal && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+                        <h3 className="text-xl font-bold text-slate-800 mb-4">Registration Details</h3>
+                        <p className="text-slate-600 mb-4">Do you require any disability accommodations for this event?</p>
+
+                        <div className="space-y-4 mb-6">
+                          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-primary"
+                              checked={accommodationForm.needsWheelchairAccess}
+                              onChange={e => setAccommodationForm({ ...accommodationForm, needsWheelchairAccess: e.target.checked })}
+                            />
+                            <span className="font-medium text-slate-700">Wheelchair Access</span>
+                          </label>
+
+                          <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-primary"
+                              checked={accommodationForm.needsSpecialSeating}
+                              onChange={e => setAccommodationForm({ ...accommodationForm, needsSpecialSeating: e.target.checked })}
+                            />
+                            <span className="font-medium text-slate-700">Special Seating</span>
+                          </label>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Other Requests (Optional)</label>
+                            <textarea
+                              className="textarea textarea-bordered w-full"
+                              placeholder="Any other specific needs..."
+                              value={accommodationForm.otherRequests}
+                              onChange={e => setAccommodationForm({ ...accommodationForm, otherRequests: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                          <button
+                            className="btn btn-ghost"
+                            onClick={() => setShowAccommodationModal(false)}
+                            disabled={registering}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className={`btn btn-primary text-white ${registering ? 'loading' : ''}`}
+                            onClick={confirmRegistration}
+                            disabled={registering}
+                          >
+                            {registering ? 'Registering...' : 'Confirm Registration'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Add Comment Form */}
                   {tokenPresent && isRegistered ? (
