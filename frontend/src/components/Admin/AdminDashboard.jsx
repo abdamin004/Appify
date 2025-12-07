@@ -13,6 +13,7 @@ import ViewEvents from './ViewEvents';
 import VendorDocuments from './VendorDocuments';
 import AttendeesReport from './AttendeesReport';
 import SalesReport from './SalesReport';
+import BlackoutDatesManagement from './BlackoutDatesManagement';
 
 export default function AdminDashboard() {
   // Default to 'events' as requested by user ("show the first tab (browse events for example)")
@@ -46,6 +47,7 @@ export default function AdminDashboard() {
     { key: 'vendor-docs', label: 'Vendor Documents', icon: '📄' },
     { key: 'attendees', label: 'Attendees Report', icon: '📊' },
     { key: 'sales', label: 'Financial Reports', icon: '💰' },
+    { key: 'blackout', label: 'Blackout Dates', icon: '🛑' },
     { key: 'loyalty', label: 'Loyalty Partners', icon: '🤝' },
   ];
 
@@ -71,6 +73,8 @@ export default function AdminDashboard() {
         return <AttendeesReport />;
       case 'sales':
         return <SalesReport />;
+      case 'blackout':
+        return <BlackoutDatesManagement />;
       case 'loyalty':
         return <LoyaltyPartnersList />;
       default:

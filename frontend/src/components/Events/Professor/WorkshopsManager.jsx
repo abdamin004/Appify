@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
-import { createWorkshop, listWorkshopsByProfessor, updateEvent, getEventById } from '../../../services/eventService';
+import { createWorkshop, listWorkshopsByProfessor, updateEvent, getEventById, uploadWorkshopResource, getWorkshopResources } from '../../../services/eventService';
 import { createEventOfficeNotification } from '../../../services/notificationService';
 import { showToast } from '../../../utils/toast';
 import Input from '../../UI/Input';
@@ -54,6 +54,11 @@ function WorkshopsManager({ editOnly = false }) {
   const [editing, setEditing] = useState(null);
   const [editData, setEditData] = useState({});
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
+  const [resources, setResources] = useState([]);
+  const [uploadingResource, setUploadingResource] = useState(false);
+  const [filesToUpload, setFilesToUpload] = useState([]); // For create mode
+
+  console.log('RENDER: Current filesToUpload:', filesToUpload);
 
   const refresh = useCallback(async () => {
     if (!professorFilter) { setWorkshops([]); return; }
@@ -75,7 +80,14 @@ function WorkshopsManager({ editOnly = false }) {
   const loadWorkshopForEdit = async (id) => {
     setLoadingWorkshop(true);
     try {
-      const workshop = await getEventById(id);
+      const [workshop, resourceList] = await Promise.all([
+        getEventById(id),
+        getWorkshopResources(id).catch((err) => {
+          console.warn('Failed to fetch resources:', err);
+          return [];
+        })
+      ]);
+
       if (workshop) {
         // Pre-fill the form with workshop data
         setForm({
@@ -115,6 +127,8 @@ function WorkshopsManager({ editOnly = false }) {
             ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' }))
             : [{ name: '', department: '' }],
         });
+        setResources(Array.isArray(resourceList) ? resourceList : []);
+
         showToast.success('Workshop loaded for editing');
         // Remove edit parameter from URL only if not in edit-only mode
         if (!editOnly) {
@@ -172,6 +186,11 @@ function WorkshopsManager({ editOnly = false }) {
         createdBy,
       };
       const createdWorkshop = await createWorkshop(payload);
+      const newWorkshopId = createdWorkshop.event?._id || createdWorkshop.event?.id || createdWorkshop._id || createdWorkshop.id;
+
+      if (filesToUpload.length > 0) {
+        await handleUploadsForNewWorkshop(newWorkshopId, filesToUpload);
+      }
 
       // Create notification for Events Office
       createEventOfficeNotification({
@@ -195,6 +214,33 @@ function WorkshopsManager({ editOnly = false }) {
       showToast.error(err.message || 'Failed to create workshop');
     }
     finally { setLoading(false); }
+  };
+
+  // Helper to handle uploads after creation
+  const handleUploadsForNewWorkshop = async (workshopId, files) => {
+    if (!files || files.length === 0) return;
+
+    // Upload files one by one or all at once? Backend supports array 'files'
+    // Let's send them all in one request if backend supports it, or iterate
+    // Current backend implementation expects 'files' field.
+    try {
+      setUploadingResource(true);
+      const formData = new FormData();
+      // Append all selected files
+      Array.from(files).forEach(fileObj => {
+        // Handle both raw File objects (legacy/fallback) and wrapped objects
+        const actualFile = fileObj.file || fileObj;
+        formData.append('files', actualFile);
+      });
+
+      await uploadWorkshopResource(workshopId, formData);
+      showToast.success('Workshop resources uploaded successfully');
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast.error('Workshop created, but failed to upload resources: ' + err.message);
+    } finally {
+      setUploadingResource(false);
+    }
   };
 
   // Remove edit requests from description
@@ -231,7 +277,17 @@ function WorkshopsManager({ editOnly = false }) {
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
       };
       await updateEvent(id, payload);
-      showToast.success('Workshop updated successfully! Edit requests have been removed.');
+
+      // Handle pending uploads during save
+      if (filesToUpload.length > 0) {
+        await handleUploadsForNewWorkshop(id, filesToUpload);
+        // We need to refresh the resources list after upload
+        const newRes = await getWorkshopResources(id).catch(() => []);
+        setResources(newRes);
+        setFilesToUpload([]); // Clear queue
+      }
+
+      showToast.success('Workshop updated successfully!');
       setEditing(null);
       setEditData({});
       // Reset form
@@ -375,6 +431,84 @@ function WorkshopsManager({ editOnly = false }) {
             </div>
 
             <div className="border-t border-slate-200 pt-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Workshop Resources</h3>
+
+              {/* Resource List */}
+              {resources.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  {resources.map((res, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="text-2xl">📄</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium text-slate-700 truncate">{res.name}</span>
+                          <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">View File</a>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 mb-4 italic">No resources uploaded yet.</p>
+              )}
+
+              {/* Upload Button */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  id="resource-upload"
+                  className="hidden"
+                  multiple
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    console.log('Edit Mode: File selection:', files);
+                    if (files && files.length > 0) {
+                      const newFiles = Array.from(files).map(f => ({
+                        name: f.name,
+                        size: f.size,
+                        type: f.type,
+                        file: f
+                      }));
+                      console.log('Edit Mode: Adding mapped files', newFiles.length);
+                      setFilesToUpload(prev => [...prev, ...newFiles]);
+                    }
+                    e.target.value = ''; // Reset input to allow re-selecting same files
+                  }}
+                />
+                <label
+                  htmlFor="resource-upload"
+                  className="btn btn-sm btn-outline gap-2"
+                >
+                  📤 Select New Resources
+                </label>
+                {filesToUpload.length > 0 && (
+                  <span className="text-sm text-emerald-600 ml-2">
+                    {filesToUpload.length} file(s) pending save
+                  </span>
+                )}
+              </div>
+
+              {/* Preview of Pending Uploads */}
+              {filesToUpload.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <h4 className="text-sm font-semibold text-slate-700">Pending Uploads:</h4>
+                  {filesToUpload.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 text-emerald-800 rounded text-sm border border-emerald-100">
+                      <span>{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFilesToUpload(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 pt-6">
               <h3 className="text-lg font-bold text-slate-800 mb-4">Professor(s) Participating</h3>
 
               {(editData.professors || []).map((p, idx) => (
@@ -448,7 +582,7 @@ function WorkshopsManager({ editOnly = false }) {
           </div>
         )}
       </FormLayout>
-    );
+    )
   }
 
   return (
@@ -567,6 +701,58 @@ function WorkshopsManager({ editOnly = false }) {
         </div>
 
         <div className="border-t border-slate-200 pt-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Workshop Resources</h3>
+
+          <div className="mb-4">
+            <p className="text-sm text-slate-600 mb-2">Upload resources now (optional) or later via Edit.</p>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                id="create-resource-upload"
+                className="hidden"
+                multiple
+                onChange={(e) => {
+                  const files = e.target.files;
+                  console.log('Create Mode: File selection:', files);
+                  if (files && files.length > 0) {
+                    const newFiles = Array.from(files).map(f => ({
+                      name: f.name,
+                      size: f.size,
+                      type: f.type,
+                      file: f
+                    }));
+                    console.log('Create Mode: Adding mapped files', newFiles.length);
+                    setFilesToUpload(prev => [...prev, ...newFiles]);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <label htmlFor="create-resource-upload" className="btn btn-sm btn-outline gap-2">
+                📤 Select Files
+              </label>
+            </div>
+
+            {/* Pending List for Create Mode */}
+            {filesToUpload.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {filesToUpload.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-emerald-50 text-emerald-800 rounded text-sm border border-emerald-100">
+                    <span>{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFilesToUpload(prev => prev.filter((_, idx) => idx !== i))}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 pt-6">
           <h3 className="text-lg font-bold text-slate-800 mb-4">Professor(s) Participating</h3>
 
           {professorInfo && form.professors?.[0]?.name && (
@@ -635,71 +821,78 @@ function WorkshopsManager({ editOnly = false }) {
         </div>
       </form>
 
-      {!editOnly && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">My Workshops</h2>
+      {
+        !editOnly && (
+          <div className="mt-16 pt-10 border-t border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-800 mb-6">My Workshops</h2>
 
-          <div className="mb-6">
-            <Input
-              placeholder="Filter by professor name..."
-              value={professorFilter}
-              onChange={e => setProfessorFilter(e.target.value)}
-              className="max-w-md"
-            />
-          </div>
+            <div className="mb-6">
+              <Input
+                placeholder="Filter by professor name..."
+                value={professorFilter}
+                onChange={e => setProfessorFilter(e.target.value)}
+                className="max-w-md"
+              />
+            </div>
 
-          <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-            <div className="text-4xl mb-3">🛠️</div>
-            <h3 className="text-lg font-semibold text-slate-700">No Workshops Found</h3>
-            <p className="text-sm mt-1">{professorFilter ? 'Try adjusting your filter.' : 'You haven\'t created any workshops yet.'}</p>
-          </div>
-          ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {workshops.map((w) => (
-              <div
-                key={w._id}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-emerald-500/50 transition-all group"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-bold text-lg text-slate-800 group-hover:text-emerald-600 transition-colors">
-                    {w.title}
-                  </h3>
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${w.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
-                    w.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                    {w.status || 'pending'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-sm text-slate-500 mb-6">
-                  <div className="flex items-center gap-2">
-                    <span>📍</span>
-                    {w.location} • {w.facultyName}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>📅</span>
-                    {new Date(w.startDate).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>⏰</span>
-                    {new Date(w.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {w.endDate ? new Date(w.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                  onClick={() => navigate(`/professor/workshops/edit/${w._id}`)}
-                >
-                  Edit Workshop
-                </Button>
+            {!loading && workshops.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-3">🛠️</div>
+                <h3 className="text-lg font-semibold text-slate-700">No Workshops Found</h3>
+                <p className="text-sm mt-1">{professorFilter ? 'Try adjusting your filter.' : 'You haven\'t created any workshops yet.'}</p>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {workshops.map((w) => (
+                  <div
+                    key={w._id}
+                    className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-emerald-500/50 transition-all group"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-emerald-600 transition-colors">
+                        {w.title}
+                      </h3>
+                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${w.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                        w.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                        {w.status || 'pending'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-500 mb-6">
+                      <div className="flex items-center gap-2">
+                        <span>📍</span>
+                        {w.location} • {w.facultyName}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>📅</span>
+                        {new Date(w.startDate).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>⏰</span>
+                        {new Date(w.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {w.endDate ? new Date(w.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>📄</span>
+                        {(w.resources?.length || 0)} Resource{(w.resources?.length || 0) !== 1 ? 's' : ''} Uploaded
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => navigate(`/professor/workshops/edit/${w._id}`)}
+                    >
+                      Edit Workshop
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          )}
-        </div>
-      )}
-    </FormLayout>
+        )
+      }
+    </FormLayout >
   );
 }
 
