@@ -103,6 +103,13 @@ router.post(
   vendorCtrl.cancelLoyaltyApplication
 );
 
+// List all approved loyalty partners (public endpoint - all authenticated users can view)
+router.get(
+  '/loyalty/partners',
+  auth,
+  vendorCtrl.listLoyaltyPartners
+);
+
 router.post(
   '/vendor-documents/upload',
   auth,

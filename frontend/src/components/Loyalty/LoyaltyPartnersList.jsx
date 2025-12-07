@@ -38,22 +38,48 @@ function LoyaltyPartnersList() {
         },
       });
 
-      // Parse response
-      let data;
-      try {
-        data = await res.json();
-      } catch (parseError) {
-        console.error('Failed to parse JSON response:', parseError);
-        const text = await res.text();
-        console.error('Response text:', text);
-        throw new Error(`Invalid response from server. Status: ${res.status}`);
+      // Check if response is OK first
+      if (!res.ok) {
+        // Try to get error message from response
+        let errorMessage = `HTTP error! status: ${res.status}`;
+        try {
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await res.json();
+            errorMessage = errorData.message || errorData.error || errorData.error?.message || errorMessage;
+          } else {
+            const text = await res.text();
+            console.error('Non-JSON error response:', text.substring(0, 200));
+            if (res.status === 404) {
+              errorMessage = 'Loyalty partners endpoint not found. Please contact support.';
+            } else if (res.status === 401 || res.status === 403) {
+              errorMessage = 'Unauthorized. Please log in again.';
+            } else {
+              errorMessage = `Server error (${res.status}). Please try again later.`;
+            }
+          }
+        } catch (parseErr) {
+          console.error('Failed to parse error response:', parseErr);
+        }
+        throw new Error(errorMessage);
       }
 
-      if (!res.ok) {
-        // Handle backend error response
-        const errorMessage = data.message || data.error || data.error?.message || `HTTP error! status: ${res.status}`;
-        console.error('Backend error response:', { status: res.status, data });
-        throw new Error(errorMessage);
+      // Parse response - read as text first to check content type
+      const contentType = res.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (parseError) {
+          console.error('Failed to parse JSON response:', parseError);
+          throw new Error(`Invalid JSON response from server. Status: ${res.status}`);
+        }
+      } else {
+        // Not JSON - likely HTML error page
+        const text = await res.text();
+        console.error('Received non-JSON response:', text.substring(0, 200));
+        throw new Error(`Server returned invalid response format. Status: ${res.status}`);
       }
 
       // Backend returns: { success: true, count: number, partners: [...] }
