@@ -1,10 +1,57 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { colors, spacing, borderRadius, shadows, typography, transitions } from '../../utils/designSystem';
 import { sendChatMessage } from '../../services/chatService';
 import { showToast } from '../../utils/toast';
 
 const ChatBot = ({ inline = false }) => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(inline); // If inline, start open
+  const [isOnHomeTab, setIsOnHomeTab] = useState(false);
+  
+  // Check if we're on a dashboard route
+  const isDashboardRoute = location.pathname.includes('student-dashboard') || 
+                          location.pathname.includes('staff-dashboard') ||
+                          location.pathname.includes('professor-dashboard') ||
+                          location.pathname.includes('ta-dashboard') ||
+                          location.pathname.includes('eventoffice-dashboard') ||
+                          location.pathname.includes('vendor-dashboard') ||
+                          location.pathname.includes('admin-dashboard') ||
+                          location.pathname.includes('Student-dashboard') ||
+                          location.pathname.includes('StaffDashboard') ||
+                          location.pathname.includes('ProfessorDashboard') ||
+                          location.pathname.includes('TaDashboard') ||
+                          location.pathname.includes('EventOfficeDashboard') ||
+                          location.pathname.includes('VendorDashboard');
+  
+  // Check if we're on the home tab by looking for the inline chat element
+  useEffect(() => {
+    if (isDashboardRoute) {
+      // Check if inline chat is visible (which means we're on home tab)
+      const checkHomeTab = () => {
+        const inlineChat = document.querySelector('[data-inline-chat="true"]');
+        const isHome = inlineChat !== null && inlineChat.offsetParent !== null; // Check if element is visible
+        setIsOnHomeTab(isHome);
+      };
+      
+      // Check immediately
+      checkHomeTab();
+      
+      // Check periodically when on dashboard (when tabs switch, DOM changes)
+      const interval = setInterval(checkHomeTab, 300);
+      
+      return () => {
+        clearInterval(interval);
+      };
+    } else {
+      setIsOnHomeTab(false);
+    }
+  }, [isDashboardRoute, location.pathname]);
+  
+  // Show floating button if:
+  // 1. Not inline mode
+  // 2. On dashboard route BUT not on home tab (or not on dashboard route at all)
+  const shouldShowFloatingButton = !inline && (isDashboardRoute ? !isOnHomeTab : true);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -88,8 +135,8 @@ const ChatBot = ({ inline = false }) => {
 
   return (
     <>
-      {/* Floating Chat Button - Only show if not inline */}
-      {!inline && (
+      {/* Floating Chat Button - Only show if not inline and not on dashboard home */}
+      {shouldShowFloatingButton && (
         <button
           onClick={() => setIsOpen(!isOpen)}
           style={{
@@ -288,6 +335,8 @@ const ChatBot = ({ inline = false }) => {
                   fontSize: typography.fontSize.base,
                   outline: 'none',
                   transition: transitions.fast,
+                  background: colors.white,
+                  color: colors.gray800,
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = colors.accent;
