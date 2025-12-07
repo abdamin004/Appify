@@ -1,16 +1,17 @@
 const Court = require('../models/Court');
 const mongoose = require('mongoose');
+const checkSchedulingConflict = require('../utils/conflictChecker');
 
 // GET /courts - Retrieve all courts
 const getAllCourts = async (req, res) => {
   try {
     const { type, status } = req.query;
     const filter = {};
-    
+
     if (type) filter.type = type;
     if (status) filter.status = status;
     else filter.status = 'available'; // Default to available courts
-    
+
     const courts = await Court.find(filter);
     res.status(200).json({ success: true, count: courts.length, courts });
   } catch (error) {
@@ -22,16 +23,16 @@ const getAllCourts = async (req, res) => {
 const getCourtById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid court ID' });
     }
-    
+
     const court = await Court.findById(id);
     if (!court) {
       return res.status(404).json({ message: 'Court not found' });
     }
-    
+
     res.status(200).json({ success: true, court });
   } catch (error) {
     res.status(500).json({ message: 'Error retrieving court', error: error.message });
@@ -43,58 +44,64 @@ const reserveCourt = async (req, res) => {
   try {
     const { courtId, slotId } = req.body;
     const userId = req.user._id; // From auth middleware
-    
+    const studentName = `${req.user.firstName} ${req.user.lastName}`;
+
     // Validate IDs
     if (!mongoose.Types.ObjectId.isValid(courtId)) {
       return res.status(400).json({ message: 'Invalid court ID' });
     }
-    
+
     // Find the court
     const court = await Court.findById(courtId);
     if (!court) {
       return res.status(404).json({ message: 'Court not found' });
     }
-    
+
     if (court.status !== 'available') {
       return res.status(400).json({ message: `Court is currently ${court.status}` });
     }
-    
+
     // Find the specific slot
     const slot = court.availability.id(slotId);
     if (!slot) {
       return res.status(404).json({ message: 'Time slot not found' });
     }
-    
+
     // Check if slot is already booked
     if (slot.isBooked) {
       return res.status(400).json({ message: 'This time slot is already booked' });
     }
-    
-    // Check if slot is in the past
-    const slotDateTime = new Date(slot.date);
-    const [hours, minutes] = slot.startTime.split(':');
-    slotDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
-    if (slotDateTime < new Date()) {
-      return res.status(400).json({ message: 'Cannot book a time slot in the past' });
-    }
-    
-    // Compose student display name
-    const studentName = [req.user && req.user.firstName, req.user && req.user.lastName]
-      .filter(Boolean)
-      .join(' ') || (req.user && req.user.email) || 'Student';
 
-    // Book the slot
+    // Check for scheduling conflicts
+    const slotDate = new Date(slot.date);
+    const [sH, sM] = slot.startTime.split(':').map(Number);
+    const [eH, eM] = slot.endTime.split(':').map(Number);
+
+    const slotStart = new Date(slotDate);
+    slotStart.setHours(sH, sM, 0, 0);
+
+    const slotEnd = new Date(slotDate);
+    slotEnd.setHours(eH, eM, 0, 0);
+
+    const conflict = await checkSchedulingConflict(userId, slotStart, slotEnd);
+    if (conflict.conflict) {
+      return res.status(409).json({
+        success: false,
+        message: `Scheduling Conflict: You are already busy during this time with "${conflict.title}"`,
+        conflictDetails: conflict
+      });
+    }
+
     slot.isBooked = true;
     slot.bookedBy = userId;
     slot.bookingRef = `BK-${Date.now()}-${userId.toString().slice(-6)}`;
     slot.bookingName = studentName;
-    
+
     await court.save();
-    
-    res.status(200).json({ 
-      success: true, 
-      message: `Court reserved successfully. Reserved by ${studentName}.`, 
+
+    res.status(200).json({
+      success: true,
+      message: `Court reserved successfully. Reserved by ${studentName}.`,
       booking: {
         courtName: court.name,
         courtType: court.type,
@@ -115,14 +122,14 @@ const reserveCourt = async (req, res) => {
 const getMyReservations = async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     // Find all courts with bookings by this user
     const courts = await Court.find({
       'availability.bookedBy': userId
     });
-    
+
     const reservations = [];
-    
+
     courts.forEach(court => {
       court.availability.forEach(slot => {
         if (slot.bookedBy && slot.bookedBy.toString() === userId.toString()) {
@@ -139,14 +146,14 @@ const getMyReservations = async (req, res) => {
         }
       });
     });
-    
+
     // Sort by date (most recent first)
     reservations.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    res.status(200).json({ 
-      success: true, 
-      count: reservations.length, 
-      reservations 
+
+    res.status(200).json({
+      success: true,
+      count: reservations.length,
+      reservations
     });
   } catch (error) {
     console.error('Error fetching reservations:', error);
@@ -159,45 +166,45 @@ const cancelReservation = async (req, res) => {
   try {
     const { courtId, slotId } = req.params;
     const userId = req.user._id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(courtId)) {
       return res.status(400).json({ message: 'Invalid court ID' });
     }
-    
+
     const court = await Court.findById(courtId);
     if (!court) {
       return res.status(404).json({ message: 'Court not found' });
     }
-    
+
     const slot = court.availability.id(slotId);
     if (!slot) {
       return res.status(404).json({ message: 'Slot not found' });
     }
-    
+
     // Check if user owns this booking
     if (!slot.bookedBy || slot.bookedBy.toString() !== userId.toString()) {
       return res.status(403).json({ message: 'You can only cancel your own reservations' });
     }
-    
+
     // Check if slot is in the past
     const slotDateTime = new Date(slot.date);
     const [hours, minutes] = slot.startTime.split(':');
     slotDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
+
     if (slotDateTime < new Date()) {
       return res.status(400).json({ message: 'Cannot cancel a past reservation' });
     }
-    
+
     // Cancel the booking
     slot.isBooked = false;
     slot.bookedBy = undefined;
     slot.bookingRef = undefined;
-    
+
     await court.save();
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Reservation cancelled successfully' 
+
+    res.status(200).json({
+      success: true,
+      message: 'Reservation cancelled successfully'
     });
   } catch (error) {
     console.error('Error cancelling reservation:', error);

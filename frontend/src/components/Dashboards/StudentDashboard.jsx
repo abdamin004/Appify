@@ -26,6 +26,8 @@ import {
 } from "../../services/notificationService";
 import WalletBadge from "../Wallet/WalletBadge";
 import { showToast } from "../../utils/toast";
+import { checkGymSessionOverlap, checkEventOverlap, doTimesOverlap, formatEventDateTime } from "../../utils/overlapDetection";
+import { showOverlapWarning } from "../UI/OverlapWarningDialog";
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("home");
@@ -43,6 +45,7 @@ function StudentDashboard() {
   const [gymSessionsError, setGymSessionsError] = useState("");
   const [gymBusyId, setGymBusyId] = useState(null);
   const [gymStatus, setGymStatus] = useState({});
+  const [overlapWarnings, setOverlapWarnings] = useState([]);
 
   const storedUser = localStorage.getItem("user");
   const user = storedUser
@@ -80,6 +83,9 @@ function StudentDashboard() {
       fetchNotifications();
     } else if (activeTab === 'reminders') {
       fetchReminders();
+    } else if (activeTab === 'warnings') {
+      // Refresh registered events to update warnings
+      fetchRegisteredEvents();
     }
   }, [activeTab]);
 
@@ -159,6 +165,8 @@ function StudentDashboard() {
       fetchNotifications();
     } else if (activeTab === "reminders") {
       fetchReminders();
+    } else if (activeTab === "warnings") {
+      fetchRegisteredEvents();
     }
   }, [activeTab]);
 
@@ -375,6 +383,7 @@ function StudentDashboard() {
       if (!res.ok) {
         try { const err = await res.json(); console.warn('registered fetch failed:', err); } catch (_) { }
         setRegisteredEvents([]);
+        setOverlapWarnings([]);
         return;
       }
       const data = await res.json();
@@ -385,6 +394,9 @@ function StudentDashboard() {
         return canUserAccessEvent(eventId);
       });
       setRegisteredEvents(filteredEvents);
+      
+      // Check for overlaps in registered events
+      checkForOverlaps(filteredEvents);
     } catch (err) {
       if (err.name === 'AbortError') {
         console.warn("Request timeout fetching registered events");
@@ -392,7 +404,83 @@ function StudentDashboard() {
         console.error(err);
       }
       setRegisteredEvents([]);
+      setOverlapWarnings([]);
     }
+  };
+
+  // Function to check for overlaps between all registered events
+  const checkForOverlaps = (events) => {
+    const warnings = [];
+    
+    if (!events || events.length < 2) {
+      setOverlapWarnings([]);
+      return;
+    }
+    
+    // Compare each event with every other event
+    for (let i = 0; i < events.length; i++) {
+      for (let j = i + 1; j < events.length; j++) {
+        const event1 = events[i];
+        const event2 = events[j];
+        
+        if (!event1 || !event2 || !event1.startDate || !event2.startDate) continue;
+        
+        // Get end times
+        const getEndTime = (event) => {
+          if (event.endDate) return new Date(event.endDate);
+          if (event.startDate && event.duration) {
+            const start = new Date(event.startDate);
+            return new Date(start.getTime() + event.duration * 60 * 1000);
+          }
+          if (event.startDate) {
+            const start = new Date(event.startDate);
+            // Default to 2 hours for events, 1 hour for gym sessions
+            const duration = event.type === 'GymSession' ? 60 * 60 * 1000 : 2 * 60 * 60 * 1000;
+            return new Date(start.getTime() + duration);
+          }
+          return null;
+        };
+        
+        const start1 = new Date(event1.startDate);
+        const end1 = getEndTime(event1);
+        const start2 = new Date(event2.startDate);
+        const end2 = getEndTime(event2);
+        
+        if (!end1 || !end2) continue;
+        
+        // Check if they overlap
+        const overlaps = doTimesOverlap(start1, end1, start2, end2);
+        
+        if (overlaps) {
+          // Check if this warning already exists (avoid duplicates)
+          const warningExists = warnings.some(w => {
+            const id1 = w.event1._id || w.event1.id;
+            const id2 = w.event2._id || w.event2.id;
+            const e1Id = event1._id || event1.id;
+            const e2Id = event2._id || event2.id;
+            return (id1 === e1Id && id2 === e2Id) || (id1 === e2Id && id2 === e1Id);
+          });
+          
+          if (!warningExists) {
+            warnings.push({
+              event1: {
+                ...event1,
+                start: start1,
+                end: end1
+              },
+              event2: {
+                ...event2,
+                start: start2,
+                end: end2
+              }
+            });
+          }
+        }
+      }
+    }
+    
+    console.log('Overlap warnings detected:', warnings.length, warnings);
+    setOverlapWarnings(warnings);
   };
 
   const unreadNotifications = notifications.filter(n => !n.isRead && n.type !== 'EventReminder');
@@ -459,6 +547,23 @@ function StudentDashboard() {
   };
 
   const handleGymRegister = async (sessionId) => {
+    // Find the session being registered
+    const session = gymSessions.find(s => (s._id || s.id) === sessionId);
+    if (!session) {
+      showToast.error('Session not found');
+      return;
+    }
+
+    // Check for time overlaps with existing registrations
+    const conflicts = checkGymSessionOverlap(session, registeredEvents);
+    if (conflicts.length > 0) {
+      const sessionName = `${session.sessionType || 'Gym Session'} with ${session.instructor || 'TBA'}`;
+      const proceed = await showOverlapWarning(conflicts, sessionName, session.startDate);
+      if (!proceed) {
+        return; // User cancelled
+      }
+    }
+
     setGymBusyId(sessionId);
     setGymStatus(prev => ({ ...prev, [sessionId]: { ok: false, msg: '' } }));
     try {
@@ -576,6 +681,14 @@ function StudentDashboard() {
     { label: "My Events", path: "#", icon: "✓", onClick: () => setActiveTab("registered") },
     { label: "Favourites", path: "#", icon: "❤️", onClick: () => setActiveTab("favourites") },
     { label: "Courts", path: "#", icon: "🏀", onClick: () => setActiveTab("courts") },
+    ...(overlapWarnings.length > 0 ? [{
+      label: "⚠️ Time Conflicts",
+      path: "#",
+      icon: "⚠️",
+      onClick: () => setActiveTab("warnings"),
+      badge: overlapWarnings.length,
+      className: "text-amber-600 font-bold"
+    }] : []),
     { label: "Notifications", path: "#", icon: "🔔", onClick: () => { setActiveTab("notifications"); fetchNotifications(); }, badge: unreadNotifications.length },
     { label: "Reminders", path: "#", icon: "⏰", onClick: () => { setActiveTab("reminders"); fetchReminders(); }, badge: unreadReminders.length },
     { label: "Loyalty", path: "#", icon: "🤝", onClick: () => setActiveTab("loyalty") },
@@ -1053,6 +1166,87 @@ function StudentDashboard() {
           {activeTab === "polls" && (
             <div className="space-y-6">
               <StudentPollVoting />
+            </div>
+          )}
+
+          {activeTab === "warnings" && (
+            <div className="space-y-6">
+              <div className="mb-2">
+                <h2 className="text-2xl font-bold text-slate-900">⚠️ Time Conflict Warnings</h2>
+                <p className="text-slate-500">You have overlapping event registrations that conflict in time</p>
+              </div>
+              {overlapWarnings.length === 0 ? (
+                <div className="bg-white p-20 rounded-2xl text-center shadow-sm border border-slate-100">
+                  <div className="text-6xl mb-6">✅</div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">No Conflicts</h3>
+                  <p className="text-slate-500">All your registered events are scheduled at different times.</p>
+                </div>
+              ) : (
+                <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-amber-200">
+                  <div className="mb-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">⚠️</span>
+                      <h3 className="text-lg font-bold text-amber-900">Warning: Time Conflicts Detected</h3>
+                    </div>
+                    <p className="text-amber-800 text-sm">
+                      You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time. 
+                      You cannot attend multiple events at the same time. Please consider cancelling one of the conflicting events.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    {overlapWarnings.map((warning, index) => {
+                      const event1Type = warning.event1.type === 'GymSession' ? 'Gym Session' : warning.event1.type || 'Event';
+                      const event2Type = warning.event2.type === 'GymSession' ? 'Gym Session' : warning.event2.type || 'Event';
+                      
+                      return (
+                        <div key={index} className="p-6 bg-red-50 rounded-xl border-2 border-red-200">
+                          <div className="flex items-start gap-4">
+                            <div className="text-3xl">⚠️</div>
+                            <div className="flex-1">
+                              <h4 className="font-bold text-red-900 mb-4 text-lg">Conflict #{index + 1}</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 bg-white rounded-lg border border-red-200">
+                                  <div className="font-semibold text-slate-900 mb-2">
+                                    {event1Type}: {warning.event1.title || warning.event1.name || 'Untitled Event'}
+                                  </div>
+                                  <div className="text-sm text-slate-600 space-y-1">
+                                    <div>📅 {formatEventDateTime(warning.event1.start)}</div>
+                                    {warning.event1.end && (
+                                      <div>⏰ Ends: {formatEventDateTime(warning.event1.end)}</div>
+                                    )}
+                                    {warning.event1.location && (
+                                      <div>📍 {warning.event1.location}</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="p-4 bg-white rounded-lg border border-red-200">
+                                  <div className="font-semibold text-slate-900 mb-2">
+                                    {event2Type}: {warning.event2.title || warning.event2.name || 'Untitled Event'}
+                                  </div>
+                                  <div className="text-sm text-slate-600 space-y-1">
+                                    <div>📅 {formatEventDateTime(warning.event2.start)}</div>
+                                    {warning.event2.end && (
+                                      <div>⏰ Ends: {formatEventDateTime(warning.event2.end)}</div>
+                                    )}
+                                    {warning.event2.location && (
+                                      <div>📍 {warning.event2.location}</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-4 p-3 bg-red-100 rounded-lg border border-red-300">
+                                <p className="text-sm text-red-900 font-medium">
+                                  ⚠️ These events overlap in time. You cannot attend both simultaneously.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerForEvent } from '../services/eventService';
 import { showToast } from '../utils/toast';
+import { checkEventOverlap } from '../utils/overlapDetection';
+import { showOverlapWarning } from './UI/OverlapWarningDialog';
 
 
 const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchive, hasEventPassed }) => {
@@ -185,6 +187,31 @@ const EventCard = ({ event, onClick, onDelete, onRegister, onArchive, onUnarchiv
     if (isRegistered) {
       showToast.info('You are already registered for this event');
       return;
+    }
+
+    // Check for time overlaps with existing registrations
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+      const res = await fetch(`${API_BASE}/events/registered`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      
+      if (res.ok) {
+        const registeredEvents = await res.json();
+        const events = Array.isArray(registeredEvents) ? registeredEvents : [];
+        const conflicts = checkEventOverlap(event, events);
+        
+        if (conflicts.length > 0) {
+          const proceed = await showOverlapWarning(conflicts, event.title || 'Event', event.startDate);
+          if (!proceed) {
+            return; // User cancelled
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error checking for overlaps:', err);
+      // Continue with registration even if overlap check fails
     }
 
     setRegistering(true);

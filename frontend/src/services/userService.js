@@ -6,7 +6,20 @@ async function fetchJson(url, opts = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, Object.assign({}, opts, { headers }));
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
+    throw data;
+  }
   return data;
 }
 
