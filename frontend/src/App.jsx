@@ -70,7 +70,7 @@ function App() {
         bodyClassName="custom-toast-body"
       />
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-
+      <ChatBot />
 
       <div style={{ paddingTop: '70px' }}>
         <Routes>

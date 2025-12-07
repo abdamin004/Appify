@@ -3,8 +3,8 @@ import { colors, spacing, borderRadius, shadows, typography, transitions } from 
 import { sendChatMessage } from '../../services/chatService';
 import { showToast } from '../../utils/toast';
 
-const ChatBot = () => {
-  const [isOpen, setIsOpen] = useState(false);
+const ChatBot = ({ inline = false }) => {
+  const [isOpen, setIsOpen] = useState(inline); // If inline, start open
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -88,61 +88,63 @@ const ChatBot = () => {
 
   return (
     <>
-      {/* Floating Chat Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'fixed',
-          bottom: spacing['4xl'],
-          right: spacing['2xl'],
-          width: '60px',
-          height: '60px',
-          borderRadius: borderRadius.full,
-          background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-          border: 'none',
-          boxShadow: shadows.xl,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          transition: transitions.fast,
-          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.transform = isOpen ? 'rotate(180deg) scale(1.1)' : 'scale(1.1)';
-          e.target.style.boxShadow = shadows.accentHover;
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.transform = isOpen ? 'rotate(180deg) scale(1)' : 'scale(1)';
-          e.target.style.boxShadow = shadows.xl;
-        }}
-        aria-label="Open chat"
-      >
-        {isOpen ? (
-          <span style={{ fontSize: '24px', color: colors.white }}>✕</span>
-        ) : (
-          <span style={{ fontSize: '28px' }}>💬</span>
-        )}
-      </button>
+      {/* Floating Chat Button - Only show if not inline */}
+      {!inline && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            position: 'fixed',
+            bottom: spacing['4xl'],
+            right: spacing['2xl'],
+            width: '60px',
+            height: '60px',
+            borderRadius: borderRadius.full,
+            background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
+            border: 'none',
+            boxShadow: shadows.xl,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            transition: transitions.fast,
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = isOpen ? 'rotate(180deg) scale(1.1)' : 'scale(1.1)';
+            e.target.style.boxShadow = shadows.accentHover;
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = isOpen ? 'rotate(180deg) scale(1)' : 'scale(1)';
+            e.target.style.boxShadow = shadows.xl;
+          }}
+          aria-label="Open chat"
+        >
+          {isOpen ? (
+            <span style={{ fontSize: '24px', color: colors.white }}>✕</span>
+          ) : (
+            <span style={{ fontSize: '28px' }}>💬</span>
+          )}
+        </button>
+      )}
 
       {/* Chat Window */}
       {isOpen && (
         <div
           style={{
-            position: 'fixed',
-            bottom: '100px',
-            right: spacing['2xl'],
-            width: '380px',
-            maxWidth: 'calc(100vw - 40px)',
-            height: '600px',
-            maxHeight: 'calc(100vh - 120px)',
+            position: inline ? 'relative' : 'fixed',
+            bottom: inline ? 'auto' : '100px',
+            right: inline ? 'auto' : spacing['2xl'],
+            width: inline ? '100%' : '380px',
+            maxWidth: inline ? '100%' : 'calc(100vw - 40px)',
+            height: inline ? '400px' : '600px',
+            maxHeight: inline ? '400px' : 'calc(100vh - 120px)',
             background: colors.white,
-            borderRadius: borderRadius['3xl'],
-            boxShadow: shadows.lg,
+            borderRadius: inline ? borderRadius.xl : borderRadius['3xl'],
+            boxShadow: inline ? shadows.sm : shadows.lg,
             display: 'flex',
             flexDirection: 'column',
-            zIndex: 999,
+            zIndex: inline ? 1 : 999,
             overflow: 'hidden',
             border: `1px solid ${colors.gray200}`,
           }}

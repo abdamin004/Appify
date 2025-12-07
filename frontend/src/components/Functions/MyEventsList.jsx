@@ -206,12 +206,39 @@ function MyEventsList({ events, showRefundButton = false, title, description }) 
       .then(res => setWalletBalance(res.balance ?? null))
       .catch(() => setWalletBalance(null));
     // Load favorites
-    setFavIds(new Set(getFavouriteIds()));
+    getFavouriteIds()
+      .then(ids => {
+        if (Array.isArray(ids)) {
+          setFavIds(new Set(ids.map(String)));
+        } else {
+          setFavIds(new Set());
+        }
+      })
+      .catch(err => {
+        console.error('Error loading favorites:', err);
+        setFavIds(new Set());
+      });
   }, []);
 
-  const handleToggleFav = (id) => {
-    const newIds = toggleFavourite(id);
-    setFavIds(new Set(newIds));
+  const handleToggleFav = async (id) => {
+    try {
+      const newIds = await toggleFavourite(id);
+      if (Array.isArray(newIds)) {
+        setFavIds(new Set(newIds.map(String)));
+      } else {
+        setFavIds(new Set());
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      // Reload favorites on error
+      getFavouriteIds()
+        .then(ids => {
+          if (Array.isArray(ids)) {
+            setFavIds(new Set(ids.map(String)));
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const handlePay = async (evt, method) => {
