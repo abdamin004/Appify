@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations, getWorkshopResources } from '../services/eventService';
+import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations, getWorkshopResources, createLinkedInPost } from '../services/eventService';
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
 import { useVendorRequest } from '../hooks/useVendorRequest.jsx';
 import EventAnalytics from './Dashboards/EventAnalytics';
@@ -54,6 +54,7 @@ export default function EventDetails() {
   const [attended, setAttended] = useState(false);
   const [workshopResources, setWorkshopResources] = useState([]);
   const [ratingHover, setRatingHover] = useState(0);
+  const [postingToMedia, setPostingToMedia] = useState(false);
 
   // Define these before useEffect to avoid initialization errors
   const tokenPresent = (() => {
@@ -216,6 +217,31 @@ export default function EventDetails() {
       showToast.error(err.message || 'Failed to export registrations');
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handlePostToMedia() {
+    if (!event) return;
+    const confirmed = await confirmDialog(
+      'This will create a telegram message to university students post via n8n workflow. Continue?',
+      'Create Telegram Message to University Students'
+    );
+    if (!confirmed) return;
+
+    try {
+      setPostingToMedia(true);
+      const eventId = event._id || event.id;
+      const result = await createLinkedInPost(eventId);
+      
+      if (result.success) {
+        showToast.success(result.message || 'Post request sent successfully!');
+      } else {
+        showToast.error(result.message || 'Failed to create post');
+      }
+    } catch (err) {
+      showToast.error(err.message || 'Failed to create post');
+    } finally {
+      setPostingToMedia(false);
     }
   }
 
@@ -458,6 +484,17 @@ export default function EventDetails() {
                     {(isEventOffice || (event && String(event.createdBy?._id || event.createdBy) === String(currentUserId))) && event.type !== 'Conference' && (
                       <button onClick={handleExportRegistrations} disabled={exporting} className={`btn btn-success btn-sm text-white gap-2 ${exporting ? 'loading' : ''}`}>
                         {exporting ? 'Exporting...' : '📊 Export Registrations'}
+                      </button>
+                    )}
+
+                    {/* Post to Media Button - EventOffice/Admin/Professor can create posts */}
+                    {(isEventOffice || canEdit) && event && (
+                      <button
+                        onClick={handlePostToMedia}
+                        disabled={postingToMedia}
+                        className={`btn btn-sm text-white gap-2 ${postingToMedia ? 'btn-disabled' : 'btn-primary'}`}
+                      >
+                        {postingToMedia ? '⏳ Posting...' : '💼 Post to Media'}
                       </button>
                     )}
 

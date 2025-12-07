@@ -4,7 +4,7 @@ import DashboardLayout from "../Layout/DashboardLayout";
 import EventsList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
 import WorkshopParticipantsView from "./WorkshopParticipantsView";
-import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops, getEventRecommendations } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
@@ -28,6 +28,8 @@ function ProfessorDashboard() {
   const [courts, setCourts] = useState([]);
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [user, setUser] = useState({ firstName: "Professor", lastName: "" });
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -438,6 +440,8 @@ function ProfessorDashboard() {
       fetchRegisteredEvents();
     } else if (activeTab === 'favourites') {
       fetchFavourites();
+    } else if (activeTab === 'recommendations') {
+      fetchRecommendations();
     } else if (activeTab === 'notifications') {
       fetchNotifications(); // Always refetch notifications
       fetchMyWorkshops(); // Also refresh workshops to check for edit requests
@@ -671,9 +675,37 @@ function ProfessorDashboard() {
     }
   };
 
+  const fetchRecommendations = async () => {
+    setRecommendationsLoading(true);
+    try {
+      console.log('📡 Calling getEventRecommendations API...');
+      // getEventRecommendations() already calls the backend API and returns full event objects
+      const events = await getEventRecommendations();
+      console.log('✅ Recommendations API returned:', events?.length || 0, 'events');
+      
+      // Filter events that user can access
+      const accessibleEvents = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return eventId && canUserAccessEvent(eventId);
+          })
+        : [];
+      
+      console.log(`✅ Loaded ${accessibleEvents.length} accessible recommended events`);
+      setRecommendedEvents(accessibleEvents);
+    } catch (e) {
+      console.error("❌ Error fetching recommendations:", e);
+      setRecommendedEvents([]);
+      showToast.error('Failed to load recommendations');
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
   const menuItems = [
     { label: "Home", icon: "🏠", onClick: () => setActiveTab("home") },
     { label: "Browse Events", icon: "🎯", onClick: () => setActiveTab("browse") },
+    { label: "✨ Recommendations", icon: "✨", onClick: () => { setActiveTab("recommendations"); fetchRecommendations(); } },
     {
       label: "Gym Sessions",
       icon: "🏋️",
@@ -685,7 +717,7 @@ function ProfessorDashboard() {
     },
     { label: "Book a Court", icon: "🏸", onClick: () => setActiveTab("courts") },
     { label: "My Registered Events", icon: "✓", onClick: () => setActiveTab("registered") },
-    { label: "Favourites", icon: "❤️", onClick: () => setActiveTab("favourites") },
+    { label: "Favourites", icon: "❤️", onClick: () => { setActiveTab("favourites"); fetchFavourites(); } },
     { label: "My Workshops", icon: "📚", onClick: () => setActiveTab("my-workshops") },
     {
       label: "Edit Requests",
@@ -944,6 +976,32 @@ function ProfessorDashboard() {
           {activeTab === "browse" && (
             <div className="space-y-6">
               <EventsList enableFavorites={true} />
+            </div>
+          )}
+
+          {activeTab === "recommendations" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">✨ Event Recommendations</h2>
+                  <p className="text-slate-500 mt-1">Personalized events based on your interests and favorites</p>
+                </div>
+              </div>
+              {recommendationsLoading ? (
+                <div className="text-center py-20">
+                  <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+                  <p className="text-slate-500 text-base">Loading recommendations...</p>
+                </div>
+              ) : recommendedEvents.length === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+                    <span>✨</span> No Recommendations Yet
+                  </h3>
+                  <p className="text-slate-500">Start favoriting events to get personalized recommendations!</p>
+                </div>
+              ) : (
+                <EventsList events={recommendedEvents} enableFavorites={true} hideFilters={true} />
+              )}
             </div>
           )}
 

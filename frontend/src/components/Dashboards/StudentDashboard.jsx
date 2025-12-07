@@ -3,6 +3,7 @@ import EventsList from "../EventList";
 import DashboardLayout from "../Layout/DashboardLayout";
 import MyEventsList from "../Functions/MyEventsList";
 import CourtsReserve from "../Functions/CourtsReserve";
+import ChatBot from "../ChatBot/ChatBot";
 import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops, getEventRecommendations } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance } from "../../services/paymentService";
@@ -166,6 +167,8 @@ function StudentDashboard() {
       fetchCourts();
     } else if (activeTab === "favourites") {
       fetchFavourites();
+    } else if (activeTab === "recommendations") {
+      fetchRecommendations();
     } else if (activeTab === "notifications") {
       fetchNotifications();
     } else if (activeTab === "reminders") {
@@ -641,41 +644,45 @@ function StudentDashboard() {
 
   const fetchFavourites = async () => {
     try {
-      const ids = getFavouriteIds().map(String);
-      if (!ids.length) { setFavouriteEvents([]); return; }
-      let list = [];
-      try {
-        const res = await fetch(`${API_BASE}/events`);
-        const data = await res.json();
-        list = Array.isArray(data) ? data : (Array.isArray(data?.events) ? data.events : []);
-      } catch (e) {
-        console.error("Error fetching events for favorites:", e);
+      // Use getMyFavoriteEvents which returns the full event objects from the backend
+      const favoriteEvents = await getMyFavoriteEvents();
+      if (Array.isArray(favoriteEvents)) {
+        // Filter out events user can't access
+        const filtered = favoriteEvents.filter(ev => {
+          const eventId = ev._id || ev.id;
+          return canUserAccessEvent(eventId);
+        });
+        setFavouriteEvents(filtered);
+      } else {
+        setFavouriteEvents([]);
       }
-      try {
-        const approvedSet = getApprovedWorkshops();
-        if (approvedSet.size > 0) {
-          const sortRes = await fetch(`${API_BASE}/events/sort`);
-          const sortData = await sortRes.json();
-          if (Array.isArray(sortData)) {
-            const approvedWorkshops = sortData.filter(
-              w => w.type === 'Workshop' && approvedSet.has(w._id) && w.status === 'pending'
-            );
-            approvedWorkshops.forEach(w => { w.status = 'published'; });
-            const existingIds = new Set(list.map(e => e._id));
-            const newWorkshops = approvedWorkshops.filter(w => !existingIds.has(w._id));
-            list = [...list, ...newWorkshops];
-          }
-        }
-      } catch (e) {
-        console.log('Error adding approved workshops to favorites:', e);
-      }
-      const filtered = list.filter(ev => {
-        const eventId = ev._id || ev.id;
-        return ids.includes(String(eventId)) && canUserAccessEvent(eventId);
-      });
-      setFavouriteEvents(filtered);
     } catch (e) {
-      console.error("Error fetching recommendations:", e);
+      console.error("Error fetching favorites:", e);
+      setFavouriteEvents([]);
+      showToast.error('Failed to load favorites');
+    }
+  };
+
+  const fetchRecommendations = async () => {
+    setRecommendationsLoading(true);
+    try {
+      console.log('📡 Calling getEventRecommendations API...');
+      // getEventRecommendations() already calls the backend API and returns full event objects
+      const events = await getEventRecommendations();
+      console.log('✅ Recommendations API returned:', events?.length || 0, 'events');
+      
+      // Filter events that user can access
+      const accessibleEvents = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return eventId && canUserAccessEvent(eventId);
+          })
+        : [];
+      
+      console.log(`✅ Loaded ${accessibleEvents.length} accessible recommended events`);
+      setRecommendedEvents(accessibleEvents);
+    } catch (e) {
+      console.error("❌ Error fetching recommendations:", e);
       setRecommendedEvents([]);
       showToast.error('Failed to load recommendations');
     } finally {
@@ -686,6 +693,7 @@ function StudentDashboard() {
   const sidebarMenuItems = [
     { label: "Home", path: "#", icon: "🏠", onClick: () => setActiveTab("home") },
     { label: "Browse Events", path: "#", icon: "🎯", onClick: () => setActiveTab("browse") },
+    { label: "Recommendations", path: "#", icon: "✨", onClick: () => { setActiveTab("recommendations"); fetchRecommendations(); } },
     { label: "Gym Sessions", path: "#", icon: "🏋️", onClick: () => { setActiveTab("gym-sessions"); fetchGymSessions(); } },
     { label: "My Events", path: "#", icon: "✓", onClick: () => setActiveTab("registered") },
     { label: "Favourites", path: "#", icon: "❤️", onClick: () => setActiveTab("favourites") },
@@ -798,18 +806,12 @@ function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Chatbot Placeholder */}
-              <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center min-h-[200px] relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative z-10">
-                  <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-3xl mb-4 mx-auto">
-                    🤖
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-700 mb-1">AI Assistant</h3>
-                  <p className="text-slate-500 text-sm max-w-xs mx-auto">
-                    Coming soon! A smart chatbot to help you navigate events and answer your questions.
-                  </p>
-                </div>
+              {/* Chatbot */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <span>🤖</span> AI Assistant
+                </h3>
+                <ChatBot inline={true} />
               </div>
             </div>
           </div>
@@ -843,6 +845,32 @@ function StudentDashboard() {
                 showRefundButton
                 onRefresh={fetchRegisteredEvents}
               />
+            </div>
+          )}
+
+          {activeTab === "recommendations" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">✨ Event Recommendations</h2>
+                  <p className="text-slate-500 mt-1">Personalized events based on your interests and favorites</p>
+                </div>
+              </div>
+              {recommendationsLoading ? (
+                <div className="text-center py-20">
+                  <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+                  <p className="text-slate-500 text-base">Loading recommendations...</p>
+                </div>
+              ) : recommendedEvents.length === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+                    <span>✨</span> No Recommendations Yet
+                  </h3>
+                  <p className="text-slate-500">Start favoriting events to get personalized recommendations!</p>
+                </div>
+              ) : (
+                <EventsList events={recommendedEvents} enableFavorites={true} hideFilters={true} />
+              )}
             </div>
           )}
 

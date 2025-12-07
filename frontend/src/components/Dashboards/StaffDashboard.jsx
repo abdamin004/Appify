@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../Layout/DashboardLayout";
 import EventList from "../EventList";
 import MyEventsList from "../Functions/MyEventsList";
-import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops } from "../../services/eventService";
+import { API_BASE, listGymSessions, registerForEvent, getApprovedWorkshops, getEventRecommendations } from "../../services/eventService";
 import { canUserAccessEvent } from "../../services/eventRestrictionService";
 import { getWalletBalance as apiGetWalletBalance, confirmStripeReceipt, sendManualReceipt } from "../../services/paymentService";
 import TopUpDialog from "../Payments/TopUpDialog";
@@ -43,6 +43,8 @@ function StaffDashboard() {
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [favouriteEvents, setFavouriteEvents] = useState([]);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(undefined);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [bannerMsg, setBannerMsg] = useState("");
@@ -85,6 +87,8 @@ function StaffDashboard() {
       fetchReminders();
     } else if (activeTab === 'favourites') {
       fetchFavourites();
+    } else if (activeTab === 'recommendations') {
+      fetchRecommendations();
     } else if (activeTab === 'warnings') {
       // Refresh registered events to update warnings
       fetchRegisteredEvents();
@@ -673,9 +677,37 @@ function StaffDashboard() {
   const unreadNotifications = notifications.filter(n => !n.isRead && n.type !== 'EventReminder');
   const unreadReminders = reminders.filter(n => !n.isRead);
 
+  const fetchRecommendations = async () => {
+    setRecommendationsLoading(true);
+    try {
+      console.log('📡 Calling getEventRecommendations API...');
+      // getEventRecommendations() already calls the backend API and returns full event objects
+      const events = await getEventRecommendations();
+      console.log('✅ Recommendations API returned:', events?.length || 0, 'events');
+      
+      // Filter events that user can access
+      const accessibleEvents = Array.isArray(events) 
+        ? events.filter(ev => {
+            const eventId = ev._id || ev.id;
+            return eventId && canUserAccessEvent(eventId);
+          })
+        : [];
+      
+      console.log(`✅ Loaded ${accessibleEvents.length} accessible recommended events`);
+      setRecommendedEvents(accessibleEvents);
+    } catch (e) {
+      console.error("❌ Error fetching recommendations:", e);
+      setRecommendedEvents([]);
+      showToast.error('Failed to load recommendations');
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
   const menuItems = [
     { key: "home", label: "Home", icon: "🏠" },
     { key: "browse", label: "Browse Events", icon: "🎯" },
+    { key: "recommendations", label: "✨ Recommendations", icon: "✨" },
     { key: "gym-sessions", label: "Gym Sessions", icon: "🏋️" },
     { key: "courts", label: "Book a Court", icon: "🏸" },
     { key: "registered", label: "My Registered", icon: "✓" },
@@ -802,6 +834,32 @@ function StaffDashboard() {
         {activeTab === "browse" && (
           <div className="space-y-6">
             <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"]} />
+          </div>
+        )}
+
+        {activeTab === "recommendations" && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">✨ Event Recommendations</h2>
+                <p className="text-slate-500 mt-1">Personalized events based on your interests and favorites</p>
+              </div>
+            </div>
+            {recommendationsLoading ? (
+              <div className="text-center py-20">
+                <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+                <p className="text-slate-500 text-base">Loading recommendations...</p>
+              </div>
+            ) : recommendedEvents.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+                  <span>✨</span> No Recommendations Yet
+                </h3>
+                <p className="text-slate-500">Start favoriting events to get personalized recommendations!</p>
+              </div>
+            ) : (
+              <EventList events={recommendedEvents} enableFavorites={true} hideFilters={true} />
+            )}
           </div>
         )}
 
