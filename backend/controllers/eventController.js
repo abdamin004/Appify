@@ -1960,6 +1960,9 @@ module.exports = {
             return res.status(500).json({
                 success: false,
                 message: err.message || 'Failed to get recommendations'
+            });
+        }
+    },
     async getMyCreatedEvents(req, res) {
         try {
             const userId = req.user._id;
@@ -2257,7 +2260,7 @@ module.exports = {
                 error: error.message
             });
         }
-    }
+    },
     // POST /events/:id/accommodations
     // Allows Student/Staff/TA/Professor to request disability accommodations for an event
     async requestDisabilityAccommodation(req, res) {

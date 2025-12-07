@@ -113,13 +113,13 @@ router.post('/:id/accommodations', auth, roleCheck('Student', 'Staff', 'TA', 'Pr
 
 
 // Add event to favorites
-router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.addEventToFavorites);
+router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.addEventToFavorites);
 
 // Remove event from favorites
-router.delete('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.removeEventFromFavorites);
+router.delete('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.removeEventFromFavorites);
 
 // View my favorites list
-router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
+router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getMyFavoriteEvents);
 
 // Create LinkedIn post for an event
 router.post('/:id/linkedin-post', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.createLinkedInPost);

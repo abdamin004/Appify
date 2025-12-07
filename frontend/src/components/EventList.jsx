@@ -67,7 +67,7 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     upcomingOnly: false,
   });
 
-  const [favIds, setFavIds] = useState(() => new Set(favourites.getFavouriteIds().map(String)));
+  const [favIds, setFavIds] = useState(new Set());
   const [vendorAppsMap, setVendorAppsMap] = useState({});
 
   // Payment State
@@ -131,18 +131,29 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
     } catch { return null; }
   };
 
-  // Load favorites on mount
+  // Load favorites on mount (only if favorites are enabled)
   useEffect(() => {
+    if (!enableFavorites) {
+      setFavIds(new Set());
+      return;
+    }
+    
     const loadFavorites = async () => {
       try {
         const ids = await favourites.getFavouriteIds();
-        setFavIds(new Set(ids.map(String)));
+        // Ensure ids is an array before mapping
+        if (Array.isArray(ids)) {
+          setFavIds(new Set(ids.map(String)));
+        } else {
+          setFavIds(new Set());
+        }
       } catch (err) {
         console.error('Error loading favorites:', err);
+        setFavIds(new Set());
       }
     };
     loadFavorites();
-  }, []);
+  }, [enableFavorites]);
 
   // Update events when providedEvents prop changes
   useEffect(() => {

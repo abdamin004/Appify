@@ -71,6 +71,7 @@ services:
       - university-network
     stdin_open: true
     tty: true
+    command: sh -c "npm install && npm run dev"
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:5001/api}
 

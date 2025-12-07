@@ -48,13 +48,30 @@ export async function getFavouriteIds() {
   try {
     // Check cache first
     if (cachedFavoriteIds && cacheTimestamp && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
-      return cachedFavoriteIds;
+      return Array.isArray(cachedFavoriteIds) ? cachedFavoriteIds : [];
     }
 
     const res = await getMyFavoriteEvents();
-    const ids = Array.isArray(res) 
-      ? res.map(event => String(event._id || event.id)).filter(Boolean)
-      : [];
+    
+    // Ensure we have an array
+    let eventsArray = [];
+    if (Array.isArray(res)) {
+      eventsArray = res;
+    } else if (res && Array.isArray(res.events)) {
+      eventsArray = res.events;
+    } else if (res && res.events && typeof res.events === 'object') {
+      // Handle case where events might be an object
+      eventsArray = [];
+    }
+    
+    // Extract IDs and ensure they're strings
+    const ids = eventsArray
+      .map(event => {
+        if (!event) return null;
+        const id = event._id || event.id;
+        return id ? String(id) : null;
+      })
+      .filter(Boolean);
     
     cachedFavoriteIds = ids;
     cacheTimestamp = Date.now();
@@ -62,7 +79,7 @@ export async function getFavouriteIds() {
   } catch (err) {
     console.error('Error fetching favorite IDs:', err);
     // Return cached data if available, otherwise empty array
-    return cachedFavoriteIds || [];
+    return Array.isArray(cachedFavoriteIds) ? cachedFavoriteIds : [];
   }
 }
 
