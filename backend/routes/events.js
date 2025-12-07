@@ -90,12 +90,17 @@ router.post(
 // Event Analytics
 router.get('/:id/analytics', auth, roleCheck('Professor', 'EventOffice', 'Admin'), eventController.getEventAnalytics);
 
+// Manage disability accommodations (Events Office)
+router.get('/accommodations/all', auth, roleCheck('EventOffice', 'Admin'), eventController.getAllAccommodationRequests);
+router.put('/accommodations/:requestId/status', auth, roleCheck('EventOffice', 'Admin'), eventController.updateAccommodationStatus);
+
 // Get single event by ID (must be before /:id/comments and /:id/ratings)
+router.get('/:id/price', eventController.getEventPrice);
 router.get('/:id', eventController.getEventById);
 
-router.get('/:id/comments', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getEventComments);
+router.get('/:id/comments', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin', 'Vendor'), eventController.getEventComments);
 // View all ratings on an event
-router.get('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getEventRatings);
+router.get('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin', 'Vendor'), eventController.getEventRatings);
 
 // Add a rating on an event (ONLY after event has ended)
 router.post('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.addEventRating);
@@ -109,5 +114,11 @@ router.post('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', 'Pr
 
 // View my favorites list
 router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
+
+// Export Registrations
+router.get('/:id/export/registrations', auth, eventController.exportEventRegistrations);
+
+// Generate Bazaar QR
+router.get('/:id/qr', auth, roleCheck('Admin', 'EventOffice', 'Student', 'Staff'), eventController.generateBazaarEventQR);
 
 module.exports = router;

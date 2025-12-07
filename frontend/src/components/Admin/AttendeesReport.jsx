@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // Full-report component that mirrors the Postman JSON 1:1 and keeps the filters/search working
+import DateTimePicker from '../UI/DateTimePicker';
+
 export default function AttendeesReport() {
   // Report pieces (match backend shape)
   const [filtersState, setFiltersState] = useState({});
@@ -160,8 +162,8 @@ export default function AttendeesReport() {
     <div className="max-w-6xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">Attendees Report</h2>
-          <p className="text-slate-500 mt-2">Comprehensive overview of event attendance</p>
+          <h2 className="text-3xl font-bold text-slate-800">Attendees Report</h2>
+          <p className="text-slate-500 mt-2 text-lg">Comprehensive overview of event attendance</p>
         </div>
 
         {/* Filters */}
@@ -213,22 +215,22 @@ export default function AttendeesReport() {
             </div>
 
             <div>
-              <label className="label text-slate-600 text-sm font-medium">Start Date</label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="Start Date"
+                showTime={false}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
+                onChange={(e) => setStartDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select start date"
               />
             </div>
 
             <div>
-              <label className="label text-slate-600 text-sm font-medium">End Date</label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="End Date"
+                showTime={false}
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
+                onChange={(e) => setEndDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select end date"
               />
             </div>
           </div>
@@ -262,17 +264,17 @@ export default function AttendeesReport() {
                   <span className="text-emerald-500">📊</span> Summary
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
-                    <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.totalEvents}</div>
-                    <div className="text-slate-500 font-medium">Total Events</div>
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.totalEvents}</div>
+                    <div className="text-slate-600 font-medium text-lg">Total Events</div>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
-                    <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.totalAttendees}</div>
-                    <div className="text-slate-500 font-medium">Total Attendees</div>
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.totalAttendees}</div>
+                    <div className="text-slate-600 font-medium text-lg">Total Attendees</div>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
-                    <div className="text-3xl font-bold text-emerald-600 mb-1">{summary.averageAttendeesPerEvent}</div>
-                    <div className="text-slate-500 font-medium">Avg. Attendees/Event</div>
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.averageAttendeesPerEvent}</div>
+                    <div className="text-slate-600 font-medium text-lg">Avg. Attendees/Event</div>
                   </div>
                 </div>
               </div>

@@ -342,9 +342,7 @@ function VendorDashboard() {
     }
   };
 
-  const handleRequestBooth = () => {
-    window.location.href = "/vendor/request-booth";
-  };
+
 
   const handleDeleteApplication = async (applicationId) => {
     const confirmed = await confirmDialog('Delete this cancelled application permanently? This cannot be undone.', 'Delete Application');
@@ -476,9 +474,9 @@ function VendorDashboard() {
         <TopUpDialog
           open={topUpOpen}
           onClose={() => setTopUpOpen(false)}
-          onSuccess={(amount) => {
+          onSuccess={(res) => {
             setTopUpOpen(false);
-            showToast.success(`Successfully topped up $${amount}!`);
+            showToast.success(`Successfully topped up $${res.amount}!`);
             getWalletBalance().then(res => setWalletBalance(res.balance));
           }}
         />
@@ -502,12 +500,7 @@ function VendorDashboard() {
               <div className="flex flex-col gap-4 items-end flex-shrink-0 w-full md:w-auto">
                 {/* Wallet Badge - Top Right */}
                 <div className="w-full md:w-auto flex justify-end gap-3">
-                  <button
-                    onClick={handleRequestBooth}
-                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-sm"
-                  >
-                    <span>➕</span> Request Booth
-                  </button>
+
                   <WalletBadge
                     balance={walletBalance}
                     currency="EGP"
@@ -540,14 +533,7 @@ function VendorDashboard() {
                 <span>⚡</span> Quick Access
               </h3>
               <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={handleRequestBooth}
-                  className="p-4 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all text-left group"
-                >
-                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">➕</div>
-                  <div className="font-bold text-slate-700 group-hover:text-emerald-700">Request Booth</div>
-                  <div className="text-xs text-slate-500">Apply for events</div>
-                </button>
+
                 <button
                   onClick={() => setActiveTab('my-applications')}
                   className="p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
@@ -814,49 +800,52 @@ function VendorDashboard() {
 
         {activeTab === "loyalty" && (
           <div className="space-y-6">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              {showLoyaltyForm ? (
-                <div>
-                  <div className="flex items-center gap-4 mb-6">
-                    <button
-                      onClick={() => setShowLoyaltyForm(false)}
-                      className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                      </svg>
-                    </button>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-800">Create New Program</h3>
-                      <p className="text-slate-500 text-sm">Define a new loyalty offer for students</p>
-                    </div>
-                  </div>
-                  <div className="p-6 bg-slate-50 rounded-xl border border-slate-200">
-                    <LoyaltyProgramForm
-                      onSuccess={() => {
-                        setShowLoyaltyForm(false);
-                        setLoyaltyRefreshKey(prev => prev + 1);
-                      }}
-                    />
+            {/* Header Card */}
+            {!showLoyaltyForm && (
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div className="text-center md:text-left">
+                  <h2 className="text-2xl font-bold text-slate-900">Your Programs</h2>
+                  <p className="text-slate-500 mt-1 max-w-2xl">Manage your loyalty programs and track applications</p>
+                </div>
+                <button
+                  onClick={() => setShowLoyaltyForm(true)}
+                  className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-600 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                >
+                  <span>✨</span> Create New Program
+                </button>
+              </div>
+            )}
+
+            {/* Content Area */}
+            {showLoyaltyForm ? (
+              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100">
+                  <button
+                    onClick={() => setShowLoyaltyForm(false)}
+                    className="w-10 h-10 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                  </button>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">Create New Program</h3>
+                    <p className="text-slate-500 text-sm">Define a new loyalty offer for students</p>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="text-center mb-8 relative flex flex-col items-center">
-                    <h3 className="text-xl font-bold text-slate-800">Your Programs</h3>
-                    <p className="text-slate-500 mt-1">Manage your loyalty programs and track applications</p>
-                    <button
-                      onClick={() => setShowLoyaltyForm(true)}
-                      className="mt-4 md:mt-0 md:absolute md:right-0 md:top-0 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors"
-                    >
-                      Create New Program
-                    </button>
-                  </div>
 
-                  <LoyaltyApplicationsList key={loyaltyRefreshKey} />
-                </>
-              )}
-            </div>
+                <LoyaltyProgramForm
+                  onSuccess={() => {
+                    setShowLoyaltyForm(false);
+                    setLoyaltyRefreshKey(prev => prev + 1);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 min-h-[400px]">
+                <LoyaltyApplicationsList key={loyaltyRefreshKey} />
+              </div>
+            )}
           </div>
         )}
 

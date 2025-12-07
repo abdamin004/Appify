@@ -24,7 +24,7 @@ export default function TopUpDialog({ open, onClose, onSuccess }) {
         const detail = { reason: 'topup', amount: value, balance: res?.balance };
         window.dispatchEvent(new CustomEvent('wallet:updated', { detail }));
       } catch (_) { }
-      onSuccess && onSuccess(res);
+      onSuccess && onSuccess(value);
       onClose && onClose();
     } catch (e2) {
       setError(e2?.message || 'Top-up failed');

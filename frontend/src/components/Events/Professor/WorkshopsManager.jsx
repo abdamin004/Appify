@@ -4,6 +4,7 @@ import { createWorkshop, listWorkshopsByProfessor, updateEvent, getEventById, up
 import { createEventOfficeNotification } from '../../../services/notificationService';
 import { showToast } from '../../../utils/toast';
 import Input from '../../UI/Input';
+import DateTimePicker from '../../UI/DateTimePicker';
 import Select from '../../UI/Select';
 import Button from '../../UI/Button';
 import FormLayout from '../../UI/FormLayout';
@@ -127,7 +128,9 @@ function WorkshopsManager({ editOnly = false }) {
             ? workshop.professors.map(p => ({ name: p.name || '', department: p.department || '' }))
             : [{ name: '', department: '' }],
         });
-        setResources(Array.isArray(resourceList) ? resourceList : []);
+
+        const resourcesArray = (resourceList && resourceList.data && Array.isArray(resourceList.data)) ? resourceList.data : (Array.isArray(resourceList) ? resourceList : []);
+        setResources(resourcesArray);
 
         showToast.success('Workshop loaded for editing');
         // Remove edit parameter from URL only if not in edit-only mode
@@ -277,18 +280,6 @@ function WorkshopsManager({ editOnly = false }) {
           .map(p => ({ name: p.name.trim(), department: (p.department || '').trim() })),
       };
       await updateEvent(id, payload);
-
-      // Handle pending uploads during save
-      if (filesToUpload.length > 0) {
-        await handleUploadsForNewWorkshop(id, filesToUpload);
-        // We need to refresh the resources list after upload
-        const newRes = await getWorkshopResources(id).catch(() => []);
-        setResources(newRes);
-        setFilesToUpload([]); // Clear queue
-      }
-
-      showToast.success('Workshop updated successfully!');
-      setEditing(null);
       setEditData({});
       // Reset form
       setForm({
@@ -345,27 +336,24 @@ function WorkshopsManager({ editOnly = false }) {
                   { label: 'GUC Berlin', value: 'GUC Berlin' }
                 ]}
               />
-              <Input
+              <DateTimePicker
                 label="Registration Deadline"
-                type="datetime-local"
                 value={editData.registrationDeadline}
-                onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+                onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value?.target?.value || e.target.value })}
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input
+              <DateTimePicker
                 label="Start Date/Time *"
-                type="datetime-local"
                 value={editData.startDate}
-                onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+                onChange={e => setEditData({ ...editData, startDate: e.target.value?.target?.value || e.target.value })}
                 required
               />
-              <Input
+              <DateTimePicker
                 label="End Date/Time *"
-                type="datetime-local"
                 value={editData.endDate}
-                onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+                onChange={e => setEditData({ ...editData, endDate: e.target.value?.target?.value || e.target.value })}
                 required
               />
             </div>
@@ -615,27 +603,24 @@ function WorkshopsManager({ editOnly = false }) {
               { label: 'GUC Berlin', value: 'GUC Berlin' }
             ]}
           />
-          <Input
+          <DateTimePicker
             label="Registration Deadline"
-            type="datetime-local"
             value={form.registrationDeadline}
-            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value?.target?.value || e.target.value })}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <DateTimePicker
             label="Start Date/Time *"
-            type="datetime-local"
             value={form.startDate}
-            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            onChange={e => setForm({ ...form, startDate: e.target.value?.target?.value || e.target.value })}
             required
           />
-          <Input
+          <DateTimePicker
             label="End Date/Time *"
-            type="datetime-local"
             value={form.endDate}
-            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            onChange={e => setForm({ ...form, endDate: e.target.value?.target?.value || e.target.value })}
             required
           />
         </div>
@@ -820,79 +805,7 @@ function WorkshopsManager({ editOnly = false }) {
           </Button>
         </div>
       </form>
-
-      {
-        !editOnly && (
-          <div className="mt-16 pt-10 border-t border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">My Workshops</h2>
-
-            <div className="mb-6">
-              <Input
-                placeholder="Filter by professor name..."
-                value={professorFilter}
-                onChange={e => setProfessorFilter(e.target.value)}
-                className="max-w-md"
-              />
-            </div>
-
-            {!loading && workshops.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                <div className="text-4xl mb-3">🛠️</div>
-                <h3 className="text-lg font-semibold text-slate-700">No Workshops Found</h3>
-                <p className="text-sm mt-1">{professorFilter ? 'Try adjusting your filter.' : 'You haven\'t created any workshops yet.'}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {workshops.map((w) => (
-                  <div
-                    key={w._id}
-                    className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-emerald-500/50 transition-all group"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-emerald-600 transition-colors">
-                        {w.title}
-                      </h3>
-                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${w.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
-                        w.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                        {w.status || 'pending'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-slate-500 mb-6">
-                      <div className="flex items-center gap-2">
-                        <span>📍</span>
-                        {w.location} • {w.facultyName}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>📅</span>
-                        {new Date(w.startDate).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>⏰</span>
-                        {new Date(w.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {w.endDate ? new Date(w.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>📄</span>
-                        {(w.resources?.length || 0)} Resource{(w.resources?.length || 0) !== 1 ? 's' : ''} Uploaded
-                      </div>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                      onClick={() => navigate(`/professor/workshops/edit/${w._id}`)}
-                    >
-                      Edit Workshop
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      }
-    </FormLayout >
+    </FormLayout>
   );
 }
 

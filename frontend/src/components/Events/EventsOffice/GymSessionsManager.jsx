@@ -4,6 +4,7 @@ import { createGymSession, listGymSessions, updateGymSession, cancelGymSession, 
 import RoleSelector from '../RoleSelector';
 import { showToast, confirmDialog } from '../../../utils/toast';
 import Input from '../../UI/Input';
+import DateTimePicker from '../../UI/DateTimePicker';
 import Select from '../../UI/Select';
 import Button from '../../UI/Button';
 import FormLayout from '../../UI/FormLayout';
@@ -22,8 +23,7 @@ function GymSessionsManager({ editOnly = false }) {
   const location = useLocation();
   const params = useParams();
   const [form, setForm] = useState({
-    date: '',
-    time: '',
+    startDate: '',
     duration: 60, // minutes
     sessionType: 'yoga',
     instructor: '',
@@ -33,7 +33,7 @@ function GymSessionsManager({ editOnly = false }) {
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [editing, setEditing] = useState(null); // id being edited
-  const [editData, setEditData] = useState({}); // { date, time, duration }
+  const [editData, setEditData] = useState({ startDate: '', duration: '', sessionType: 'yoga', instructor: '', capacity: '' }); // { startDate, duration }
   const [loadedSession, setLoadedSession] = useState(null); // Store loaded session for edit-only mode
   const autoEditApplied = useRef(false);
   const editId = editOnly ? params.id : null;
@@ -49,10 +49,6 @@ function GymSessionsManager({ editOnly = false }) {
   function toDateInputValue(d) {
     const dt = new Date(d);
     return dt.toISOString().slice(0, 10);
-  }
-  function toTimeInputValue(d) {
-    const dt = new Date(d);
-    return dt.toISOString().slice(11, 16);
   }
 
   async function refresh() {
@@ -82,8 +78,7 @@ function GymSessionsManager({ editOnly = false }) {
 
         const start = session.startDate ? new Date(session.startDate) : new Date();
         setEditData({
-          date: toDateInputValue(start),
-          time: toTimeInputValue(start),
+          startDate: start.toISOString(),
           duration: session.durationMinutes || 60,
           sessionType: session.sessionType || 'yoga',
           instructor: session.instructor || '',
@@ -128,9 +123,9 @@ function GymSessionsManager({ editOnly = false }) {
     e.preventDefault();
     setLoading(true);
     try {
-      if (!form.date || !form.time) throw new Error('Please select date and time');
+      if (!form.startDate) throw new Error('Please select date and time');
       if (!form.instructor) throw new Error('Please enter instructor name');
-      const start = new Date(`${form.date}T${form.time}:00`);
+      const start = new Date(form.startDate);
       const end = new Date(start.getTime() + Number(form.duration || 0) * 60000);
       const payload = {
         title: `Gym: ${form.sessionType} Session`,
@@ -149,7 +144,7 @@ function GymSessionsManager({ editOnly = false }) {
 
       const sessionEvent = createdSession?.event || createdSession;
 
-      setForm({ date: '', time: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
+      setForm({ startDate: '', duration: 60, sessionType: 'yoga', instructor: '', capacity: '' });
       setAllowedRoles([]);
 
       // Create notifications for all users if event is published
@@ -173,8 +168,7 @@ function GymSessionsManager({ editOnly = false }) {
     const duration = Math.max(0, Math.round((end - start) / 60000));
     setEditing(row._id);
     setEditData({
-      date: toDateInputValue(start),
-      time: toTimeInputValue(start),
+      startDate: row.startDate ? new Date(row.startDate).toISOString() : '',
       duration: duration || 60,
       sessionType: row.sessionType || 'yoga',
       instructor: row.instructor || '',
@@ -186,7 +180,7 @@ function GymSessionsManager({ editOnly = false }) {
   const onSave = async (id) => {
     setLoading(true);
     try {
-      const start = new Date(`${editData.date}T${editData.time}:00`);
+      const start = new Date(editData.startDate);
       const end = new Date(start.getTime() + Number(editData.duration || 0) * 60000);
       await updateGymSession(id, {
         startDate: start.toISOString(),
@@ -233,19 +227,11 @@ function GymSessionsManager({ editOnly = false }) {
         backLink="/EventOfficeDashboard"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Input
-              label="Date *"
-              type="date"
-              value={editData.date}
-              onChange={e => setEditData({ ...editData, date: e.target.value })}
-              required
-            />
-            <Input
-              label="Time *"
-              type="time"
-              value={editData.time}
-              onChange={e => setEditData({ ...editData, time: e.target.value })}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <DateTimePicker
+              label="Start Date/Time *"
+              value={editData.startDate}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value?.target?.value || e.target.value })}
               required
             />
             <Input
@@ -321,19 +307,11 @@ function GymSessionsManager({ editOnly = false }) {
       backLink="/EventOfficeDashboard"
     >
       <form onSubmit={onCreate} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Input
-            label="Date *"
-            type="date"
-            value={form.date}
-            onChange={e => setForm({ ...form, date: e.target.value })}
-            required
-          />
-          <Input
-            label="Time *"
-            type="time"
-            value={form.time}
-            onChange={e => setForm({ ...form, time: e.target.value })}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <DateTimePicker
+            label="Start Date/Time *"
+            value={form.startDate}
+            onChange={e => setForm({ ...form, startDate: e.target.value?.target?.value || e.target.value })}
             required
           />
           <Input
@@ -389,73 +367,6 @@ function GymSessionsManager({ editOnly = false }) {
           </Button>
         </div>
       </form>
-
-      {!editOnly && sessions.length > 0 && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Gym Sessions</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {sessions.map((s) => (
-              <div
-                key={s._id}
-                className={`bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group hover:border-emerald-200 ${s.status === 'cancelled' ? 'opacity-60 bg-slate-50' : ''
-                  }`}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    {s.title || 'Gym Session'}
-                  </h3>
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
-                    s.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                    {s.status || 'published'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-sm text-slate-600 mb-6">
-                  <div className="flex items-center gap-2">
-                    <span>🏋️</span>
-                    {(s.sessionType ? s.sessionType : (s.tags && s.tags[0] ? s.tags[0] : '')) || '-'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>👥</span>
-                    Capacity: {s.capacity ?? '-'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>📅</span>
-                    {s.startDate ? new Date(s.startDate).toLocaleDateString() : '-'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>⏰</span>
-                    {s.startDate ? new Date(s.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'} - {s.endDate ? new Date(s.endDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => navigate(`/events-office/gym-sessions/edit/${s._id}`)}
-                    disabled={s.status === 'cancelled'}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-                    onClick={() => handleDeleteGymSession(s._id)}
-                    disabled={s.status === 'cancelled'}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </FormLayout>
   );
 }

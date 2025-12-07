@@ -203,7 +203,7 @@ function BoothPollManager() {
               onChange={(e) => setPollDescription(e.target.value)}
               placeholder="Optional description for the poll"
               rows={3}
-              className="textarea textarea-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="textarea textarea-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-white text-slate-800"
             />
           </div>
 

@@ -6,7 +6,7 @@ import MyEventsList from "../Functions/MyEventsList";
 import QRCodeGenerator from "../QRCode/QRCodeGenerator";
 import BoothPollManager from "../Polls/BoothPollManager";
 import adminService from "../../services/adminService";
-import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses } from "../../services/eventService";
+import { listGymSessions, cancelGymSession, listPendingWorkshops, approveWorkshop, rejectWorkshop, updateEvent, API_BASE, generateVendorAttendeePasses, listAccommodationRequests, updateAccommodationRequest } from "../../services/eventService";
 import { createProfessorNotification, getEventOfficeNotifications, markEventOfficeNotificationRead, markAllEventOfficeNotificationsRead, deleteEventOfficeNotification, deleteAllEventOfficeNotifications, getEventOfficeUnreadCount, createEventOfficeNotification, getSeenEventIds, markEventsAsSeen, getSentReminders, markReminderSent, createReminderNotification, getCurrentUserReminders, markReminderRead, deleteReminder } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import AttendeesReport from "../Admin/AttendeesReport";
@@ -29,6 +29,7 @@ function EventOfficeDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [pendingWorkshops, setPendingWorkshops] = useState([]);
+  const [accommodationRequests, setAccommodationRequests] = useState([]);
   const [editRequestModal, setEditRequestModal] = useState({ open: false, workshopId: null, editRequest: "" });
   const [qrCodeEvent, setQrCodeEvent] = useState(null);
   const [approvedWorkshops, setApprovedWorkshops] = useState(() => {
@@ -69,21 +70,21 @@ function EventOfficeDashboard() {
     const handleCommentAdded = (event) => {
       console.log('EventOfficeDashboard: Received comment:added event', event.detail);
       // Always dispatch refresh event - component will refresh when tab is active
-      window.dispatchEvent(new CustomEvent('feedback:refresh', { 
+      window.dispatchEvent(new CustomEvent('feedback:refresh', {
         detail: { eventId: event.detail?.eventId },
-        bubbles: true 
+        bubbles: true
       }));
     };
-    
+
     const handleRatingAdded = (event) => {
       console.log('EventOfficeDashboard: Received rating:added event', event.detail);
       // Always dispatch refresh event - component will refresh when tab is active
-      window.dispatchEvent(new CustomEvent('feedback:refresh', { 
+      window.dispatchEvent(new CustomEvent('feedback:refresh', {
         detail: { eventId: event.detail?.eventId },
-        bubbles: true 
+        bubbles: true
       }));
     };
-    
+
     window.addEventListener('comment:added', handleCommentAdded);
     window.addEventListener('rating:added', handleRatingAdded);
 
@@ -154,6 +155,8 @@ function EventOfficeDashboard() {
       fetchGymSessions();
     } else if (activeTab === "workshop-approvals") {
       fetchPendingWorkshops();
+    } else if (activeTab === "accommodations") {
+      fetchAccommodationRequests();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -525,7 +528,7 @@ function EventOfficeDashboard() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      
+
       const res = await fetch(`${API_BASE}/events`);
       if (res.status === 401) {
         localStorage.removeItem('token');
@@ -547,7 +550,7 @@ function EventOfficeDashboard() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      
+
       const res = await fetch(`${API_BASE}/events`);
       if (res.status === 401) {
         localStorage.removeItem('token');
@@ -795,6 +798,27 @@ function EventOfficeDashboard() {
     navigate(routes[type] || "/events");
   };
 
+  const fetchAccommodationRequests = async () => {
+    try {
+      const requests = await listAccommodationRequests();
+      setAccommodationRequests(Array.isArray(requests) ? requests : []);
+    } catch (err) {
+      console.error("Error fetching accommodation requests:", err);
+      showToast.error("Failed to load accommodation requests");
+    }
+  };
+
+  const handleAccommodationStatus = async (requestId, newStatus) => {
+    try {
+      await updateAccommodationRequest(requestId, newStatus);
+      showToast.success(`Request marked as ${newStatus}`);
+      fetchAccommodationRequests();
+    } catch (err) {
+      console.error("Error updating accommodation:", err);
+      showToast.error("Failed to update status");
+    }
+  };
+
   const unreadNotifications = notifications.filter(n => !n.read || !n.isRead).length;
 
   const menuItems = [
@@ -819,6 +843,7 @@ function EventOfficeDashboard() {
     { key: "sales-report", label: "Financial Reports", icon: "💰" },
     { key: "gym-sessions", label: "Gym Sessions", icon: "💪" },
     { key: "workshop-approvals", label: "Workshop Approvals", icon: "🎓", badge: pendingWorkshops.length },
+    { key: "accommodations", label: "Accommodations", icon: "♿", badge: accommodationRequests.filter(r => r.status === 'pending').length },
     { key: "polls", label: "Booth Polls", icon: "📊" },
     { key: "feedback-analytics", label: "Feedback Analytics", icon: "📊" },
     { key: "loyalty", label: "Loyalty Partners", icon: "⭐" },
@@ -1228,6 +1253,125 @@ function EventOfficeDashboard() {
           </div>
         )}
 
+        {activeTab === "notifications" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="relative mb-8">
+              <div className="flex flex-col items-center justify-center text-center">
+                <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+                <p className="text-slate-500 mt-1">Updates about events and activities</p>
+              </div>
+              <div className="flex gap-3 justify-center mt-4 md:mt-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2">
+                <button
+                  onClick={() => {
+                    markAllEventOfficeNotificationsRead();
+                    fetchNotifications();
+                  }}
+                  className="btn btn-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+                >
+                  Mark All Read
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Delete all notifications?')) {
+                      deleteAllEventOfficeNotifications();
+                      fetchNotifications();
+                    }
+                  }}
+                  className="btn btn-sm bg-white border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-200 shadow-sm"
+                >
+                  Delete All
+                </button>
+              </div>
+            </div>
+            {notifications.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">🔔</div>
+                <p>No notifications at this time.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {notifications.map((notif) => {
+                  const isRead = notif.read || notif.isRead;
+                  return (
+                    <div
+                      key={notif.id || notif._id}
+                      className={`p-6 rounded-xl border transition-all ${isRead
+                        ? 'bg-slate-50 border-slate-200'
+                        : 'bg-white border-emerald-200 shadow-md'
+                        }`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {notif.type === 'NewEvent' && <span className="text-2xl">🎉</span>}
+                            {notif.type === 'EditRequest' && <span className="text-2xl">✏️</span>}
+                            {notif.type === 'WorkshopSubmitted' && <span className="text-2xl">🎓</span>}
+                            <h3 className={`text-lg ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                              {notif.type === 'NewEvent' ? 'New Event Available' :
+                                notif.type === 'EditRequest' ? 'Workshop Edit Requested' :
+                                  notif.type === 'WorkshopSubmitted' ? 'New Workshop Submitted' :
+                                    'Notification'}
+                            </h3>
+                            {!isRead && (
+                              <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                            )}
+                          </div>
+                          <p className={`text-base mb-2 ${isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
+                            {notif.message}
+                          </p>
+                          {notif.eventId && notif.type === 'NewEvent' && (
+                            <button
+                              onClick={() => {
+                                window.location.href = `/events/${notif.eventId}`;
+                              }}
+                              className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
+                            >
+                              View Event
+                            </button>
+                          )}
+                          {notif.type === 'WorkshopSubmitted' && (
+                            <button
+                              onClick={() => setActiveTab('workshop-approvals')}
+                              className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
+                            >
+                              Review Workshop
+                            </button>
+                          )}
+                          <p className="text-xs text-slate-400 mt-3">
+                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          {!isRead && (
+                            <button
+                              onClick={() => {
+                                markEventOfficeNotificationRead(notif.id || notif._id);
+                                fetchNotifications();
+                              }}
+                              className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors"
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              deleteEventOfficeNotification(notif.id || notif._id);
+                              fetchNotifications();
+                            }}
+                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "reminders" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 h-[80vh] flex flex-col">
             <div className="mb-6 shrink-0 relative">
@@ -1347,157 +1491,6 @@ function EventOfficeDashboard() {
           </div>
         )}
 
-        {activeTab === "notifications" && (
-          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="mb-8 relative">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-slate-800 m-0">
-                  Notifications
-                </h2>
-                <p className="text-slate-500 mt-1">Updates and alerts</p>
-              </div>
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex gap-3">
-                {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      markAllEventOfficeNotificationsRead();
-                      fetchNotifications();
-                      showToast.success('All notifications marked as read');
-                    }}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm"
-                  >
-                    Mark All as Read
-                  </button>
-                )}
-                {notifications.length > 0 && (
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                      if (confirmed) {
-                        deleteAllEventOfficeNotifications();
-                        fetchNotifications();
-                        showToast.success('All notifications deleted');
-                      }
-                    }}
-                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                  >
-                    Delete All
-                  </button>
-                )}
-              </div>
-              {/* Mobile stacked buttons */}
-              {(notifications.length > 0 || notifications.filter(n => !n.read && !n.isRead).length > 0) && (
-                <div className="flex gap-3 mt-4 justify-center md:hidden">
-                  {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
-                    <button
-                      onClick={() => {
-                        markAllEventOfficeNotificationsRead();
-                        fetchNotifications();
-                        showToast.success('All notifications marked as read');
-                      }}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm"
-                    >
-                      Mark All as Read
-                    </button>
-                  )}
-                  {notifications.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
-                        if (confirmed) {
-                          deleteAllEventOfficeNotifications();
-                          fetchNotifications();
-                          showToast.success('All notifications deleted');
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                    >
-                      Delete All
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            {notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                <div className="text-4xl mb-4">🔔</div>
-                <p>No notifications at this time.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {notifications.map((notif) => {
-                  const isRead = notif.read || notif.isRead;
-                  return (
-                    <div
-                      key={notif.id || notif._id}
-                      className={`p-6 rounded-xl border transition-all ${isRead
-                        ? 'bg-slate-50 border-slate-200'
-                        : 'bg-white border-emerald-200 shadow-md'
-                        }`}
-                    >
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            {notif.type === 'NewEvent' && <span className="text-2xl">🎉</span>}
-                            {notif.type === 'LoyaltyPartnerAdded' && <span className="text-2xl">⭐</span>}
-                            <h3 className={`text-lg ${isRead ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
-                              {notif.type === 'NewEvent' ? 'New Event Available' :
-                                notif.type === 'LoyaltyPartnerAdded' ? 'New Loyalty Partner' :
-                                  'Notification'}
-                            </h3>
-                            {!isRead && (
-                              <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
-                            )}
-                          </div>
-                          <p className={`text-base mb-2 ${isRead ? 'text-slate-500' : 'text-slate-700 font-medium'}`}>
-                            {notif.message}
-                          </p>
-                          {notif.eventId && (
-                            <button
-                              onClick={() => {
-                                window.location.href = `/events/${notif.eventId}`;
-                              }}
-                              className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm hover:shadow"
-                            >
-                              View Event
-                            </button>
-                          )}
-                          <p className="text-xs text-slate-400 mt-3">
-                            {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          {!isRead && (
-                            <button
-                              onClick={() => {
-                                markEventOfficeNotificationRead(notif.id);
-                                fetchNotifications();
-                              }}
-                              className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors"
-                            >
-                              Mark Read
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              deleteEventOfficeNotification(notif.id);
-                              fetchNotifications();
-                              showToast.success('Notification deleted');
-                            }}
-                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === "vendor-documents" && (
           <div className="space-y-6">
             <VendorDocuments />
@@ -1532,35 +1525,73 @@ function EventOfficeDashboard() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {gymSessions.map((session) => (
-                    <div key={session._id || session.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-bold text-lg text-slate-900">{session.sessionType}</h3>
-                        <button
-                          onClick={() => handleDeleteGymSession(session._id || session.id)}
-                          className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Cancel Session"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                      <div className="space-y-3 text-sm text-slate-600">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">👤</span>
-                          <span className="font-medium">{session.instructor}</span>
+                    <div key={session._id || session.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col group relative border border-slate-200 h-full">
+                      {/* Header */}
+                      <div className="h-28 bg-gradient-to-r from-blue-400 to-indigo-500 relative p-6">
+                        <div className="absolute top-4 right-4 z-10 flex gap-2">
+                          <button
+                            onClick={() => navigate(`/events-office/gym-sessions/edit/${session._id || session.id}`)}
+                            className="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm flex items-center justify-center transition-all"
+                            title="Edit Session"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGymSession(session._id || session.id)}
+                            className="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-red-500/80 backdrop-blur-sm flex items-center justify-center transition-all"
+                            title="Cancel Session"
+                          >
+                            🗑️
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">📅</span>
-                          <span>{new Date(session.startDate).toLocaleDateString()}</span>
+                        <div className="text-4xl absolute bottom-4 left-6">
+                          💪
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">⏰</span>
-                          <span>{new Date(session.startDate).toLocaleTimeString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">👥</span>
-                          <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold">
-                            {session.registeredCount || 0} / {session.capacity}
+                        <div className="absolute top-4 left-4">
+                          <span className="px-2 py-1 bg-white/20 text-white text-xs font-bold rounded-lg backdrop-blur-sm uppercase tracking-wider">
+                            Gym Session
                           </span>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-6 flex-1 flex flex-col gap-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors">
+                            {session.sessionType || 'Workout Session'}
+                          </h3>
+                          <p className="text-sm text-slate-500 font-medium flex items-center gap-2">
+                            <span>👤</span> {session.instructor || 'TBA'}
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 mt-auto pt-4 border-t border-slate-100">
+                          <div className="flex items-center gap-3 text-sm text-slate-600">
+                            <span className="text-lg w-6 text-center">📅</span>
+                            <span className="font-medium">{new Date(session.startDate).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-slate-600">
+                            <span className="text-lg w-6 text-center">⏰</span>
+                            <span>
+                              {new Date(session.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-slate-600">
+                            <span className="text-lg w-6 text-center">👥</span>
+                            <div className="flex-1">
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className={session.registeredCount >= session.capacity ? 'text-red-600 font-bold' : ''}>
+                                  {session.registeredCount || 0} Registered
+                                </span>
+                                <span className="text-slate-400">Cap: {session.capacity}</span>
+                              </div>
+                              <progress
+                                className={`progress w-full h-1.5 ${session.registeredCount >= session.capacity ? 'progress-error' : 'progress-primary'}`}
+                                value={session.registeredCount || 0}
+                                max={session.capacity}
+                              ></progress>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1586,6 +1617,82 @@ function EventOfficeDashboard() {
         {activeTab === "loyalty" && (
           <div className="space-y-6">
             <LoyaltyPartnersList />
+          </div>
+        )}
+        {activeTab === "accommodations" && (
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-800">Accommodation Requests</h2>
+              <p className="text-slate-500 mt-1">Review disability access requests from students and staff</p>
+            </div>
+
+            {accommodationRequests.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">♿</div>
+                <p className="text-slate-500">No accommodation requests found.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table w-full">
+                  <thead>
+                    <tr>
+                      <th>Requester</th>
+                      <th>Event</th>
+                      <th>Needs</th>
+                      <th>Details</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accommodationRequests.map((req) => (
+                      <tr key={req._id}>
+                        <td>
+                          <div className="font-bold">{req.user?.firstName} {req.user?.lastName}</div>
+                          <div className="text-xs opacity-50">{req.roleAtEvent}</div>
+                        </td>
+                        <td>
+                          <div className="font-bold">{req.event?.title || 'Unknown Event'}</div>
+                          <div className="text-xs opacity-50">{new Date(req.event?.startDate).toLocaleDateString()}</div>
+                        </td>
+                        <td>
+                          <div className="flex flex-col gap-1">
+                            {req.needsWheelchairAccess && <span className="badge badge-sm badge-info">Wheelchair</span>}
+                            {req.needsSpecialSeating && <span className="badge badge-sm badge-info">Seating</span>}
+                          </div>
+                        </td>
+                        <td className="max-w-xs break-words text-sm">
+                          {req.otherRequests || "—"}
+                        </td>
+                        <td>
+                          <span className={`badge ${req.status === 'approved' ? 'badge-success' : req.status === 'rejected' ? 'badge-error' : 'badge-warning'}`}>
+                            {req.status}
+                          </span>
+                        </td>
+                        <td>
+                          {req.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleAccommodationStatus(req._id, 'approved')}
+                                className="btn btn-xs btn-success text-white"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleAccommodationStatus(req._id, 'rejected')}
+                                className="btn btn-xs btn-error text-white"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -3,11 +3,38 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations, getWorkshopResources } from '../services/eventService';
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
+import { useVendorRequest } from '../hooks/useVendorRequest.jsx';
 import EventAnalytics from './Dashboards/EventAnalytics';
 import FeedbackModal from './Modals/FeedbackModal';
 
 import { showToast, confirmDialog } from '../utils/toast';
 import { FaStar } from 'react-icons/fa';
+
+
+// Per-user ratings storage key helper (syncs with MyEventsList)
+const ratingsStorageKeyForUser = () => {
+  try {
+    if (typeof localStorage === "undefined") return "eventRatings:guest";
+    const raw = localStorage.getItem("user");
+    const user = raw ? JSON.parse(raw) : null;
+    const id = user?._id || user?.id || "guest";
+    return `eventRatings:${id}`;
+  } catch (_) {
+    return "eventRatings:guest";
+  }
+};
+
+const saveRatingLocally = (eventId, value) => {
+  try {
+    const key = ratingsStorageKeyForUser();
+    const raw = localStorage.getItem(key);
+    const current = raw ? JSON.parse(raw) : {};
+    const next = { ...current, [eventId]: value };
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch (_) {
+    // no-op
+  }
+};
 
 export default function EventDetails() {
   const { id } = useParams();
@@ -24,6 +51,9 @@ export default function EventDetails() {
   const [exporting, setExporting] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [attended, setAttended] = useState(false);
+  const [workshopResources, setWorkshopResources] = useState([]);
+  const [ratingHover, setRatingHover] = useState(0);
 
   // Define these before useEffect to avoid initialization errors
   const tokenPresent = (() => {
@@ -63,44 +93,41 @@ export default function EventDetails() {
     if (id) load();
   }, [id, currentUserId]);
 
-  // Auth & Roles Checks
-  const isEventOffice = (() => {
+  // Helper to get raw role string
+  const getUserRole = () => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-      if (!raw) return false;
+      if (!raw) return '';
       const u = JSON.parse(raw);
-      const role = (u.role || '').toLowerCase();
-      return role === 'eventoffice' || role === 'admin';
-    } catch {
-      return false;
-    }
-  })();
+      return (u.role || '').toLowerCase();
+    } catch { return ''; }
+  };
+
+  const userRole = getUserRole();
+  const isEventOffice = userRole === 'eventoffice' || userRole === 'admin';
+
+  // Specific permission: Archive is ONLY for Event Office (not Admin)
+  const canArchive = userRole === 'eventoffice';
+  const canDelete = isEventOffice;
 
   const canEdit = (() => {
     try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('user') : null;
-      if (!raw || !event) return false;
-      const u = JSON.parse(raw);
-      const role = (u.role || '').toLowerCase();
-      const userId = String(u._id || u.id || '');
+      if (!event) return false;
       const now = new Date();
 
-      if (role === 'eventoffice') {
+      if (userRole === 'eventoffice') {
         if (event.type === 'Workshop') return false;
         if (event.type === 'Bazaar' && event.startDate && new Date(event.startDate) <= now) return false;
         if (event.type === 'Trip' && event.startDate && new Date(event.startDate) <= now) return false;
         return true;
       }
-      if (role === 'professor' && event.type === 'Workshop') {
+      if (userRole === 'professor' && event.type === 'Workshop') {
         const eventCreatorId = String(event.createdBy || event.createdByUser || event.professor || '');
-        return eventCreatorId && userId && eventCreatorId === userId;
+        return eventCreatorId && currentUserId && eventCreatorId === currentUserId;
       }
       return false;
     } catch { return false; }
   })();
-
-  const canDelete = isEventOffice;
-  const canArchive = isEventOffice;
 
   const hasRegistrations = (event?.registeredCount || (event?.registeredUsers && event.registeredUsers.length) || 0) > 0;
   const eventHasPassed = event && ((event.endDate && new Date(event.endDate) <= new Date()) || (!event.endDate && event.startDate && new Date(event.startDate) <= new Date()));
@@ -192,7 +219,7 @@ export default function EventDetails() {
     }
   }
 
-  const [workshopResources, setWorkshopResources] = useState([]);
+
 
   useEffect(() => {
     async function load() {
@@ -266,6 +293,9 @@ export default function EventDetails() {
     otherRequests: ''
   });
 
+  // Vendor Request Hook
+  const { canRequest: canVendorRequest, requestStatus, openRequestModal: openVendorModal, RequestModal: VendorRequestModal } = useVendorRequest(event);
+
   async function handleRegister() {
     if (!tokenPresent) {
       showToast.warning('Please log in to register');
@@ -334,6 +364,27 @@ export default function EventDetails() {
 
   const canRate = tokenPresent && isRegistered && (!event?.endDate || new Date(event.endDate) <= new Date());
 
+  async function handleRating(score) {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await rateEvent(id, score);
+      setUserRating(score);
+
+      // Update local storage to keep MyEventsList in sync
+      saveRatingLocally(id, score);
+
+      const newRatings = await getEventRatings(id);
+      setRatings(newRatings && typeof newRatings === 'object' ? newRatings : { average: 0, count: 0, ratings: [], histogram: {} });
+      showToast.success('Rating submitted successfully');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('rating:added', { detail: { eventId: String(id) } })), 500);
+    } catch (err) {
+      showToast.error(err.message || 'Failed to submit rating');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   // Helpers
   const getEventIcon = (type) => ({ Workshop: '🎓', Trip: '✈️', Bazaar: '🛍️', Booth: '🏢', Conference: '🎙️' }[type] || '📅');
   const getEventGradient = (type) => ({
@@ -386,7 +437,9 @@ export default function EventDetails() {
 
                     {/* Analytics Button */}
                     {(isEventOffice || (event && String(event.createdBy?._id || event.createdBy) === String(currentUserId))) && (
-                      <button onClick={() => setShowAnalytics(true)} className="btn btn-info btn-sm text-white gap-2">📊 Analytics</button>
+                      <div className="tooltip" data-tip="View detailed feedback statistics">
+                        <button onClick={() => setShowAnalytics(true)} className="btn btn-info btn-sm text-white gap-2">📊 Analytics</button>
+                      </div>
                     )}
 
                     {canDelete && !hasRegistrations && (
@@ -398,14 +451,25 @@ export default function EventDetails() {
                     {canArchive && isArchived && (
                       <button onClick={handleUnarchiveEvent} className="btn btn-accent btn-sm text-white gap-2">📤 Unarchive</button>
                     )}
-                    {isEventOffice && event.type !== 'Conference' && (
+                    {(isEventOffice || (event && String(event.createdBy?._id || event.createdBy) === String(currentUserId))) && event.type !== 'Conference' && (
                       <button onClick={handleExportRegistrations} disabled={exporting} className={`btn btn-success btn-sm text-white gap-2 ${exporting ? 'loading' : ''}`}>
                         {exporting ? 'Exporting...' : '📊 Export Registrations'}
                       </button>
                     )}
 
+                    {/* Vendor Button / Status */}
+                    {requestStatus ? (
+                      <button disabled className={`btn btn-sm text-white gap-2 cursor-default ${requestStatus === 'approved' ? 'btn-success' : requestStatus === 'rejected' ? 'btn-error' : 'btn-warning'}`}>
+                        {requestStatus === 'approved' ? '✓ Application Approved' : requestStatus === 'rejected' ? '✕ Application Rejected' : '⏳ Application Pending'}
+                      </button>
+                    ) : canVendorRequest && (
+                      <button onClick={openVendorModal} className="btn btn-primary btn-sm text-white gap-2">
+                        📝 Request Spot
+                      </button>
+                    )}
+
                     {/* Registration */}
-                    {!isEventOffice && event.type !== 'Booth' && event.type !== 'Bazaar' && event.status !== 'cancelled' && event.status !== 'completed' &&
+                    {!isEventOffice && userRole !== 'vendor' && event.type !== 'Booth' && event.type !== 'Bazaar' && event.status !== 'cancelled' && event.status !== 'completed' &&
                       (!event.registrationDeadline || new Date(event.registrationDeadline) > new Date()) &&
                       (!event.capacity || (event.registeredUsers?.length || 0) < event.capacity) && (
                         <>
@@ -582,7 +646,7 @@ export default function EventDetails() {
                             onClick={() => handleRating(star)}
                             onMouseEnter={() => setRatingHover(star)}
                             onMouseLeave={() => setRatingHover(0)}
-                            disabled={submittingRating}
+                            disabled={submitting}
                             className="p-1 transition-transform hover:scale-110 focus:outline-none"
                           >
                             <FaStar
@@ -664,7 +728,7 @@ export default function EventDetails() {
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Other Requests (Optional)</label>
                             <textarea
-                              className="textarea textarea-bordered w-full"
+                              className="textarea textarea-bordered w-full text-slate-900"
                               placeholder="Any other specific needs..."
                               value={accommodationForm.otherRequests}
                               onChange={e => setAccommodationForm({ ...accommodationForm, otherRequests: e.target.value })}
@@ -699,7 +763,7 @@ export default function EventDetails() {
                         value={newComment}
                         onChange={e => setNewComment(e.target.value)}
                         placeholder="Share your thoughts..."
-                        className="input input-bordered w-full"
+                        className="input input-bordered w-full bg-white text-slate-900 placeholder-slate-400"
                         disabled={submitting}
                       />
                       <button type="submit" disabled={submitting || !newComment.trim()} className="btn btn-primary">Post</button>
@@ -710,6 +774,9 @@ export default function EventDetails() {
             </div>
           </>
         )}
+
+        {/* Vendor Request Modal */}
+        {VendorRequestModal}
 
         {showAnalytics && <EventAnalytics eventId={id} isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />}
         {showFeedback && <FeedbackModal eventId={id} isOpen={showFeedback} onClose={() => setShowFeedback(false)} onSuccess={(v) => {

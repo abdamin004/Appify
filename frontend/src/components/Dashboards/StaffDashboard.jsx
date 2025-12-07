@@ -27,6 +27,7 @@ import {
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
+import CourtsReserve from "../Functions/CourtsReserve";
 import WalletBadge from "../Wallet/WalletBadge";
 import { checkGymSessionOverlap, doTimesOverlap, formatEventDateTime } from "../../utils/overlapDetection";
 import { showOverlapWarning } from "../UI/OverlapWarningDialog";
@@ -37,6 +38,7 @@ function StaffDashboard() {
   const user = storedUser ? JSON.parse(storedUser) : { firstName: "Guest", role: "staff" };
 
   const [activeTab, setActiveTab] = useState("home");
+  const [courts, setCourts] = useState([]);
   const [registeredEvents, setRegisteredEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [favouriteEvents, setFavouriteEvents] = useState([]);
@@ -54,6 +56,7 @@ function StaffDashboard() {
 
   useEffect(() => {
     fetchRegisteredEvents();
+    fetchCourts();
     fetchWallet();
     fetchNotifications();
     fetchReminders();
@@ -475,7 +478,7 @@ function StaffDashboard() {
           return canUserAccessEvent(eventId);
         });
         setRegisteredEvents(filteredEvents);
-        
+
         // Check for overlaps in registered events
         checkForOverlaps(filteredEvents);
       }
@@ -489,20 +492,20 @@ function StaffDashboard() {
   // Function to check for overlaps between all registered events
   const checkForOverlaps = (events) => {
     const warnings = [];
-    
+
     if (!events || events.length < 2) {
       setOverlapWarnings([]);
       return;
     }
-    
+
     // Compare each event with every other event
     for (let i = 0; i < events.length; i++) {
       for (let j = i + 1; j < events.length; j++) {
         const event1 = events[i];
         const event2 = events[j];
-        
+
         if (!event1 || !event2 || !event1.startDate || !event2.startDate) continue;
-        
+
         // Get end times
         const getEndTime = (event) => {
           if (event.endDate) return new Date(event.endDate);
@@ -518,17 +521,17 @@ function StaffDashboard() {
           }
           return null;
         };
-        
+
         const start1 = new Date(event1.startDate);
         const end1 = getEndTime(event1);
         const start2 = new Date(event2.startDate);
         const end2 = getEndTime(event2);
-        
+
         if (!end1 || !end2) continue;
-        
+
         // Check if they overlap
         const overlaps = doTimesOverlap(start1, end1, start2, end2);
-        
+
         if (overlaps) {
           // Check if this warning already exists (avoid duplicates)
           const warningExists = warnings.some(w => {
@@ -538,7 +541,7 @@ function StaffDashboard() {
             const e2Id = event2._id || event2.id;
             return (id1 === e1Id && id2 === e2Id) || (id1 === e2Id && id2 === e1Id);
           });
-          
+
           if (!warningExists) {
             warnings.push({
               event1: {
@@ -556,7 +559,7 @@ function StaffDashboard() {
         }
       }
     }
-    
+
     console.log('Staff Dashboard - Overlap warnings detected:', warnings.length, warnings);
     setOverlapWarnings(warnings);
   };
@@ -611,6 +614,91 @@ function StaffDashboard() {
     }
   };
 
+  // --- Courts Logic ---
+  function generateFakeCourts() {
+    const types = [
+      { type: 'basketball', name: 'Basketball Court A' },
+      { type: 'tennis', name: 'Tennis Court 1' },
+      { type: 'football', name: 'Football Field' }
+    ];
+    const now = new Date();
+    return types.map((t, idx) => {
+      const slots = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + i);
+        const startHour = 10 + i;
+        const endHour = startHour + 1;
+        slots.push({
+          slotId: `fake-slot-${idx}-${i}`,
+          date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(),
+          startTime: `${String(startHour).padStart(2, '0')}:00`,
+          endTime: `${String(endHour).padStart(2, '0')}:00`
+        });
+      }
+      return {
+        _id: `fake-court-${idx}`,
+        id: `fake-court-${idx}`,
+        name: t.name,
+        type: t.type,
+        status: 'available',
+        available: true,
+        location: 'Sports Complex',
+        availabilityDates: slots
+      };
+    });
+  }
+
+  const fetchCourts = async () => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`${API_BASE}/courts`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      const raw = Array.isArray(data) ? data : (Array.isArray(data.courts) ? data.courts : []);
+      const now = new Date();
+      const processed = raw.map(court => {
+        const slots = Array.isArray(court.availability) ? court.availability : [];
+        const availabilityDates = slots
+          .filter(s => {
+            try {
+              if (s.isBooked) return false;
+              const slotDate = new Date(s.date);
+              if (!s.startTime) return false;
+              const [h, m] = s.startTime.split(':').map(x => parseInt(x, 10));
+              slotDate.setHours(h || 0, m || 0, 0, 0);
+              return slotDate >= now;
+            } catch (e) { return false; }
+          })
+          .map(s => ({ slotId: s._id, date: s.date, startTime: s.startTime, endTime: s.endTime }));
+        const available = (court.status === 'available') && availabilityDates.length > 0;
+        return { ...court, availabilityDates, available };
+      });
+      if (processed.length === 0) {
+        setCourts(generateFakeCourts());
+      } else {
+        setCourts(processed);
+      }
+    } catch (err) {
+      console.error(err);
+      setCourts(generateFakeCourts());
+    }
+  };
+
+  function handleReserve(courtId, slotId) {
+    setCourts(prev => (prev || []).map(c => {
+      const cid = String(c._id || c.id);
+      if (cid !== String(courtId)) return c;
+      const remaining = (c.availabilityDates || []).filter(s => String(s.slotId) !== String(slotId));
+      return { ...c, availabilityDates: remaining };
+    }));
+  }
+  // --- End Courts Logic ---
+
   const unreadNotifications = notifications.filter(n => !n.isRead && n.type !== 'EventReminder');
   const unreadReminders = reminders.filter(n => !n.isRead);
 
@@ -618,6 +706,7 @@ function StaffDashboard() {
     { key: "home", label: "Home", icon: "🏠" },
     { key: "browse", label: "Browse Events", icon: "🎯" },
     { key: "gym-sessions", label: "Gym Sessions", icon: "🏋️" },
+    { key: "courts", label: "Book a Court", icon: "🏸" },
     { key: "registered", label: "My Registered", icon: "✓" },
     { key: "favourites", label: "Favourites", icon: "❤️" },
     ...(overlapWarnings.length > 0 ? [{ key: "warnings", label: "⚠️ Time Conflicts", icon: "⚠️", badge: overlapWarnings.length }] : []),
@@ -741,7 +830,7 @@ function StaffDashboard() {
       <div className="mt-6">
         {activeTab === "browse" && (
           <div className="space-y-6">
-            <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />
+            <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"]} />
           </div>
         )}
 
@@ -941,7 +1030,7 @@ function StaffDashboard() {
                     <h3 className="text-lg font-bold text-amber-900">Warning: Time Conflicts Detected</h3>
                   </div>
                   <p className="text-amber-800 text-sm">
-                    You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time. 
+                    You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time.
                     You cannot attend multiple events at the same time. Please consider cancelling one of the conflicting events.
                   </p>
                 </div>
@@ -949,7 +1038,7 @@ function StaffDashboard() {
                   {overlapWarnings.map((warning, index) => {
                     const event1Type = warning.event1.type === 'GymSession' ? 'Gym Session' : warning.event1.type || 'Event';
                     const event2Type = warning.event2.type === 'GymSession' ? 'Gym Session' : warning.event2.type || 'Event';
-                    
+
                     return (
                       <div key={index} className="p-6 bg-red-50 rounded-xl border-2 border-red-200">
                         <div className="flex items-start gap-4">
@@ -1117,6 +1206,12 @@ function StaffDashboard() {
           </div>
         )}
 
+        {activeTab === "courts" && (
+          <div className="space-y-6">
+            <CourtsReserve courts={courts} onReserved={handleReserve} />
+          </div>
+        )}
+
         {activeTab === "gym-sessions" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
             <div className="text-center mb-8 relative">
@@ -1159,7 +1254,8 @@ function StaffDashboard() {
               };
               const alreadyRegistered = (s) => {
                 const id = String(s._id || s.id);
-                return gymSessions.some(gs => String(gs._id || gs.id) === id && gs.registered);
+                // Check against registeredEvents state which is reliable
+                return registeredEvents.some(re => String(re._id || re.id) === id);
               };
               return (
                 <div className="flex flex-col gap-10">
@@ -1182,9 +1278,6 @@ function StaffDashboard() {
                             <div key={tk} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
                               <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
                                 <div className="font-bold text-slate-800 text-lg">{tk}</div>
-                                <span className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">
-                                  {byType[tk].length} Sessions
-                                </span>
                               </div>
                               <ul className="divide-y divide-slate-100">
                                 {byType[tk]
@@ -1261,13 +1354,15 @@ function StaffDashboard() {
         )}
       </div>
 
-      {topUpOpen && (
-        <TopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onSuccess={(res) => {
-          const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
-          if (typeof next === 'number') setWalletBalance(next);
-        }} />
-      )}
-    </DashboardLayout>
+      {
+        topUpOpen && (
+          <TopUpDialog open={topUpOpen} onClose={() => setTopUpOpen(false)} onSuccess={(res) => {
+            const next = (res && typeof res.balance === 'number') ? res.balance : undefined;
+            if (typeof next === 'number') setWalletBalance(next);
+          }} />
+        )
+      }
+    </DashboardLayout >
   );
 }
 
