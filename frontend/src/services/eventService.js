@@ -280,10 +280,14 @@ export async function getEventRatings(id) {
   }
 }
 
-export function rateEvent(id, value) {
-  // Backend expects POST /events/:id/ratings with { rating: value }
-  // Frontend was calling /events/:id/rate with { value }
-  return http('POST', `${API_BASE}/events/${id}/ratings`, { rating: value });
+export function rateEvent(id, data) {
+  // Backend expects POST /events/:id/ratings with { ratings: {...}, comment } (New) or { rating: value } (Legacy)
+  const payload = typeof data === 'object' ? data : { rating: data };
+  return http('POST', `${API_BASE}/events/${id}/ratings`, payload);
+}
+
+export function getEventAnalytics(id) {
+  return http('GET', `${API_BASE}/events/${id}/analytics`);
 }
 
 // Comments (auth required to add/delete)
@@ -418,7 +422,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
       const adminService = await import('./adminService');
       const professors = await adminService.listAllUsers('Professor');
       const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-      
+
       // Create notification for each professor
       professorList.forEach(professor => {
         const professorId = String(professor._id || professor.id);

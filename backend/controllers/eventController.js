@@ -9,21 +9,14 @@ const Booth = require('../models/Booth');
 const Conference = require('../models/Conference');
 const GymSession = require('../models/GymSession'); // NEW
 const Comment = require('../models/Comment');
-const Rating = require('../models/Rating');
+const Rating = require('../models/Rating'); // Legacy
+const Feedback = require('../models/Feedback');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
-const {
-    sendGymSessionCancellationEmail,
-    sendGymSessionUpdateEmail,
-    sendVendorVisitorPassesEmail,
-    sendIndividualVisitorPassEmail
-} = require('../utils/sendEmail');
-const Notification = require('../models/Notification');
-const VisitorPass = require('../models/VisitorPass');
-const QRCode = require('qrcode');
-const crypto = require('crypto');
+const checkSchedulingConflict = require('../utils/conflictChecker');
 
-const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'EventOffice'];
+const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin', 'Vendor'];
+
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
 async function attachApprovedParticipants(events) {
@@ -166,7 +159,7 @@ module.exports = {
                 durationMinutes,
                 prerequisites
             } = req.body;
-        
+
             // Check for duplicate events (same title, location, and startDate)
             if (title && location && startDate) {
                 const existingEvent = await Event.findOne({
@@ -175,14 +168,14 @@ module.exports = {
                     startDate: new Date(startDate),
                     status: { $ne: 'cancelled' } // Don't count cancelled events as duplicates
                 });
-                
+
                 if (existingEvent) {
-                    return res.status(409).json({ 
-                        error: 'An event with the same title, location, and start date already exists' 
+                    return res.status(409).json({
+                        error: 'An event with the same title, location, and start date already exists'
                     });
                 }
             }
-        
+
             const eventData = {
                 title,
                 shortDescription,
@@ -519,7 +512,21 @@ module.exports = {
                 }
             }
 
-            // Check if user already registered
+            // Check for scheduling conflicts
+            const eventStart = new Date(event.startDate);
+            // Default to 2 hours if no end date provided
+            const eventEnd = event.endDate ? new Date(event.endDate) : new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+
+            const conflict = await checkSchedulingConflict(userId, eventStart, eventEnd);
+            if (conflict.conflict) {
+                return res.status(409).json({
+                    success: false,
+                    message: `Scheduling Conflict: You are already busy during this time with "${conflict.title}"`,
+                    conflictDetails: conflict
+                });
+            }
+
+            // Check if user already registered (existing check)
             if (user.registeredEvents && user.registeredEvents.includes(eventId)) {
                 return res.status(400).json({
                     success: false,
@@ -733,18 +740,18 @@ module.exports = {
             if (event.type === 'Workshop' && description !== undefined) {
                 const originalDescription = event.description || '';
                 const newDescription = description || '';
-                
+
                 // Check if original description had edit request markers
                 const editRequestRegex = /--- EDIT REQUEST FROM EVENTS OFFICE \([^)]+\) ---[\s\S]*?--- END EDIT REQUEST ---/g;
                 const originalHadEditRequests = editRequestRegex.test(originalDescription);
                 const newHasEditRequests = editRequestRegex.test(newDescription);
-                
+
                 // If original had edit requests but new one doesn't, professor addressed them
                 if (originalHadEditRequests && !newHasEditRequests) {
                     try {
                         // Get all EventOffice users
                         const eventOfficeUsers = await User.find({ role: 'EventOffice' });
-                        
+
                         // Create backend notification
                         await Notification.create({
                             type: 'WorkshopEditSubmitted',
@@ -752,7 +759,7 @@ module.exports = {
                             event: event._id,
                             recipientsRoles: ['EventOffice']
                         });
-                        
+
                         // Also add to each EventOffice user's notifications array (legacy support)
                         for (const officeUser of eventOfficeUsers) {
                             officeUser.notifications.push({
@@ -1053,19 +1060,19 @@ module.exports = {
             event.status = 'published';
             await event.save();
 
-        //  New Event Published notification
-        try {
-            await Notification.create({
-                type: 'NewEventPublished',
-                message: `A new ${event.type || 'event'} has been published: ${event.title}`,
-                event: event._id,
-                recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
-            });
-        } catch (notifyErr) {
-            // don't fail the request because of a notification error
-        }
+            //  New Event Published notification
+            try {
+                await Notification.create({
+                    type: 'NewEventPublished',
+                    message: `A new ${event.type || 'event'} has been published: ${event.title}`,
+                    event: event._id,
+                    recipientsRoles: ['Student', 'Staff', 'EventOffice', 'TA', 'Professor']
+                });
+            } catch (notifyErr) {
+                // don't fail the request because of a notification error
+            }
 
-        res.status(200).json({ success: true, message: 'Event published successfully', event });
+            res.status(200).json({ success: true, message: 'Event published successfully', event });
         } catch (err) {
             res.status(500).json({ success: false, error: err.message });
         }
@@ -1147,9 +1154,20 @@ module.exports = {
                 });
             }
 
-            const ratings = await Rating.find({ event: eventId })
-                .populate('user', 'firstName lastName email') // adjust to your User fields
+            // Fetch Feedbacks
+            const feedbacks = await Feedback.find({ event: eventId })
+                .populate('user', 'firstName lastName email')
                 .sort({ createdAt: -1 });
+
+            // Map to legacy format expected by frontend, but include new data
+            const ratings = feedbacks.map(f => ({
+                _id: f._id,
+                user: f.user,
+                rating: f.ratings.overall, // Legacy field
+                ratings: f.ratings, // New structure
+                comment: f.comment,
+                createdAt: f.createdAt
+            }));
 
             const count = ratings.length;
             const average =
@@ -1172,70 +1190,135 @@ module.exports = {
     },
 
 
-
-    // Wrapper function for route /:id/ratings (maps id to eventId)
+    // Add a rating on an event (ONLY after event has ended)
     async addEventRating(req, res) {
-        const eventId = req.params.id;
-        const { rating } = req.body;
-        const userId = req.user._id;
-
         try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+            const { rating, ratings, comment } = req.body;
+
             const event = await Event.findById(eventId);
             if (!event) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Event not found'
-                });
+                return res.status(404).json({ success: false, message: 'Event not found' });
             }
 
+            // Check if event has ended
             const now = new Date();
+            const end = event.endDate ? new Date(event.endDate) : null;
+            // Using startDate as fallback if endDate is missing
+            const start = event.startDate ? new Date(event.startDate) : null;
 
-            if (!event.endDate || new Date(event.endDate) > now) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You can only rate this event after it has ended.'
-                });
+            // Logic: If endDate provided, must be past. If not, maybe fallback to start + 2h? 
+            // For now, strict check: if endDate exists, it must be in the past.
+            if (end && end > now) {
+                return res.status(400).json({ success: false, message: 'You can only rate an event after it has ended' });
+            }
+            // If strictly no endDate, we might skip check or assume it's okay (or check start).
+            // Let's assume if start is in future it's definitely not ended.
+            if (!end && start && start > now) {
+                return res.status(400).json({ success: false, message: 'Event has not started yet' });
             }
 
+            // Check if user is registered
             if (!event.registeredUsers || !event.registeredUsers.some(u => u.toString() === userId.toString())) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'You must be registered for this event to rate it.'
-                });
+                return res.status(403).json({ success: false, message: 'You must be registered for this event to rate it.' });
             }
 
-            const numericRating = Number(rating);
-            if (Number.isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Rating must be a number between 1 and 5.'
-                });
+            // Construct ratings object
+            let finalRatings = ratings || {};
+
+            // Support legacy 'rating' field from frontend if 'ratings' object is missing/incomplete
+            if (!finalRatings.overall && rating) {
+                finalRatings.overall = rating;
             }
 
-            const existing = await Rating.findOne({ event: eventId, user: userId });
-            if (existing) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'You have already rated this event.'
-                });
+            if (!finalRatings.overall) {
+                return res.status(400).json({ success: false, message: 'Overall rating is required' });
             }
 
-            const newRating = await Rating.create({
+            await Feedback.create({
                 event: eventId,
                 user: userId,
-                rating: numericRating
+                ratings: finalRatings,
+                comment
             });
 
-            return res.status(201).json({
-                success: true,
-                message: 'Rating added successfully',
-                rating: newRating
-            });
+            return res.status(201).json({ success: true, message: 'Rating submitted successfully' });
+
         } catch (err) {
-            return res.status(500).json({
-                success: false,
-                message: err.message
+            // Handle duplicate key error (user already rated this event)
+            if (err.code === 11000) {
+                return res.status(400).json({ success: false, message: 'You have already rated this event' });
+            }
+            return res.status(500).json({ success: false, message: err.message });
+        }
+    },
+
+    // Detailed Analytics for Event Creators (Professor/EventOffice)
+    async getEventAnalytics(req, res) {
+        try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+            const userRole = req.user.role;
+
+            const event = await Event.findById(eventId);
+            if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
+
+            // Authorization: Creator or Admin/EventOffice
+            const isCreator = event.createdBy && event.createdBy.toString() === userId.toString();
+            const isAdmin = ['Admin', 'EventOffice'].includes(userRole);
+
+            if (!isCreator && !isAdmin) {
+                return res.status(403).json({ success: false, message: 'Not authorized to view analytics' });
+            }
+
+            const feedbacks = await Feedback.find({ event: eventId }).populate('user', 'firstName lastName');
+
+            const total = feedbacks.length;
+            if (total === 0) {
+                return res.status(200).json({
+                    success: true,
+                    total: 0,
+                    averages: { overall: 0, content: 0, speaker: 0, organization: 0 },
+                    comments: []
+                });
+            }
+
+            // Calculate averages
+            const sums = { overall: 0, content: 0, speaker: 0, organization: 0 };
+            const comments = [];
+
+            feedbacks.forEach(f => {
+                sums.overall += f.ratings.overall || 0;
+                sums.content += f.ratings.content || 0;
+                sums.speaker += f.ratings.speaker || 0;
+                sums.organization += f.ratings.organization || 0;
+                if (f.comment) {
+                    comments.push({
+                        text: f.comment,
+                        user: f.user ? `${f.user.firstName} ${f.user.lastName}` : 'Unknown User',
+                        rating: f.ratings.overall,
+                        date: f.createdAt
+                    });
+                }
             });
+
+            const averages = {
+                overall: Number((sums.overall / total).toFixed(1)),
+                content: Number((sums.content / total).toFixed(1)),
+                speaker: Number((sums.speaker / total).toFixed(1)),
+                organization: Number((sums.organization / total).toFixed(1))
+            };
+
+            return res.status(200).json({
+                success: true,
+                total,
+                averages,
+                comments
+            });
+
+        } catch (err) {
+            return res.status(500).json({ success: false, message: err.message });
         }
     },
 
@@ -1528,3 +1611,5 @@ module.exports = {
 
 
 };
+
+
