@@ -49,26 +49,26 @@ Screenshots will be added to illustrate the full user journey.
 
 ---
 
-### Events Office Dashboard
-![edash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0121.jpg)
+### Login Dashboard
+![edash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0031.jpg)
 
-### Admin Dashboard
-![adash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0122.jpg)
+### Sign Up Dashboard
+![adash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0032.jpg)
+
+### TA Dashboard
+![vdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0033.jpg)
+
 
 ### Vendor Dashboard
-![vdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0123.jpg)
+![pdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0034.jpg)
+
+
+### Student Dashboard
+![sdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0035.jpg)
 
 
 ### Professor Dashboard
-![pdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0124.jpg)
-
-
-### Staff Dashboard
-![sdash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0125.jpg)
-
-
-### Staff Dashboard
-![tadash](https://github.com/abdamin004/Appify/blob/main/IMG-20251129-WA0126.jpg)
+![tadash](https://github.com/abdamin004/Appify/blob/main/IMG-20251207-WA0036.jpg)
 
  
 ## 🛠️ **Tech Stack**
@@ -462,6 +462,7 @@ Appify was developed solely as part of a **university academic project**, and is
 You are free to view the code for learning purposes, but redistribution, sublicensing, or commercial use is not permitted unless explicitly approved by the project owners.
 
 If you wish to reuse any part of this project, please contact the team first.
+
 
 
 
