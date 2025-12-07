@@ -279,7 +279,10 @@ export default function EventDetails() {
 
     if (event?.type === 'Workshop' && (attended || userIsRegistered)) {
       getWorkshopResources(id)
-        .then(res => setWorkshopResources(Array.isArray(res) ? res : []))
+        .then(res => {
+          const resources = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+          setWorkshopResources(resources);
+        })
         .catch(err => console.error('Failed to load workshop resources', err));
     }
   }, [event, attended, id, currentUserId]);
@@ -435,12 +438,13 @@ export default function EventDetails() {
                       null
                     )}
 
-                    {/* Analytics Button */}
-                    {(isEventOffice || (event && String(event.createdBy?._id || event.createdBy) === String(currentUserId))) && (
+                    {/* Analytics Button removed for all users */ /*
+                    {isEventOffice && (
                       <div className="tooltip" data-tip="View detailed feedback statistics">
                         <button onClick={() => setShowAnalytics(true)} className="btn btn-info btn-sm text-white gap-2">📊 Analytics</button>
                       </div>
                     )}
+                    */}
 
                     {canDelete && !hasRegistrations && (
                       <button onClick={handleDeleteEvent} className="btn btn-error btn-sm text-white gap-2">🗑️ Delete</button>
@@ -578,7 +582,7 @@ export default function EventDetails() {
                           {workshopResources.map((res, idx) => (
                             <a
                               key={idx}
-                              href={res.url}
+                              href={res.url && res.url.startsWith('http') ? res.url : `http://localhost:5001${res.url}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 p-4 bg-white rounded-lg shadow-sm border border-emerald-200 hover:shadow-md hover:border-emerald-300 transition-all group"

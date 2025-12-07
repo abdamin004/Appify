@@ -1965,10 +1965,9 @@ module.exports = {
             const workshopId = req.params.id;
             const userId = req.user._id;
 
-            const workshop = await Workshop.findById(workshopId).populate(
-                'attendedParticipants',
-                '_id firstName lastName email'
-            );
+            const workshop = await Workshop.findById(workshopId)
+                .populate('attendedParticipants', '_id firstName lastName email')
+                .populate('registeredUsers', '_id');
             if (!workshop) {
                 return res.status(404).json({
                     success: false,
@@ -1993,7 +1992,11 @@ module.exports = {
                 (u) => (u._id || u).toString() === userId.toString()
             );
 
-            if (!hasAttended && !isStaff && !isRegistered) {
+            // Also allow the creator to see their own resources
+            const isCreator = workshop.createdBy && workshop.createdBy.toString() === userId.toString();
+
+            if (!hasAttended && !isStaff && !isRegistered && !isCreator) {
+                console.log(`Access denied to resources for user ${userId}. Registered: ${isRegistered}, Creator: ${isCreator}`);
                 return res.status(403).json({
                     success: false,
                     message: 'Only registered participants who attended this workshop can access its resources'
