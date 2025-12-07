@@ -87,8 +87,7 @@ const getLocation = (evt) => evt.location || 'TBA';
 const getCapacity = (evt) => evt.capacity || 0;
 const getPrice = (evt) => evt.ticketPrice || 0;
 const getFundingSource = (evt) => evt.fundingSource;
-const canRate = (evt) => !!(evt.attended || evt.attendedParticipants?.includes(evt.currentUserId)); // Simplified logic
-const isRegistered = (evt) => true; // Simplified for display purposes
+// Note: isRegistered removed from here to avoid duplication/errors, defined in component.
 
 const getEventColor = (type) => {
   switch (String(type || '').toLowerCase()) {
@@ -142,32 +141,82 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
   // Interaction states
   const [attendedSet, setAttendedSet] = useState(new Set());
 
-  // Helpers for user interaction
-  const setEventRating = async (id, val) => {
+  // Check if user is registered for the event
+  const isRegistered = (evt) => {
     try {
-      setRatings(prev => {
-        const next = { ...prev, [id]: val };
-        saveRatings(next);
-        return next;
+      const raw = localStorage.getItem('user');
+      if (!raw) return false;
+      const user = JSON.parse(raw);
+      const userId = user && (user._id || user.id);
+      if (!userId) return false;
+
+      // Check registeredUsers array in event
+      const registeredUsers = evt?.registeredUsers || evt?.event?.registeredUsers || [];
+      return Array.isArray(registeredUsers) && registeredUsers.some(u => {
+        const uId = String(u._id || u.id || u);
+        return uId === String(userId);
       });
-      await rateEvent(id, val);
-      showToast.success('Rating saved!');
-    } catch (err) {
-      showToast.error('Failed to save rating');
+    } catch {
+      return false;
     }
   };
 
-  const toggleAttendedLocal = async (id) => {
+  const setEventRating = async (eventId, value) => {
+    // Check if event has ended and user is registered
+    const evt = events.find(e => getEventId(e) === eventId);
+    if (!evt) {
+      showToast.error('Event not found');
+      return;
+    }
+
+    const hasEnded = hasEventEnded(evt);
+    const isReg = isRegistered(evt);
+
+    if (!hasEnded) {
+      showToast.warning('You can only rate events after they have ended');
+      return;
+    }
+
+    if (!isReg) {
+      showToast.warning('You must be registered for this event to rate it');
+      return;
+    }
+
+    // Update local state immediately for better UX
+    setRatings((prev) => {
+      const next = { ...prev, [eventId]: value };
+      saveRatings(next);
+      return next;
+    });
+
+    // Send to backend
     try {
-      await toggleAttended(id);
-      setAttendedSet(prev => {
-        const next = new Set(prev);
-        if (next.has(String(id))) next.delete(String(id));
-        else next.add(String(id));
+      await rateEvent(eventId, value);
+      showToast.success('Rating submitted successfully!');
+
+      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('rating:added', {
+            detail: { eventId: String(eventId) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+        } catch (err) {
+          console.error('Error dispatching rating:added event:', err);
+        }
+      }, 500);
+    } catch (err) {
+      console.error('Failed to save rating to backend:', err);
+      // Revert local state on error
+      setRatings((prev) => {
+        const next = { ...prev };
+        delete next[eventId];
+        saveRatings(next);
         return next;
       });
-    } catch (err) {
-      showToast.error('Failed to update attendance');
+      showToast.error(err?.message || 'Failed to save rating.');
     }
   };
 
@@ -196,50 +245,8 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
     if (events) {
       const attendantIds = events.filter(e => e.attended).map(e => getEventId(e));
       setAttendedSet(new Set(attendantIds.map(String)));
-    }
-  }, [events]);
 
-  useEffect(() => {
-    // Fetch wallet balance
-    getWalletBalance().then(bal => setWalletBalance(bal)).catch(() => setWalletBalance(null));
-  }, []);
-
-  const toggleComments = async (id) => {
-    setOpenComments(prev => ({ ...prev, [id]: !prev[id] }));
-    if (!openComments[id] && !commentsByEvent[id]) {
-      try {
-        setCommentsLoading(prev => ({ ...prev, [id]: true }));
-        const list = await getEventComments(id);
-        setCommentsByEvent(prev => ({ ...prev, [id]: list }));
-        setCommentsError(prev => ({ ...prev, [id]: null }));
-      } catch (err) {
-        console.error('Failed to load comments', err);
-        setCommentsError(prev => ({ ...prev, [id]: 'Failed to load comments' }));
-      } finally {
-        setCommentsLoading(prev => ({ ...prev, [id]: false }));
-      }
-    }
-  };
-
-  const submitComment = async (id) => {
-    const text = newCommentByEvent[id];
-    if (!text || !text.trim()) return;
-    try {
-      setCommentsLoading(prev => ({ ...prev, [id]: true }));
-      const newComment = await addEventComment(id, text);
-      setCommentsByEvent(prev => ({ ...prev, [id]: [...(prev[id] || []), newComment] }));
-      setNewCommentByEvent(prev => ({ ...prev, [id]: '' }));
-      showToast.success('Comment posted');
-    } catch (err) {
-      showToast.error('Failed to post comment');
-    } finally {
-      setCommentsLoading(prev => ({ ...prev, [id]: false }));
-    }
-  };
-
-  useEffect(() => {
-    // Fetch prices for all events
-    if (events && events.length > 0) {
+      // Fetch prices for all events
       events.forEach(async (evt) => {
         const id = getEventId(evt);
         if (id && !eventPrices[id]) {
@@ -253,6 +260,62 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
       });
     }
   }, [events]);
+
+  useEffect(() => {
+    // Fetch wallet balance
+    getWalletBalance().then(bal => setWalletBalance(bal)).catch(() => setWalletBalance(null));
+  }, []);
+
+  const loadComments = async (eventId) => {
+    try {
+      setCommentsLoading(prev => ({ ...prev, [eventId]: true }));
+      setCommentsError(prev => ({ ...prev, [eventId]: "" }));
+      const rows = await getEventComments(eventId);
+      setCommentsByEvent(prev => ({ ...prev, [eventId]: Array.isArray(rows) ? rows : [] }));
+    } catch (err) {
+      setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to load comments" }));
+    } finally {
+      setCommentsLoading(prev => ({ ...prev, [eventId]: false }));
+    }
+  };
+
+  const toggleComments = async (id) => {
+    setOpenComments(prev => ({ ...prev, [id]: !prev[id] }));
+    if (!openComments[id]) {
+      await loadComments(id);
+    }
+  };
+
+  const submitComment = async (id) => {
+    const text = newCommentByEvent[id];
+    if (!text || !text.trim()) return;
+    try {
+      setCommentsLoading(prev => ({ ...prev, [id]: true }));
+      await addEventComment(id, text);
+      setNewCommentByEvent(prev => ({ ...prev, [id]: '' }));
+      await loadComments(id);
+      showToast.success('Comment posted');
+
+      setTimeout(() => {
+        try {
+          const event = new CustomEvent('comment:added', {
+            detail: { eventId: String(id) },
+            bubbles: true,
+            cancelable: true
+          });
+          window.dispatchEvent(event);
+        } catch (err) {
+          console.error(err);
+        }
+      }, 500);
+
+    } catch (err) {
+      showToast.error('Failed to post comment');
+      setCommentsError(prev => ({ ...prev, [id]: 'Failed to post comment' }));
+    } finally {
+      setCommentsLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   const handlePay = async (evt, method) => {
     const id = getEventId(evt);
@@ -288,104 +351,24 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
     }
   };
 
+  const toggleAttendedLocal = async (id) => {
+    try {
+      await toggleAttended(id);
+      setAttendedSet(prev => {
+        const next = new Set(prev);
+        if (next.has(String(id))) next.delete(String(id));
+        else next.add(String(id));
+        return next;
+      });
+    } catch (err) {
+      showToast.error('Failed to update attendance');
+    }
+  };
+
   // Wrappers to match JSX usage
   const handleCardPay = (evt) => handlePay(evt, 'card');
   const handleWalletPay = (evt) => handlePay(evt, 'wallet');
   const handleRefundAndCancel = (evt) => handleRefund(evt);
-
-  const renderContent = () => {
-    if (!events || !Array.isArray(events)) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
-          <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">Loading events...</h3>
-          <p className="text-slate-500">Please wait while we fetch your events.</p>
-        </div>
-      );
-    }
-  }
-
-  const setEventRating = async (eventId, value) => {
-    // Check if event has ended and user is registered
-    const evt = events.find(e => getEventId(e) === eventId);
-    if (!evt) {
-      showToast.error('Event not found');
-      return;
-    }
-
-    const hasEnded = hasEventEnded(evt);
-    const isReg = isRegistered(evt);
-
-    if (!hasEnded) {
-      showToast.warning('You can only rate events after they have ended');
-      return;
-    }
-
-    if (!isReg) {
-      showToast.warning('You must be registered for this event to rate it');
-      return;
-    }
-
-    // Update local state immediately for better UX
-    setRatings((prev) => {
-      const next = { ...prev, [eventId]: value };
-      saveRatings(next);
-      return next;
-    });
-
-    // Send to backend
-    try {
-      await rateEvent(eventId, value);
-      showToast.success('Rating submitted successfully!');
-      
-      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
-      // Use a small delay to ensure the backend has processed the rating
-      setTimeout(() => {
-        try {
-          const event = new CustomEvent('rating:added', { 
-            detail: { eventId: String(eventId) },
-            bubbles: true,
-            cancelable: true
-          });
-          window.dispatchEvent(event);
-          console.log('MyEventsList: Dispatched rating:added event for eventId:', eventId);
-        } catch (err) {
-          console.error('Error dispatching rating:added event:', err);
-        }
-      }, 500);
-    } catch (err) {
-      console.error('Failed to save rating to backend:', err);
-      // Revert local state on error
-      setRatings((prev) => {
-        const next = { ...prev };
-        delete next[eventId];
-        saveRatings(next);
-        return next;
-      });
-      showToast.error(err?.message || 'Failed to save rating. Please try again.');
-
-    if (events.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
-          <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <span>📭</span> No events found
-          </h3>
-          <p className="text-slate-500">
-            You don't have any events in this category yet.
-          </p>
-        </div>
-      );
-    }
-
-  const hasEventEnded = (evt) => {
-    try {
-      const end = getEnd(evt) || getStart(evt);
-      if (!end) return false;
-      return new Date(end).getTime() < Date.now();
-    } catch (_) {
-      return false;
-    }
-  };
 
   // Rating allowed if: event has ended AND user is registered
   const canRate = (evt) => {
@@ -393,89 +376,39 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
     return isRegistered(evt);
   };
 
-  // Check if user is registered for the event (for comments - requirement 17)
-  const isRegistered = (evt) => {
-    try {
-      const raw = localStorage.getItem('user');
-      if (!raw) return false;
-      const user = JSON.parse(raw);
-      const userId = user && (user._id || user.id);
-      if (!userId) return false;
-
-      // Check registeredUsers array in event
-      const registeredUsers = evt?.registeredUsers || evt?.event?.registeredUsers || [];
-      return Array.isArray(registeredUsers) && registeredUsers.some(u => {
-        const uId = String(u._id || u.id || u);
-        return uId === String(userId);
-      });
-    } catch {
-      return false;
-    }
-  };
-
-  const toggleAttendedLocal = (eventId) => {
-    const next = new Set(toggleAttended(eventId).map(String));
-    setAttendedSet(next);
-  };
-
-  // Comments helpers
-  const toggleComments = async (eventId) => {
-    setOpenComments(prev => ({ ...prev, [eventId]: !prev[eventId] }));
-    if (!openComments[eventId]) {
-      await loadComments(eventId);
-    }
-  };
-
-  const loadComments = async (eventId) => {
-    try {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: true }));
-      setCommentsError(prev => ({ ...prev, [eventId]: "" }));
-      const rows = await getEventComments(eventId);
-      // getEventComments now returns array directly (handles backend format)
-      setCommentsByEvent(prev => ({ ...prev, [eventId]: Array.isArray(rows) ? rows : [] }));
-    } catch (err) {
-      setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to load comments" }));
-    } finally {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: false }));
-    }
-  };
-
-  const submitComment = async (eventId) => {
-    const txt = (newCommentByEvent[eventId] || "").trim();
-    if (!txt) return;
-    try {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: true }));
-      await addEventComment(eventId, txt);
-      setNewCommentByEvent(prev => ({ ...prev, [eventId]: "" }));
-      await loadComments(eventId);
-      showToast.success('Comment added successfully!');
-      
-      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
-      // Use a small delay to ensure the backend has processed the comment
-      setTimeout(() => {
-        try {
-          const event = new CustomEvent('comment:added', { 
-            detail: { eventId: String(eventId) },
-            bubbles: true,
-            cancelable: true
-          });
-          window.dispatchEvent(event);
-          console.log('MyEventsList: Dispatched comment:added event for eventId:', eventId);
-        } catch (err) {
-          console.error('Error dispatching comment:added event:', err);
-        }
-      }, 500);
-    } catch (err) {
-      setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to add comment" }));
-      showToast.error(err?.message || "Failed to add comment");
-    } finally {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: false }));
-    }
-  };
-
-  // Loading / empty states
+  // Render logic
   if (!events || !Array.isArray(events)) {
     return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
+        <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">Loading events...</h3>
+        <p className="text-slate-500">Please wait while we fetch your events.</p>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100 text-center">
+        <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+          <span>📭</span> No events found
+        </h3>
+        <p className="text-slate-500">
+          You don't have any events in this category yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {(title || description) && (
+        <div className="mb-2">
+          {title && <h2 className="text-2xl font-bold text-slate-900">{title}</h2>}
+          {description && <p className="text-slate-500">{description}</p>}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {events.map((evt) => {
           const id = getEventId(evt);
@@ -634,27 +567,27 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
                       {openComments[id] ? 'Hide Comments' : 'Show Comments'}
                     </button>
 
-                  {!commentsLoading[id] && !commentsError[id] && (
-                    <div className="space-y-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                      {(!commentsByEvent[id] || commentsByEvent[id].length === 0) ? (
-                        <p className="text-center text-slate-400 text-xs py-4 bg-slate-50 rounded-lg">No comments yet.</p>
-                      ) : (
-                        commentsByEvent[id].map((c, i) => (
-                          <div key={i} className="bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="font-bold text-slate-800 text-xs">
-                                {c.user?.firstName || 'User'} {c.user?.lastName || ''}
-                              </span>
-                              <span className="text-xs text-slate-400">
-                                {new Date(c.createdAt).toLocaleDateString()}
-                              </span>
+                    {!commentsLoading[id] && !commentsError[id] && (
+                      <div className="space-y-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                        {(!commentsByEvent[id] || commentsByEvent[id].length === 0) ? (
+                          <p className="text-center text-slate-400 text-xs py-4 bg-slate-50 rounded-lg">No comments yet.</p>
+                        ) : (
+                          commentsByEvent[id].map((c, i) => (
+                            <div key={i} className="bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
+                              <div className="flex justify-between items-start mb-1">
+                                <span className="font-bold text-slate-800 text-xs">
+                                  {c.user?.firstName || 'User'} {c.user?.lastName || ''}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  {new Date(c.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap break-words">{c.content || c.comment || c.text || 'No content'}</p>
                             </div>
-                            <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap break-words">{c.content || c.comment || c.text || 'No content'}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
+                          ))
+                        )}
+                      </div>
+                    )}
                     {canRefund && (
                       <button
                         type="button"
@@ -715,7 +648,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
                                     {new Date(c.createdAt).toLocaleDateString()}
                                   </span>
                                 </div>
-                                <p className="text-slate-600 text-xs leading-relaxed">{c.comment}</p>
+                                <p className="text-slate-600 text-xs leading-relaxed">{c.comment || c.content}</p>
                               </div>
                             ))
                           )}
@@ -758,19 +691,6 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
           );
         })}
       </div>
-    );
-  };
-
-
-  return (
-    <div className="space-y-6">
-      {(title || description) && (
-        <div className="mb-2">
-          {title && <h2 className="text-2xl font-bold text-slate-900">{title}</h2>}
-          {description && <p className="text-slate-500">{description}</p>}
-        </div>
-      )}
-      {renderContent()}
     </div>
   );
 }

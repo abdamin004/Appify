@@ -5,17 +5,7 @@ import { getEventById, getEventComments, getEventRatings, addEventComment, delet
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
 import EventAnalytics from './Dashboards/EventAnalytics';
 import FeedbackModal from './Modals/FeedbackModal';
-import {
-  getEventById,
-  getEventComments,
-  getEventRatings,
-  addEventComment,
-  deleteEventComment,
-  registerForEvent,
-  rateEvent,
-  deleteEvent,
-  exportEventRegistrations
-} from '../services/eventService';
+
 import { showToast, confirmDialog } from '../utils/toast';
 import { FaStar } from 'react-icons/fa';
 
@@ -267,17 +257,7 @@ export default function EventDetails() {
     }
   }, [event, attended, id, currentUserId]);
 
-  // Check if user is registered - handle both populated objects and IDs
-  const isRegistered = (() => {
-    if (!event || !currentUserId) return false;
-    const registeredUsers = event.registeredUsers || [];
-    if (!Array.isArray(registeredUsers)) return false;
-    return registeredUsers.some(u => {
-      // Handle both populated objects and plain IDs
-      const userId = u?._id || u?.id || u;
-      return String(userId) === String(currentUserId);
-    });
-  })();
+
 
   const [showAccommodationModal, setShowAccommodationModal] = useState(false);
   const [accommodationForm, setAccommodationForm] = useState({
@@ -286,7 +266,6 @@ export default function EventDetails() {
     otherRequests: ''
   });
 
-  function handleRegister() {
   async function handleRegister() {
     if (!tokenPresent) {
       showToast.warning('Please log in to register');
@@ -713,29 +692,16 @@ export default function EventDetails() {
                     </div>
                   )}
 
-                  {/* Add Comment Form */}
-                  {tokenPresent && isRegistered ? (
-                    <form onSubmit={submitComment} className="mt-auto pt-4 border-t border-slate-100">
-                      <div className="flex gap-3">
-                        <input
-                          type="text"
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Share your thoughts..."
-                          className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          disabled={submitting}
-                        />
-                        <button
-                          type="submit"
-                          disabled={submitting || !newComment.trim()}
-                          className={`btn btn-primary px-6 ${submitting ? 'loading' : ''}`}
-                        >
-                          Post
-                        </button>
-                      </div>
                   {tokenPresent && isRegistered && (
                     <form onSubmit={submitComment} className="mt-auto pt-4 border-t border-slate-100 flex gap-3">
-                      <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Share thoughts..." className="input input-bordered w-full" disabled={submitting} />
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={e => setNewComment(e.target.value)}
+                        placeholder="Share your thoughts..."
+                        className="input input-bordered w-full"
+                        disabled={submitting}
+                      />
                       <button type="submit" disabled={submitting || !newComment.trim()} className="btn btn-primary">Post</button>
                     </form>
                   )}
