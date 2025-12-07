@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getEventComments, addEventComment, rateEvent } from "../../services/eventService";
+import { rateEvent, getEventPrice, getEventById } from "../../services/eventService";
 import { getAttendedIds, toggleAttended } from "../../services/attendanceService";
-import { FaStar } from "react-icons/fa";
-import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance, getEventPrice } from "../../services/paymentService";
-import PaymentActions from "../Payments/PaymentActions";
+import { refundAndCancel, createCheckoutSession, payWithWallet, getWalletBalance } from "../../services/paymentService";
 import { showToast, confirmDialog } from "../../utils/toast";
-
+import EventCard from "../Cards/EventCard";
+import { getFavouriteIds, toggleFavourite } from '../../services/favoritesService';
 
 // Per-user ratings storage key (frontend-only persistence)
 const ratingsStorageKeyForUser = () => {
@@ -41,76 +40,15 @@ const saveRatings = (ratings) => {
   }
 };
 
-function RatingStars({ value = 0, onChange, disabled = false }) {
-  const [hover, setHover] = useState(0);
-  const active = hover || value || 0;
-  const stars = [1, 2, 3, 4, 5];
-
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className="flex items-center"
-        role="radiogroup"
-        aria-label="Rate event"
-      >
-        {stars.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => !disabled && onChange && onChange(s)}
-            onMouseEnter={() => !disabled && setHover(s)}
-            onMouseLeave={() => !disabled && setHover(0)}
-            aria-label={`Rate ${s} star${s > 1 ? "s" : ""}`}
-            aria-checked={active === s}
-            role="radio"
-            disabled={disabled}
-            className={`p-1 bg-transparent border-none ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:scale-110 transition-transform"}`}
-          >
-            <FaStar size={20} color={s <= active ? "#fbbf24" : "#e2e8f0"} />
-          </button>
-        ))}
-      </div>
-      {value > 0 && (
-        <span className="text-slate-500 text-xs font-semibold">You rated {value}/5</span>
-      )}
-    </div>
-  );
-}
-
 // Helper functions to safely extract data from different event types (Workshop, Course, etc.)
 const getEventId = (evt) => evt._id || evt.id;
 const getType = (evt) => evt.type || 'Event';
-const getTitle = (evt) => evt.title || evt.name || 'Untitled Event';
-const getDesc = (evt) => evt.shortDescription || evt.description || 'No description available';
-const getStart = (evt) => evt.startDate || evt.date;
-const getLocation = (evt) => evt.location || 'TBA';
-const getCapacity = (evt) => evt.capacity || 0;
-const getPrice = (evt) => evt.ticketPrice || 0;
 const getFundingSource = (evt) => evt.fundingSource;
-// Note: isRegistered removed from here to avoid duplication/errors, defined in component.
-
-const getEventColor = (type) => {
-  switch (String(type || '').toLowerCase()) {
-    case 'workshop': return 'from-emerald-400 to-teal-500';
-    case 'course': return 'from-blue-400 to-indigo-500';
-    case 'hackathon': return 'from-violet-400 to-purple-500';
-    case 'seminar': return 'from-amber-400 to-orange-500';
-    default: return 'from-slate-400 to-slate-500';
-  }
-};
-
-const getEventIcon = (type) => {
-  switch (String(type || '').toLowerCase()) {
-    case 'workshop': return '🛠️';
-    case 'course': return '📚';
-    case 'hackathon': return '🚀';
-    case 'seminar': return '🎤';
-    default: return '📅';
-  }
-};
+const getPrice = (evt) => evt.ticketPrice || evt.price || 0;
+const getStart = (evt) => evt.startDate || evt.date;
 
 const hasEventEnded = (evt) => {
-  const end = evt.endDate || evt.date; // simplified
+  const end = evt.endDate || evt.date;
   return end ? new Date(end) < new Date() : false;
 };
 
@@ -119,7 +57,7 @@ const hasEventStarted = (evt) => {
   return start ? new Date(start) <= new Date() : false;
 };
 
-function MyEventsList({ events, showRefundButton = false, onRefresh, title, description }) {
+function MyEventsList({ events, showRefundButton = false, title, description }) {
   const navigate = useNavigate();
   // State for functional features
   const [ratings, setRatings] = useState(loadRatings());
@@ -130,20 +68,18 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
   const [payingId, setPayingId] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null);
   const [eventPrices, setEventPrices] = useState({});
+  const [favIds, setFavIds] = useState(new Set());
 
-  // Comments state
-  const [openComments, setOpenComments] = useState({});
-  const [newCommentByEvent, setNewCommentByEvent] = useState({});
-  const [commentsByEvent, setCommentsByEvent] = useState({});
-  const [commentsLoading, setCommentsLoading] = useState({});
-  const [commentsError, setCommentsError] = useState({});
-
-  // Interaction states
-  const [attendedSet, setAttendedSet] = useState(new Set());
+  const [attendedSet, setAttendedSet] = useState(() => new Set(getAttendedIds()));
 
   // Check if user is registered for the event
   const isRegistered = (evt) => {
     try {
+      // 1. Trust explicit flag from backend if present
+      if (typeof evt.isRegistered === 'boolean') return evt.isRegistered;
+      if (typeof evt.registered === 'boolean') return evt.registered;
+
+      // 2. Existing manual check
       const raw = localStorage.getItem('user');
       if (!raw) return false;
       const user = JSON.parse(raw);
@@ -194,7 +130,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
       await rateEvent(eventId, value);
       showToast.success('Rating submitted successfully!');
 
-      // Dispatch event to notify other components (like FeedbackAnalytics) to refresh
+      // Dispatch event to notify other components
       setTimeout(() => {
         try {
           const event = new CustomEvent('rating:added', {
@@ -241,10 +177,13 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
   };
 
   useEffect(() => {
-    // Sync attended set from events if needed (simplified)
+    // Sync attended set from events if needed (merge with local)
     if (events) {
-      const attendantIds = events.filter(e => e.attended).map(e => getEventId(e));
-      setAttendedSet(new Set(attendantIds.map(String)));
+      const serverAttendedIds = events.filter(e => e.attended).map(e => String(getEventId(e)));
+      const localAttendedIds = getAttendedIds(); // Get from service (localStorage)
+
+      // Merge unique Set
+      setAttendedSet(new Set([...serverAttendedIds, ...localAttendedIds]));
 
       // Fetch prices for all events
       events.forEach(async (evt) => {
@@ -263,58 +202,16 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
 
   useEffect(() => {
     // Fetch wallet balance
-    getWalletBalance().then(bal => setWalletBalance(bal)).catch(() => setWalletBalance(null));
+    getWalletBalance()
+      .then(res => setWalletBalance(res.balance ?? null))
+      .catch(() => setWalletBalance(null));
+    // Load favorites
+    setFavIds(new Set(getFavouriteIds()));
   }, []);
 
-  const loadComments = async (eventId) => {
-    try {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: true }));
-      setCommentsError(prev => ({ ...prev, [eventId]: "" }));
-      const rows = await getEventComments(eventId);
-      setCommentsByEvent(prev => ({ ...prev, [eventId]: Array.isArray(rows) ? rows : [] }));
-    } catch (err) {
-      setCommentsError(prev => ({ ...prev, [eventId]: err?.message || "Failed to load comments" }));
-    } finally {
-      setCommentsLoading(prev => ({ ...prev, [eventId]: false }));
-    }
-  };
-
-  const toggleComments = async (id) => {
-    setOpenComments(prev => ({ ...prev, [id]: !prev[id] }));
-    if (!openComments[id]) {
-      await loadComments(id);
-    }
-  };
-
-  const submitComment = async (id) => {
-    const text = newCommentByEvent[id];
-    if (!text || !text.trim()) return;
-    try {
-      setCommentsLoading(prev => ({ ...prev, [id]: true }));
-      await addEventComment(id, text);
-      setNewCommentByEvent(prev => ({ ...prev, [id]: '' }));
-      await loadComments(id);
-      showToast.success('Comment posted');
-
-      setTimeout(() => {
-        try {
-          const event = new CustomEvent('comment:added', {
-            detail: { eventId: String(id) },
-            bubbles: true,
-            cancelable: true
-          });
-          window.dispatchEvent(event);
-        } catch (err) {
-          console.error(err);
-        }
-      }, 500);
-
-    } catch (err) {
-      showToast.error('Failed to post comment');
-      setCommentsError(prev => ({ ...prev, [id]: 'Failed to post comment' }));
-    } finally {
-      setCommentsLoading(prev => ({ ...prev, [id]: false }));
-    }
+  const handleToggleFav = (id) => {
+    const newIds = toggleFavourite(id);
+    setFavIds(new Set(newIds));
   };
 
   const handlePay = async (evt, method) => {
@@ -327,7 +224,7 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
         setPaidLocal(prev => new Set(prev).add(String(id)));
         showToast.success('Payment successful via Wallet!');
         // Refresh wallet balance
-        getWalletBalance().then(bal => setWalletBalance(bal));
+        getWalletBalance().then(res => setWalletBalance(res.balance ?? null));
       } else {
         await createCheckoutSession(id);
       }
@@ -364,11 +261,6 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
       showToast.error('Failed to update attendance');
     }
   };
-
-  // Wrappers to match JSX usage
-  const handleCardPay = (evt) => handlePay(evt, 'card');
-  const handleWalletPay = (evt) => handlePay(evt, 'wallet');
-  const handleRefundAndCancel = (evt) => handleRefund(evt);
 
   // Rating allowed if: event has ended AND user is registered
   const canRate = (evt) => {
@@ -412,22 +304,13 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {events.map((evt) => {
           const id = getEventId(evt);
-          const type = getType(evt);
-          const title = getTitle(evt);
-          const desc = getDesc(evt);
-          const start = getStart(evt);
-          const location = getLocation(evt);
-          const capacity = getCapacity(evt);
-          const allowed = canRate(evt) || attendedSet.has(String(id));
-          const canComment = isRegistered(evt);
-          const current = ratings[id] || 0;
           const price = getPrice(evt);
           const fundingSource = getFundingSource(evt);
           const eventType = getType(evt);
           const serverPaid = Boolean(evt?.paymentStatus || evt?.paid || evt?.event?.paymentStatus || evt?.event?.paid);
           const isPaid = (serverPaid && !refundedSet.has(String(id))) || paidLocal.has(String(id));
           const requiresPayment = eventType === 'Workshop'
-            ? (price > 0 && ['Internal'].includes(fundingSource))
+            ? (price > 0 && fundingSource === 'Internal')
             : (price > 0);
           const isPayable = isRegistered(evt) && requiresPayment && !isPaid && !hasEventEnded(evt);
           const canRefund =
@@ -445,255 +328,36 @@ function MyEventsList({ events, showRefundButton = false, onRefresh, title, desc
               }
             })();
           const canUseWallet = typeof walletBalance === 'number' && walletBalance >= price;
-          const walletDisabled = payingId === id || !canUseWallet;
-
-          const gradientClass = getEventColor(type);
-          const eventIcon = getEventIcon(type);
-          const eventStarted = hasEventStarted(evt);
 
           return (
-            <div
+            <EventCard
               key={id}
-              className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col group relative border border-slate-200"
-            >
-              {/* Event Header with Gradient */}
-              <div className={`h-40 bg-gradient-to-r ${gradientClass} relative p-6 flex flex-col justify-between`}>
-                <div className="absolute top-4 right-4 z-10">
-                  {eventStarted && isRegistered(evt) ? (
-                    <button
-                      onClick={() => toggleAttendedLocal(id)}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg ${attendedSet.has(String(id))
-                        ? 'bg-white text-emerald-600'
-                        : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
-                        }`}
-                      title={attendedSet.has(String(id)) ? "Attended" : "Mark as Attended"}
-                    >
-                      {attendedSet.has(String(id)) ? '✓' : '👁'}
-                    </button>
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white/50">
-                      {/* Placeholder or actual like button if needed later */}
-                      ❤️
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-4xl filter drop-shadow-md">
-                  {eventIcon}
-                </div>
-
-                <div className="flex justify-between items-end">
-                  <span className="px-3 py-1 bg-white/20 text-white text-xs font-bold uppercase tracking-wider rounded-full backdrop-blur-sm">
-                    {type}
-                  </span>
-                  {price > 0 && (
-                    <span className="bg-white/20 px-3 py-1 rounded-full text-white font-bold backdrop-blur-sm text-sm">
-                      {price} {eventPrices[getEventId(evt)]?.currency?.toUpperCase() || 'EGP'}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-6 flex-1 flex flex-col">
-                <h3 className="text-xl font-bold text-slate-800 mb-2 line-clamp-1 group-hover:text-emerald-600 transition-colors">
-                  {title}
-                </h3>
-
-                <p className="text-slate-500 text-sm mb-6 line-clamp-2">
-                  {desc || "No description available"}
-                </p>
-
-                <div className="space-y-3 mt-auto mb-6">
-                  {start && (
-                    <div className="flex items-center gap-3 text-slate-600 text-sm">
-                      <span className="text-lg w-6 flex justify-center">📅</span>
-                      <span className="font-medium">{new Date(start).toLocaleDateString()} • {new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  )}
-                  {location && (
-                    <div className="flex items-center gap-3 text-slate-600 text-sm">
-                      <span className="text-lg w-6 flex justify-center">📍</span>
-                      <span className="font-medium">{location}</span>
-                    </div>
-                  )}
-                </div>
-
-                {isPayable && (
-                  <div className="mb-4 pt-4 border-t border-slate-100">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleCardPay(evt)}
-                        disabled={processingPayment && payingId === id}
-                        className="flex-1 btn btn-primary btn-sm bg-gradient-to-r from-emerald-500 to-teal-600 border-none text-white shadow-lg shadow-emerald-900/20"
-                      >
-                        {processingPayment && payingId === id ? '...' : 'Pay Card'}
-                      </button>
-                      {canUseWallet && (
-                        <button
-                          onClick={() => handleWalletPay(evt)}
-                          disabled={walletDisabled}
-                          className="flex-1 btn btn-secondary btn-sm bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
-                        >
-                          Wallet
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-slate-100 flex flex-col gap-4">
-                  {/* Rating & Details Row */}
-                  <div className="flex items-center justify-between gap-4">
-                    <RatingStars
-                      value={current}
-                      onChange={(v) => setEventRating(id, v)}
-                      disabled={!allowed}
-                    />
-                    <button
-                      onClick={() => navigate(`/events/${id}`)}
-                      className="btn btn-ghost btn-sm text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
-                    >
-                      Details →
-                    </button>
-                  </div>
-
-                  {/* Secondary Actions Row */}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleComments(id)}
-                      className="flex-1 btn btn-ghost btn-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200"
-                    >
-                      {openComments[id] ? 'Hide Comments' : 'Show Comments'}
-                    </button>
-
-                    {!commentsLoading[id] && !commentsError[id] && (
-                      <div className="space-y-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {(!commentsByEvent[id] || commentsByEvent[id].length === 0) ? (
-                          <p className="text-center text-slate-400 text-xs py-4 bg-slate-50 rounded-lg">No comments yet.</p>
-                        ) : (
-                          commentsByEvent[id].map((c, i) => (
-                            <div key={i} className="bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
-                              <div className="flex justify-between items-start mb-1">
-                                <span className="font-bold text-slate-800 text-xs">
-                                  {c.user?.firstName || 'User'} {c.user?.lastName || ''}
-                                </span>
-                                <span className="text-xs text-slate-400">
-                                  {new Date(c.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap break-words">{c.content || c.comment || c.text || 'No content'}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                    {canRefund && (
-                      <button
-                        type="button"
-                        onClick={() => handleRefundAndCancel(evt)}
-                        className="flex-1 btn btn-ghost btn-xs text-red-500 hover:bg-red-50 border border-red-200"
-                      >
-                        Cancel & Refund
-                      </button>
-                    )}
-
-                    {canEditWorkshop(evt) && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/professor/workshops/edit/${id}`)}
-                        className="flex-1 btn btn-ghost btn-xs text-amber-600 hover:bg-amber-50 border border-amber-200"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Refund Closed Message */}
-                  {showRefundButton && isPaid && !canRefund && !hasEventEnded(evt) && (
-                    <div className="text-center">
-                      <span className="text-[10px] text-slate-400 italic">
-                        Cancellation only available ≥ 14 days before start.
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Comments Section - Styled light */}
-                  {openComments[id] && (
-                    <div className="pt-4 border-t border-slate-100 animate-in slide-in-from-top-2 fade-in duration-200">
-                      {commentsLoading[id] && (
-                        <div className="flex justify-center py-4">
-                          <span className="loading loading-spinner loading-sm text-emerald-500"></span>
-                        </div>
-                      )}
-
-                      {!commentsLoading[id] && commentsError[id] && (
-                        <div className="alert alert-error text-xs py-2 mb-2 rounded-lg">
-                          <span>{commentsError[id]}</span>
-                        </div>
-                      )}
-
-                      {!commentsLoading[id] && !commentsError[id] && (
-                        <div className="space-y-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                          {(!commentsByEvent[id] || commentsByEvent[id].length === 0) ? (
-                            <p className="text-center text-slate-400 text-xs py-4 bg-slate-50 rounded-lg">No comments yet.</p>
-                          ) : (
-                            commentsByEvent[id].map((c, i) => (
-                              <div key={i} className="bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="font-bold text-slate-700 text-xs">
-                                    {c.user?.firstName || 'User'} {c.user?.lastName || ''}
-                                  </span>
-                                  <span className="text-xs text-slate-400">
-                                    {new Date(c.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <p className="text-slate-600 text-xs leading-relaxed">{c.comment || c.content}</p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-
-                      {canComment ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Add a comment..."
-                            value={newCommentByEvent[id] || ""}
-                            onChange={(e) => setNewCommentByEvent(prev => ({ ...prev, [id]: e.target.value }))}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                submitComment(id);
-                              }
-                            }}
-                            className="input input-bordered input-sm flex-1 text-xs rounded-lg focus:outline-none focus:border-emerald-500 bg-white border-slate-300 text-slate-700 placeholder-slate-400"
-                          />
-                          <button
-                            onClick={() => submitComment(id)}
-                            disabled={!newCommentByEvent[id]?.trim() || commentsLoading[id]}
-                            className="btn btn-primary btn-sm btn-square rounded-lg bg-emerald-600 hover:bg-emerald-500 border-none text-white disabled:bg-slate-200 disabled:text-slate-400"
-                          >
-                            ➤
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-center text-xs text-slate-400 italic py-3 bg-slate-50 rounded-xl border border-slate-100">
-                          Only registered users can comment
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+              event={evt}
+              isFavorite={favIds.has(String(id))}
+              onToggleFavorite={handleToggleFav}
+              isRegistered={isRegistered(evt)}
+              canRate={canRate(evt)}
+              rating={ratings[id] || 0}
+              onRate={setEventRating}
+              isAttended={attendedSet.has(String(id))}
+              onAttendedToggle={hasEventStarted(evt) && isRegistered(evt) ? toggleAttendedLocal : null}
+              canEdit={canEditWorkshop(evt)}
+              onEdit={(id) => navigate(`/professor/workshops/edit/${id}`)}
+              canRefund={canRefund}
+              onRefund={handleRefund}
+              canUseWallet={canUseWallet}
+              onPayCard={() => handlePay(evt, 'card')}
+              onPayWallet={() => handlePay(evt, 'wallet')}
+              processingPayment={processingPayment && payingId === id}
+              isPayable={isPayable}
+              showRefundButton={showRefundButton}
+              isPaid={isPaid}
+            />
           );
         })}
       </div>
     </div>
   );
 }
-
 
 export default MyEventsList;

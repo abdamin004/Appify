@@ -27,6 +27,7 @@ import {
 } from "../../services/notificationService";
 import LoyaltyPartnersList from "../Loyalty/LoyaltyPartnersList";
 import StudentPollVoting from "../Polls/StudentPollVoting";
+import CourtsReserve from "../Functions/CourtsReserve";
 import WalletBadge from "../Wallet/WalletBadge";
 import { checkGymSessionOverlap, doTimesOverlap, formatEventDateTime } from "../../utils/overlapDetection";
 import { showOverlapWarning } from "../UI/OverlapWarningDialog";
@@ -35,6 +36,7 @@ function TADashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [registeredEvents, setRegisteredEvents] = useState([]);
+  const [courts, setCourts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const [favouriteEvents, setFavouriteEvents] = useState([]);
@@ -55,6 +57,7 @@ function TADashboard() {
 
   useEffect(() => {
     fetchRegisteredEvents();
+    fetchCourts();
     fetchWallet();
     fetchNotifications();
     fetchReminders();
@@ -484,7 +487,7 @@ function TADashboard() {
         return canUserAccessEvent(eventId);
       });
       setRegisteredEvents(filteredEvents);
-      
+
       // Check for overlaps in registered events
       checkForOverlaps(filteredEvents);
     } catch (err) {
@@ -503,20 +506,20 @@ function TADashboard() {
   // Function to check for overlaps between all registered events
   const checkForOverlaps = (events) => {
     const warnings = [];
-    
+
     if (!events || events.length < 2) {
       setOverlapWarnings([]);
       return;
     }
-    
+
     // Compare each event with every other event
     for (let i = 0; i < events.length; i++) {
       for (let j = i + 1; j < events.length; j++) {
         const event1 = events[i];
         const event2 = events[j];
-        
+
         if (!event1 || !event2 || !event1.startDate || !event2.startDate) continue;
-        
+
         // Get end times
         const getEndTime = (event) => {
           if (event.endDate) return new Date(event.endDate);
@@ -532,17 +535,17 @@ function TADashboard() {
           }
           return null;
         };
-        
+
         const start1 = new Date(event1.startDate);
         const end1 = getEndTime(event1);
         const start2 = new Date(event2.startDate);
         const end2 = getEndTime(event2);
-        
+
         if (!end1 || !end2) continue;
-        
+
         // Check if they overlap
         const overlaps = doTimesOverlap(start1, end1, start2, end2);
-        
+
         if (overlaps) {
           // Check if this warning already exists (avoid duplicates)
           const warningExists = warnings.some(w => {
@@ -552,7 +555,7 @@ function TADashboard() {
             const e2Id = event2._id || event2.id;
             return (id1 === e1Id && id2 === e2Id) || (id1 === e2Id && id2 === e1Id);
           });
-          
+
           if (!warningExists) {
             warnings.push({
               event1: {
@@ -570,10 +573,95 @@ function TADashboard() {
         }
       }
     }
-    
+
     console.log('TA Dashboard - Overlap warnings detected:', warnings.length, warnings);
     setOverlapWarnings(warnings);
   };
+
+  // --- Courts Logic ---
+  function generateFakeCourts() {
+    const types = [
+      { type: 'basketball', name: 'Basketball Court A' },
+      { type: 'tennis', name: 'Tennis Court 1' },
+      { type: 'football', name: 'Football Field' }
+    ];
+    const now = new Date();
+    return types.map((t, idx) => {
+      const slots = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + i);
+        const startHour = 10 + i;
+        const endHour = startHour + 1;
+        slots.push({
+          slotId: `fake-slot-${idx}-${i}`,
+          date: new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(),
+          startTime: `${String(startHour).padStart(2, '0')}:00`,
+          endTime: `${String(endHour).padStart(2, '0')}:00`
+        });
+      }
+      return {
+        _id: `fake-court-${idx}`,
+        id: `fake-court-${idx}`,
+        name: t.name,
+        type: t.type,
+        status: 'available',
+        available: true,
+        location: 'Sports Complex',
+        availabilityDates: slots
+      };
+    });
+  }
+
+  const fetchCourts = async () => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(`${API_BASE}/courts`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      const raw = Array.isArray(data) ? data : (Array.isArray(data.courts) ? data.courts : []);
+      const now = new Date();
+      const processed = raw.map(court => {
+        const slots = Array.isArray(court.availability) ? court.availability : [];
+        const availabilityDates = slots
+          .filter(s => {
+            try {
+              if (s.isBooked) return false;
+              const slotDate = new Date(s.date);
+              if (!s.startTime) return false;
+              const [h, m] = s.startTime.split(':').map(x => parseInt(x, 10));
+              slotDate.setHours(h || 0, m || 0, 0, 0);
+              return slotDate >= now;
+            } catch (e) { return false; }
+          })
+          .map(s => ({ slotId: s._id, date: s.date, startTime: s.startTime, endTime: s.endTime }));
+        const available = (court.status === 'available') && availabilityDates.length > 0;
+        return { ...court, availabilityDates, available };
+      });
+      if (processed.length === 0) {
+        setCourts(generateFakeCourts());
+      } else {
+        setCourts(processed);
+      }
+    } catch (err) {
+      console.error(err);
+      setCourts(generateFakeCourts());
+    }
+  };
+
+  function handleReserve(courtId, slotId) {
+    setCourts(prev => (prev || []).map(c => {
+      const cid = String(c._id || c.id);
+      if (cid !== String(courtId)) return c;
+      const remaining = (c.availabilityDates || []).filter(s => String(s.slotId) !== String(slotId));
+      return { ...c, availabilityDates: remaining };
+    }));
+  }
+  // --- End Courts Logic ---
 
   const fetchFavourites = async () => {
     try {
@@ -637,6 +725,7 @@ function TADashboard() {
         fetchGymSessions();
       }
     },
+    { label: "Book a Court", icon: "🏸", onClick: () => setActiveTab("courts") },
     { label: "My Events", icon: "✓", onClick: () => setActiveTab("registered") },
     { label: "Favourites", icon: "❤️", onClick: () => setActiveTab("favourites") },
     {
@@ -662,7 +751,7 @@ function TADashboard() {
       badge: overlapWarnings.length
     }] : []),
     { label: "Loyalty Partners", icon: "⭐", onClick: () => setActiveTab("loyalty") },
-    { label: "Vote for Vendors", icon: "📊", onClick: () => setActiveTab("polls") },
+    { label: "Polls", icon: "📊", onClick: () => setActiveTab("polls") },
   ];
 
   return (
@@ -779,7 +868,7 @@ function TADashboard() {
       <div className="mt-6">
         {activeTab === "browse" && (
           <div className="space-y-6">
-            <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession"]} />
+            <EventList enableFavorites={true} filterByTypes={["Workshop", "Trip", "Conference", "GymSession", "Bazaar", "Booth"]} />
           </div>
         )}
 
@@ -987,11 +1076,9 @@ function TADashboard() {
                 };
 
                 const alreadyRegistered = (s) => {
-                  try {
-                    if (!currentUserId) return false;
-                    const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
-                    return arr.map(String).includes(String(currentUserId));
-                  } catch { return false; }
+                  const id = String(s._id || s.id);
+                  // Check against registeredEvents state which is reliable
+                  return registeredEvents.some(re => String(re._id || re.id) === id);
                 };
 
                 return (
@@ -1015,9 +1102,6 @@ function TADashboard() {
                               <div key={tk} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
                                 <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
                                   <div className="font-bold text-slate-900 text-lg">{tk}</div>
-                                  <div className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">
-                                    {byType[tk].length} Session{byType[tk].length !== 1 ? 's' : ''}
-                                  </div>
                                 </div>
                                 <ul className="divide-y divide-slate-100">
                                   {byType[tk]
@@ -1085,6 +1169,12 @@ function TADashboard() {
                 );
               })()}
             </div>
+          </div>
+        )}
+
+        {activeTab === "courts" && (
+          <div className="space-y-6">
+            <CourtsReserve courts={courts} onReserved={handleReserve} />
           </div>
         )}
 
@@ -1238,7 +1328,7 @@ function TADashboard() {
                     <h3 className="text-lg font-bold text-amber-900">Warning: Time Conflicts Detected</h3>
                   </div>
                   <p className="text-amber-800 text-sm">
-                    You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time. 
+                    You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time.
                     You cannot attend multiple events at the same time. Please consider cancelling one of the conflicting events.
                   </p>
                 </div>
@@ -1246,7 +1336,7 @@ function TADashboard() {
                   {overlapWarnings.map((warning, index) => {
                     const event1Type = warning.event1.type === 'GymSession' ? 'Gym Session' : warning.event1.type || 'Event';
                     const event2Type = warning.event2.type === 'GymSession' ? 'Gym Session' : warning.event2.type || 'Event';
-                    
+
                     return (
                       <div key={index} className="p-6 bg-red-50 rounded-xl border-2 border-red-200">
                         <div className="flex items-start gap-4">

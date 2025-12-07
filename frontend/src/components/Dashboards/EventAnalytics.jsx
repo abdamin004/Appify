@@ -58,7 +58,16 @@ export default function EventAnalytics({ eventId, isOpen, onClose }) {
                 {/* Header */}
                 <div className="bg-slate-100 p-6 flex justify-between items-center border-b border-slate-200">
                     <h3 className="font-bold text-2xl text-slate-700">Event Feedback Analytics</h3>
-                    <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost text-slate-500 hover:bg-slate-200">✕</button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={loadAnalytics}
+                            disabled={loading}
+                            className="btn btn-sm btn-ghost text-slate-600 hover:bg-slate-200 gap-2"
+                        >
+                            🔄 Refresh
+                        </button>
+                        <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost text-slate-500 hover:bg-slate-200">✕</button>
+                    </div>
                 </div>
 
                 <div className="p-8 overflow-y-auto max-h-[70vh]">
@@ -71,9 +80,12 @@ export default function EventAnalytics({ eventId, isOpen, onClose }) {
                             <span>{error}</span>
                         </div>
                     ) : !data || data.total === 0 ? (
-                        <div className="text-center py-12 text-slate-400">
-                            <div className="text-6xl mb-4">📊</div>
-                            <p className="text-lg">No feedback collected yet.</p>
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                            <div className="text-6xl mb-4 opacity-50">📊</div>
+                            <h3 className="text-xl font-bold text-slate-700 mb-2">No Feedback Yet</h3>
+                            <p className="text-slate-500 max-w-sm mx-auto">
+                                Analysis will appear here once students start rating and commenting on your event.
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-8">

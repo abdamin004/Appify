@@ -19,7 +19,7 @@ function FeedbackAnalytics() {
         fetchAnalytics();
       }, 1000);
     };
-    
+
     window.addEventListener('feedback:refresh', handleRefresh);
 
     return () => {
@@ -96,9 +96,32 @@ function FeedbackAnalytics() {
 
   if (!analyticsData || !analyticsData.events || analyticsData.events.length === 0) {
     return (
-      <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-        <h2 className="text-2xl font-bold text-slate-800 mb-4">📊 Feedback Analytics</h2>
-        <p className="text-slate-600">You haven't created any events yet.</p>
+      <div className="bg-white p-12 rounded-2xl shadow-sm border border-slate-200 text-center">
+        <div className="text-6xl mb-4 opacity-50">📅</div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">No Events Created</h2>
+        <p className="text-slate-500">You haven't created any events yet. Create an event to start collecting feedback.</p>
+      </div>
+    );
+  }
+
+  // Check if we have events but no feedback at all
+  if (analyticsData.summary && analyticsData.summary.totalResponses === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">📊 Feedback Analytics</h2>
+          <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-200 border-dashed">
+            <div className="text-6xl mb-4 opacity-50">💬</div>
+            <h3 className="text-xl font-bold text-slate-700 mb-2">No Feedback Yet</h3>
+            <p className="text-slate-600 max-w-lg mx-auto mb-4">
+              You have <strong>{analyticsData.events.length}</strong> created events, but none have received feedback yet.
+              Encourage your students to rate and review your events!
+            </p>
+            <button onClick={fetchAnalytics} className="btn btn-primary btn-sm gap-2 text-white">
+              🔄 Check Again
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -242,11 +265,11 @@ function FeedbackAnalytics() {
                             {eventAnalytics.recentComments.map((comment, idx) => {
                               // Handle different comment structures
                               const commentText = comment.content || comment.text || comment.comment || comment.message || 'No content';
-                              const userName = comment.user?.firstName 
+                              const userName = comment.user?.firstName
                                 ? `${comment.user.firstName}${comment.user.lastName ? ' ' + comment.user.lastName : ''}`
                                 : (comment.user?.name || comment.userName || 'Anonymous User');
                               const commentDate = comment.createdAt || comment.date || comment.timestamp;
-                              
+
                               return (
                                 <div key={idx} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                   <div className="text-sm text-slate-700 mb-2 whitespace-pre-wrap break-words">

@@ -8,7 +8,7 @@ export async function exportEventRegistrations(eventId) {
     throw new Error('You must be logged in to export registrations');
   }
 
-  const response = await fetch(`${API_BASE}/admin/events/${eventId}/export-registrations`, {
+  const response = await fetch(`${API_BASE}/events/${eventId}/export/registrations`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`
@@ -493,5 +493,54 @@ export async function notifyAllUsersAboutNewEvent(event) {
     window.dispatchEvent(new CustomEvent('newEventCreated', { detail: { event } }));
   } catch (err) {
     console.error('Error creating notifications for new event:', err);
+  }
+}
+
+// Accommodation Management
+export async function listAccommodationRequests() {
+
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/events/accommodations/all`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to list accommodation requests');
+  return data.data;
+}
+
+export async function updateAccommodationRequest(requestId, status) {
+
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/events/accommodations/${requestId}/status`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ status })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to update request');
+  return data.data;
+}
+
+export async function getEventPrice(id) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}/price`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch price');
+    const data = await res.json();
+    return data.price || 0;
+  } catch (err) {
+    // Fallback: get full event and check ticketPrice
+    try {
+      const evt = await getEventById(id);
+      return evt.ticketPrice || 0;
+    } catch {
+      return 0;
+    }
   }
 }

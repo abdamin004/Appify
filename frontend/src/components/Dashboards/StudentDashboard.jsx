@@ -22,7 +22,9 @@ import {
   createReminderNotification,
   getCurrentUserReminders,
   markReminderRead,
-  deleteReminder
+  deleteReminder,
+  markAllStudentNotificationsRead,
+  deleteAllStudentNotifications
 } from "../../services/notificationService";
 import WalletBadge from "../Wallet/WalletBadge";
 import { showToast } from "../../utils/toast";
@@ -394,7 +396,7 @@ function StudentDashboard() {
         return canUserAccessEvent(eventId);
       });
       setRegisteredEvents(filteredEvents);
-      
+
       // Check for overlaps in registered events
       checkForOverlaps(filteredEvents);
     } catch (err) {
@@ -411,20 +413,20 @@ function StudentDashboard() {
   // Function to check for overlaps between all registered events
   const checkForOverlaps = (events) => {
     const warnings = [];
-    
+
     if (!events || events.length < 2) {
       setOverlapWarnings([]);
       return;
     }
-    
+
     // Compare each event with every other event
     for (let i = 0; i < events.length; i++) {
       for (let j = i + 1; j < events.length; j++) {
         const event1 = events[i];
         const event2 = events[j];
-        
+
         if (!event1 || !event2 || !event1.startDate || !event2.startDate) continue;
-        
+
         // Get end times
         const getEndTime = (event) => {
           if (event.endDate) return new Date(event.endDate);
@@ -440,17 +442,17 @@ function StudentDashboard() {
           }
           return null;
         };
-        
+
         const start1 = new Date(event1.startDate);
         const end1 = getEndTime(event1);
         const start2 = new Date(event2.startDate);
         const end2 = getEndTime(event2);
-        
+
         if (!end1 || !end2) continue;
-        
+
         // Check if they overlap
         const overlaps = doTimesOverlap(start1, end1, start2, end2);
-        
+
         if (overlaps) {
           // Check if this warning already exists (avoid duplicates)
           const warningExists = warnings.some(w => {
@@ -460,7 +462,7 @@ function StudentDashboard() {
             const e2Id = event2._id || event2.id;
             return (id1 === e1Id && id2 === e2Id) || (id1 === e2Id && id2 === e1Id);
           });
-          
+
           if (!warningExists) {
             warnings.push({
               event1: {
@@ -478,7 +480,7 @@ function StudentDashboard() {
         }
       }
     }
-    
+
     console.log('Overlap warnings detected:', warnings.length, warnings);
     setOverlapWarnings(warnings);
   };
@@ -916,11 +918,9 @@ function StudentDashboard() {
                   };
 
                   const alreadyRegistered = (s) => {
-                    try {
-                      if (!currentUserId) return false;
-                      const arr = Array.isArray(s.registeredUsers) ? s.registeredUsers : [];
-                      return arr.map(String).includes(String(currentUserId));
-                    } catch { return false; }
+                    const id = String(s._id || s.id);
+                    // Check against registeredEvents state which is reliable
+                    return registeredEvents.some(re => String(re._id || re.id) === id);
                   };
 
                   return (
@@ -944,9 +944,6 @@ function StudentDashboard() {
                                 <div key={tk} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
                                   <div className="bg-slate-50 p-4 border-b border-slate-100 flex justify-between items-center">
                                     <div className="font-bold text-slate-900 text-lg">{tk}</div>
-                                    <div className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">
-                                      {byType[tk].length} Session{byType[tk].length !== 1 ? 's' : ''}
-                                    </div>
                                   </div>
                                   <ul className="divide-y divide-slate-100">
                                     {byType[tk]
@@ -1021,9 +1018,33 @@ function StudentDashboard() {
 
           {activeTab === "notifications" && (
             <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
-                <p className="text-slate-500 mt-2">Updates about events and activities</p>
+              <div className="relative mb-8">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+                  <p className="text-slate-500 mt-1">Updates about events and activities</p>
+                </div>
+                <div className="flex gap-3 justify-center mt-4 md:mt-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2">
+                  <button
+                    onClick={() => {
+                      markAllStudentNotificationsRead();
+                      fetchNotifications();
+                    }}
+                    className="btn btn-sm bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+                  >
+                    Mark All Read
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete all notifications?')) {
+                        deleteAllStudentNotifications();
+                        fetchNotifications();
+                      }
+                    }}
+                    className="btn btn-sm bg-white border-slate-200 text-red-500 hover:bg-red-50 hover:border-red-200 shadow-sm"
+                  >
+                    Delete All
+                  </button>
+                </div>
               </div>
               {notifications.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
@@ -1189,7 +1210,7 @@ function StudentDashboard() {
                       <h3 className="text-lg font-bold text-amber-900">Warning: Time Conflicts Detected</h3>
                     </div>
                     <p className="text-amber-800 text-sm">
-                      You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time. 
+                      You have {overlapWarnings.length} conflict{overlapWarnings.length !== 1 ? 's' : ''} where events overlap in time.
                       You cannot attend multiple events at the same time. Please consider cancelling one of the conflicting events.
                     </p>
                   </div>
@@ -1197,7 +1218,7 @@ function StudentDashboard() {
                     {overlapWarnings.map((warning, index) => {
                       const event1Type = warning.event1.type === 'GymSession' ? 'Gym Session' : warning.event1.type || 'Event';
                       const event2Type = warning.event2.type === 'GymSession' ? 'Gym Session' : warning.event2.type || 'Event';
-                      
+
                       return (
                         <div key={index} className="p-6 bg-red-50 rounded-xl border-2 border-red-200">
                           <div className="flex items-start gap-4">

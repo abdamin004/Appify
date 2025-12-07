@@ -20,12 +20,12 @@ export function showOverlapWarning(conflicts, newItemName, newItemStart) {
       const conflictType = conflict.type === 'GymSession' ? 'Gym Session' : conflict.type || 'Event';
       const conflictTitle = conflict.title || conflict.name || 'Untitled Event';
       const conflictStart = formatEventDateTime(conflict.conflictStart || conflict.startDate);
-      
+
       return (
-        <div key={index} style={{ 
-          padding: '12px', 
-          marginBottom: '8px', 
-          background: '#fef3c7', 
+        <div key={index} style={{
+          padding: '12px',
+          marginBottom: '8px',
+          background: '#fef3c7',
           borderRadius: '8px',
           border: '1px solid #fbbf24'
         }}>
@@ -53,10 +53,10 @@ export function showOverlapWarning(conflicts, newItemName, newItemStart) {
         <div style={{ marginBottom: '16px', maxHeight: '300px', overflowY: 'auto' }}>
           {conflictList}
         </div>
-        <div style={{ 
-          padding: '10px', 
-          background: '#fef2f2', 
-          borderRadius: '6px', 
+        <div style={{
+          padding: '10px',
+          background: '#fef2f2',
+          borderRadius: '6px',
           marginBottom: '12px',
           border: '1px solid #fecaca'
         }}>
@@ -65,6 +65,7 @@ export function showOverlapWarning(conflicts, newItemName, newItemStart) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+
           <button
             onClick={() => {
               toast.dismiss(toastId);
@@ -81,25 +82,7 @@ export function showOverlapWarning(conflicts, newItemName, newItemStart) {
               fontSize: '0.9rem',
             }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              toast.dismiss(toastId);
-              resolve(true);
-            }}
-            style={{
-              padding: '8px 20px',
-              background: '#dc2626',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.9rem',
-            }}
-          >
-            Register Anyway
+            Close
           </button>
         </div>
       </div>,

@@ -4,6 +4,7 @@ import { createConference, listConferences, updateEvent, getEventById } from '..
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import Input from '../../UI/Input';
+import DateTimePicker from '../../UI/DateTimePicker';
 import Select from '../../UI/Select';
 import Button from '../../UI/Button';
 import FormLayout from '../../UI/FormLayout';
@@ -225,28 +226,25 @@ function ConferencesManager({ editOnly = false }) {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input
+            <DateTimePicker
               label="Start Date/Time *"
-              type="datetime-local"
               value={editData.startDate}
-              onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value?.target?.value || e.target.value })}
               required
             />
-            <Input
+            <DateTimePicker
               label="End Date/Time *"
-              type="datetime-local"
               value={editData.endDate}
-              onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, endDate: e.target.value?.target?.value || e.target.value })}
               required
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input
+            <DateTimePicker
               label="Registration Deadline"
-              type="datetime-local"
               value={editData.registrationDeadline}
-              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value?.target?.value || e.target.value })}
             />
             <Input
               label="Conference Website Link *"
@@ -352,28 +350,25 @@ function ConferencesManager({ editOnly = false }) {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <DateTimePicker
             label="Start Date/Time *"
-            type="datetime-local"
             value={form.startDate}
-            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            onChange={e => setForm({ ...form, startDate: e.target.value?.target?.value || e.target.value })}
             required
           />
-          <Input
+          <DateTimePicker
             label="End Date/Time *"
-            type="datetime-local"
             value={form.endDate}
-            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            onChange={e => setForm({ ...form, endDate: e.target.value?.target?.value || e.target.value })}
             required
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <DateTimePicker
             label="Registration Deadline"
-            type="datetime-local"
             value={form.registrationDeadline}
-            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value?.target?.value || e.target.value })}
           />
           <Input
             label="Conference Website Link *"
@@ -445,73 +440,6 @@ function ConferencesManager({ editOnly = false }) {
           </Button>
         </div>
       </form>
-
-      {!editOnly && confs.length > 0 && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Conferences</h2>
-
-          {listLoading ? (
-            <div className="text-center py-10">
-              <span className="loading loading-spinner loading-lg text-emerald-500"></span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {confs.map((c) => (
-                <div
-                  key={c._id}
-                  className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group hover:border-emerald-200"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
-                      {c.title}
-                    </h3>
-                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${c.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                      {c.status || 'published'}
-                    </span>
-                  </div>
-
-                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">
-                    {c.shortDescription || 'No description provided.'}
-                  </p>
-
-                  <div className="space-y-2 text-sm text-slate-500 mb-6">
-                    <div className="flex items-center gap-2">
-                      <span>📅</span>
-                      {c.startDate ? new Date(c.startDate).toLocaleDateString() : 'TBA'} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'TBA'}
-                    </div>
-                    {c.websiteLink && (
-                      <div className="flex items-center gap-2">
-                        <span>🔗</span>
-                        <a href={c.websiteLink} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-800 hover:underline">
-                          Website
-                        </a>
-                      </div>
-                    )}
-                    {(c.requiredBudget || c.fundingSource) && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span>💰</span>
-                        {c.requiredBudget ? `$${c.requiredBudget}` : ''}
-                        {c.requiredBudget && c.fundingSource ? ' • ' : ''}
-                        {c.fundingSource ? c.fundingSource : ''}
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => navigate(`/events-office/conferences/edit/${c._id}`)}
-                  >
-                    Edit Details
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </FormLayout>
   );
 }

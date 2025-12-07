@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../services/eventService';
 import { showToast, confirmDialog } from '../../utils/toast';
 import Input from '../UI/Input';
+import DateTimePicker from '../UI/DateTimePicker';
 import Button from '../UI/Button';
 
 export default function BlackoutDatesManagement() {
@@ -123,18 +124,16 @@ export default function BlackoutDatesManagement() {
                         />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
+                        <DateTimePicker
                             label="Start Date *"
-                            type="datetime-local"
                             value={newDate.startDate}
-                            onChange={e => setNewDate({ ...newDate, startDate: e.target.value })}
+                            onChange={e => setNewDate({ ...newDate, startDate: e.target.value?.target?.value || e.target.value })}
                             required
                         />
-                        <Input
+                        <DateTimePicker
                             label="End Date *"
-                            type="datetime-local"
                             value={newDate.endDate}
-                            onChange={e => setNewDate({ ...newDate, endDate: e.target.value })}
+                            onChange={e => setNewDate({ ...newDate, endDate: e.target.value?.target?.value || e.target.value })}
                             required
                         />
                     </div>

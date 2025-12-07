@@ -58,6 +58,18 @@ export default function AdminNotifications() {
     }
   };
 
+  const deleteAll = async () => {
+    const confirmed = await confirmDialog('Delete ALL notifications? This cannot be undone.', 'Confirm Delete All');
+    if (!confirmed) return;
+    try {
+      await adminService.deleteAllNotifications();
+      load();
+      showToast.success('All notifications deleted');
+    } catch (err) {
+      showToast.error(err.message || 'Failed to delete all notifications');
+    }
+  };
+
   const deleteNotif = async (id) => {
     const confirmed = await confirmDialog('Delete this notification?', 'Confirm');
     if (!confirmed) return;
@@ -79,12 +91,20 @@ export default function AdminNotifications() {
             <p className="text-slate-500 mt-1">Stay updated with system alerts</p>
           </div>
           {notifs.length > 0 && (
-            <button
-              onClick={markAll}
-              className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none btn-sm mt-2"
-            >
-              Mark all as read
-            </button>
+            <div className="w-full flex justify-end gap-3 mt-4 border-t border-slate-100 pt-4">
+              <button
+                onClick={markAll}
+                className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none btn-sm"
+              >
+                Mark all as read
+              </button>
+              <button
+                onClick={deleteAll}
+                className="btn bg-red-50 hover:bg-red-100 text-red-600 border-none btn-sm"
+              >
+                Delete All
+              </button>
+            </div>
           )}
         </div>
 

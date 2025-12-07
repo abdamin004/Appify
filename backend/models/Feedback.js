@@ -18,9 +18,9 @@ const feedbackSchema = new Schema({
     // Structured Ratings (1-5 scale)
     ratings: {
         overall: { type: Number, min: 1, max: 5, required: true },
-        content: { type: Number, min: 1, max: 5, default: 0 }, // 0 means N/A or skipped
-        speaker: { type: Number, min: 1, max: 5, default: 0 },
-        organization: { type: Number, min: 1, max: 5, default: 0 }
+        content: { type: Number, min: 0, max: 5, default: 0 }, // 0 means N/A or skipped
+        speaker: { type: Number, min: 0, max: 5, default: 0 },
+        organization: { type: Number, min: 0, max: 5, default: 0 }
     },
 
     // Optional Text Comment

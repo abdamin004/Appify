@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import DateTimePicker from '../UI/DateTimePicker';
 
 export default function SalesReport() {
   const [summary, setSummary] = useState(null);
@@ -150,8 +151,8 @@ export default function SalesReport() {
     <div className="max-w-6xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-800">Financial Reports</h2>
-          <p className="text-slate-500 mt-2">Financial overview and revenue analysis</p>
+          <h2 className="text-3xl font-bold text-slate-800">Financial Reports</h2>
+          <p className="text-slate-500 mt-2 text-lg">Financial overview and revenue analysis</p>
         </div>
 
         {/* Filters */}
@@ -203,22 +204,22 @@ export default function SalesReport() {
             </div>
 
             <div>
-              <label className="label text-slate-600 text-sm font-medium">Start Date</label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="Start Date"
+                showTime={false}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
+                onChange={(e) => setStartDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select start date"
               />
             </div>
 
             <div>
-              <label className="label text-slate-600 text-sm font-medium">End Date</label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="End Date"
+                showTime={false}
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
+                onChange={(e) => setEndDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select end date"
               />
             </div>
 
@@ -254,29 +255,29 @@ export default function SalesReport() {
           <div className="space-y-8">
             {/* Summary */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <h3 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <span className="text-emerald-500">💰</span> Summary
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
-                  <div className="text-sm text-emerald-700 font-medium mb-1">Total Revenue</div>
-                  <div className="text-3xl font-bold text-emerald-600">{summary?.totalRevenue ?? 0} EGP</div>
+                <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
+                  <div className="text-base text-emerald-700 font-medium mb-1">Total Revenue</div>
+                  <div className="text-4xl font-bold text-emerald-600">{summary?.totalRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-sm text-slate-500 font-medium mb-1">Trip Revenue</div>
-                  <div className="text-2xl font-bold text-slate-800">{summary?.tripRevenue ?? 0} EGP</div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Trip Revenue</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.tripRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-sm text-slate-500 font-medium mb-1">Vendor Revenue</div>
-                  <div className="text-2xl font-bold text-slate-800">{summary?.vendorRevenue ?? 0} EGP</div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Vendor Revenue</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.vendorRevenue ?? 0} EGP</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-sm text-slate-500 font-medium mb-1">Total Trip Events</div>
-                  <div className="text-2xl font-bold text-slate-800">{summary?.totalTripEvents ?? 0}</div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Total Trip Events</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.totalTripEvents ?? 0}</div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-sm text-slate-500 font-medium mb-1">Total Vendor Applications</div>
-                  <div className="text-2xl font-bold text-slate-800">{summary?.totalVendorApplications ?? 0}</div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Total Vendor Applications</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.totalVendorApplications ?? 0}</div>
                 </div>
               </div>
             </div>

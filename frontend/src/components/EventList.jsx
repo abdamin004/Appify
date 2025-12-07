@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import EventCard from "./EventCard";
+import EventCard from "./Cards/EventCard";
+import DateTimePicker from "./UI/DateTimePicker";
 import { API_BASE } from "../services/eventService";
 import { deleteEvent, getApprovedWorkshops } from '../services/eventService';
+import { listMyApplications } from '../services/vendorService';
 import { FaHeart } from 'react-icons/fa';
 import favourites from "../services/favoritesService";
 import { canUserAccessEvent } from "../services/eventRestrictionService";
 import { showToast, confirmDialog } from '../utils/toast';
+import { createCheckoutSession, payWithWallet, getWalletBalance, getEventPrice } from '../services/paymentService'; // Added payment services
+import { getAttendedIds } from '../services/attendanceService'; // Added attendance (optional but good for consistency)
 
 function EventsList({ filterByTypes = null, presetType = null, showQuickNav = false, enableFavorites = false, onDelete = null, onArchive = null, onUnarchive = null, headerAction = null, showArchivedOnly = false, hideArchived = false }) {
   const navigate = useNavigate();
@@ -64,6 +68,68 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
   });
 
   const [favIds, setFavIds] = useState(() => new Set(favourites.getFavouriteIds().map(String)));
+  const [vendorAppsMap, setVendorAppsMap] = useState({});
+
+  // Payment State
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [payingId, setPayingId] = useState(null);
+  const [paidLocal, setPaidLocal] = useState(new Set()); // Track local successful payments
+
+  useEffect(() => {
+    // Fetch wallet balance on mount
+    getWalletBalance()
+      .then(res => setWalletBalance(res.balance ?? null))
+      .catch(() => setWalletBalance(null));
+  }, []);
+
+  const handlePay = async (evt, method) => {
+    const id = evt._id || evt.id;
+    setPayingId(id);
+    setProcessingPayment(true);
+    try {
+      if (method === 'wallet') {
+        await payWithWallet(id);
+        setPaidLocal(prev => new Set(prev).add(String(id)));
+        showToast.success('Payment successful via Wallet!');
+        // Refresh wallet balance
+        getWalletBalance().then(res => setWalletBalance(res.balance ?? null));
+        // Refresh events to show updated status (optional, but good)
+        fetchEvents();
+      } else {
+        await createCheckoutSession(id);
+      }
+    } catch (err) {
+      showToast.error(`Payment failed: ${err.message}`);
+    } finally {
+      setProcessingPayment(false);
+      setPayingId(null);
+    }
+  };
+
+  useEffect(() => {
+    const user = userIdFromProto();
+    if (user && user.role === 'vendor') {
+      listMyApplications().then(res => {
+        const apps = res.applications || res.data || [];
+        if (res.success && Array.isArray(apps)) {
+          const map = {};
+          apps.forEach(app => {
+            const eid = app.event._id || app.event;
+            map[String(eid)] = app.status;
+          });
+          setVendorAppsMap(map);
+        }
+      }).catch(err => console.warn('Failed to load apps', err));
+    }
+  }, []);
+
+  // Helper
+  const userIdFromProto = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch { return null; }
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -198,6 +264,68 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
       if (filters.sortBy === "title") return a.title.localeCompare(b.title);
       return 0;
     });
+
+  const getCanEdit = (event) => {
+    const userData = localStorage.getItem("user");
+    if (!userData) return false;
+    const user = JSON.parse(userData);
+    const role = (user.role || '').toLowerCase();
+    const eventType = event.type || 'Event';
+
+    if (role === 'admin') return true;
+
+    if (role === 'eventoffice') {
+      // Event Office cannot edit Workshops (Professor only)
+      if (eventType === 'Workshop') return false;
+      return true;
+    }
+
+    if (role === 'professor' && eventType === 'Workshop') {
+      // Professor can edit their own workshops
+      const userId = user._id || user.id;
+      const creator = event.createdBy || event.professor || '';
+      return creator === userId;
+    }
+
+    return false;
+  };
+
+  const handleEditEvent = (id, event) => {
+    const type = event?.type || 'Event';
+    if (!type) {
+      showToast.error('Unknown event type');
+      return;
+    }
+
+    // Route based on type
+    switch (type) {
+      case 'GymSession':
+        navigate(`/events-office/gym-sessions/edit/${id}`);
+        return;
+      case 'Bazaar':
+        navigate(`/events-office/bazaars/edit/${id}`);
+        return;
+      case 'Booth':
+        navigate(`/events-office/booths`); // Booths usually managed in list, or add edit route if exists
+        // Checking App.jsx: /events-office/booths exists, but edit?
+        // "Route path="/events-office/booths" element={<BoothsManager />} />"
+        // No edit route for booths? Assuming inline or modal. 
+        // If no edit route, maybe navigate to manager.
+        return;
+      case 'Trip':
+        navigate(`/events-office/trips/edit/${id}`);
+        return;
+      case 'Conference':
+        navigate(`/events-office/conferences/edit/${id}`);
+        return;
+      case 'Workshop':
+        navigate(`/professor/workshops/edit/${id}`);
+        return;
+      default:
+        // Fallback
+        navigate(`/events/${id}/edit`);
+    }
+  };
 
   const handleEventClick = (id) => navigate(`/events/${id}`);
 
@@ -392,21 +520,21 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
             {/* Date Range */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
               <div className="form-control">
-                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">Start Date</label>
-                <input
-                  type="date"
+                <DateTimePicker
+                  label="Start Date"
+                  showTime={false}
                   value={filters.startDate}
-                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                  className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
+                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value ? e.target.value.slice(0, 10) : '' })}
+                  placeholder="Filter by start date"
                 />
               </div>
               <div className="form-control">
-                <label className="label text-xs font-bold text-emerald-600 uppercase tracking-wider">End Date</label>
-                <input
-                  type="date"
+                <DateTimePicker
+                  label="End Date"
+                  showTime={false}
                   value={filters.endDate}
-                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                  className="input input-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 transition-colors"
+                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value ? e.target.value.slice(0, 10) : '' })}
+                  placeholder="Filter by end date"
                 />
               </div>
             </div>
@@ -469,23 +597,105 @@ function EventsList({ filterByTypes = null, presetType = null, showQuickNav = fa
               const isFav = favIds.has(String(id));
               return (
                 <div key={id} className="relative h-full group">
-                  {enableFavorites && (
-                    <button
-                      type="button"
-                      onClick={(ev) => { ev.stopPropagation(); toggleFav(id); }}
-                      className="absolute top-4 right-4 z-20 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:scale-110 transition-all duration-200 border border-slate-100 group-hover:shadow-md"
-                    >
-                      <FaHeart className={`w-5 h-5 transition-colors ${isFav ? 'text-red-500' : 'text-slate-300 hover:text-red-300'}`} />
-                    </button>
-                  )}
+
                   <EventCard
                     event={e}
-                    onClick={() => handleEventClick(id)}
-                    onDelete={(canDelete && (onDelete || handleDeleteEvent)) ? () => handleDeleteEvent(id) : undefined}
-                    onArchive={(onArchive || handleArchiveEvent) ? () => handleArchiveEvent(id, e) : undefined}
-                    onUnarchive={(onUnarchive || handleUnarchiveEvent) ? () => handleUnarchiveEvent(id, e) : undefined}
-                    hasEventPassed={hasEventPassed}
+                    canEdit={getCanEdit(e)}
+                    onEdit={() => handleEditEvent(id, e)}
+                    isFavorite={isFav}
+                    onToggleFavorite={enableFavorites ? () => toggleFav(id) : null}
+                    vendorRequestStatus={vendorAppsMap[String(id)]}
+
+                    // Payment Props
+                    processingPayment={processingPayment && payingId === id}
+                    onPayCard={() => handlePay(e, 'card')}
+                    onPayWallet={() => handlePay(e, 'wallet')}
+                    canUseWallet={typeof walletBalance === 'number' && walletBalance >= (e.ticketPrice || e.price || 0)}
+
+                    // Logic for display
+                    isPayable={(() => {
+                      // Check if registered
+                      const userData = localStorage.getItem("user");
+                      const user = userData ? JSON.parse(userData) : null;
+                      const userId = user && (user._id || user.id);
+                      if (!userId) return false;
+                      const registeredUsers = e.registeredUsers || [];
+                      const isReg = registeredUsers.some(u => String(u._id || u.id || u) === String(userId));
+
+                      if (!isReg) return false;
+
+                      // Check if paid
+                      const serverPaid = Boolean(e.paymentStatus || e.paid);
+                      const isPaid = serverPaid || paidLocal.has(String(id));
+                      if (isPaid) return false;
+
+                      // Check if price > 0
+                      const price = e.ticketPrice || e.price || 0;
+                      if (!price || price <= 0) return false;
+
+                      // Check type specific
+                      if (e.type === 'Workshop' && e.fundingSource !== 'Internal') return false;
+
+                      return true;
+                    })()}
+
+                    isPaid={(() => {
+                      const serverPaid = Boolean(e.paymentStatus || e.paid);
+                      return serverPaid || paidLocal.has(String(id));
+                    })()}
+
+                    customActions={(
+                      <>
+                        {(canDelete && (onDelete || handleDeleteEvent)) && (
+                          <button
+                            onClick={() => (onDelete || handleDeleteEvent)(id)}
+                            className="flex-1 btn btn-ghost btn-xs text-red-600 hover:bg-red-50 border border-red-200"
+                          >
+                            Delete
+                          </button>
+                        )}
+                        {(onArchive || handleArchiveEvent) && !archivedEventsSet.has(id) && isEventOffice && (
+                          <button
+                            onClick={() => (onArchive || handleArchiveEvent)(id, e)}
+                            className="flex-1 btn btn-ghost btn-xs text-slate-500 hover:bg-slate-100 border border-slate-200"
+                          >
+                            Archive
+                          </button>
+                        )}
+                        {(onUnarchive || handleUnarchiveEvent) && archivedEventsSet.has(id) && isEventOffice && (
+                          <button
+                            onClick={() => (onUnarchive || handleUnarchiveEvent)(id, e)}
+                            className="flex-1 btn btn-ghost btn-xs text-emerald-600 hover:bg-emerald-50 border border-emerald-200"
+                          >
+                            Unarchive
+                          </button>
+                        )}
+                      </>
+                    )}
                   />
+                  {/* Overlay click for details if clicking outside interactive elements, 
+                      or we can trust the 'Details' button in the card. 
+                      Since EventCard has a 'Details' button, we don't strictly need 
+                      the whole card to be clickable, but to keep consistent behavior
+                      with browsing, we might want to wrap it or leave it as is. 
+                      
+                      IMPORTANT: The new EventCard doesn't accept 'onClick' for the whole card
+                      to avoid conflict with inner buttons. It has a specific 'Details' button.
+                      
+                      If we want the delete/archive actions which were available here:
+                      The generic EventCard doesn't natively expose 'delete/archive' props 
+                      in the same way 'MyEventsList' used pay/rate.
+                      
+                      We need to double check EventCard definition.
+                      It supports: canEdit, onEdit, canRefund, onRefund. 
+                      It does NOT currently accept arbitrary action buttons or slots. 
+                      
+                      We should update EventCard to accept 'renderActions' or similar, 
+                      OR update EventsList to just display the card.
+                      
+                      However, looking at the previous code, EventsList passed 'onDelete' etc.
+                      Let's stick to the props EventCard accepts.
+                  */}
                 </div>
               );
             })}

@@ -4,6 +4,7 @@ import { createTrip, listTrips, updateEvent, getEventById } from '../../../servi
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import Input from '../../UI/Input';
+import DateTimePicker from '../../UI/DateTimePicker';
 import Button from '../../UI/Button';
 import FormLayout from '../../UI/FormLayout';
 
@@ -207,18 +208,16 @@ function TripsManager({ editOnly = false }) {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input
+            <DateTimePicker
               label="Start Date/Time *"
-              type="datetime-local"
               value={editData.startDate}
-              onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value?.target?.value || e.target.value })}
               required
             />
-            <Input
+            <DateTimePicker
               label="End Date/Time *"
-              type="datetime-local"
               value={editData.endDate}
-              onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, endDate: e.target.value?.target?.value || e.target.value })}
               required
             />
           </div>
@@ -230,11 +229,10 @@ function TripsManager({ editOnly = false }) {
               onChange={e => setEditData({ ...editData, location: e.target.value })}
               required
             />
-            <Input
+            <DateTimePicker
               label="Registration Deadline"
-              type="datetime-local"
               value={editData.registrationDeadline}
-              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value?.target?.value || e.target.value })}
             />
           </div>
 
@@ -306,18 +304,16 @@ function TripsManager({ editOnly = false }) {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <DateTimePicker
             label="Start Date/Time *"
-            type="datetime-local"
             value={form.startDate}
-            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            onChange={e => setForm({ ...form, startDate: e.target.value?.target?.value || e.target.value })}
             required
           />
-          <Input
+          <DateTimePicker
             label="End Date/Time *"
-            type="datetime-local"
             value={form.endDate}
-            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            onChange={e => setForm({ ...form, endDate: e.target.value?.target?.value || e.target.value })}
             required
           />
         </div>
@@ -329,11 +325,10 @@ function TripsManager({ editOnly = false }) {
             onChange={e => setForm({ ...form, location: e.target.value })}
             required
           />
-          <Input
+          <DateTimePicker
             label="Registration Deadline"
-            type="datetime-local"
             value={form.registrationDeadline}
-            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value?.target?.value || e.target.value })}
           />
         </div>
 
@@ -370,62 +365,6 @@ function TripsManager({ editOnly = false }) {
           </Button>
         </div>
       </form>
-
-      {!editOnly && trips.length > 0 && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Trips</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {trips.map((t) => (
-              <div
-                key={t._id}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group hover:border-emerald-200"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    {t.title}
-                  </h3>
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${t.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                    {t.status || 'published'}
-                  </span>
-                </div>
-
-                <p className="text-slate-600 text-sm mb-4 line-clamp-2">
-                  {t.shortDescription || 'No description provided.'}
-                </p>
-
-                <div className="space-y-2 text-sm text-slate-500 mb-6">
-                  <div className="flex items-center gap-2">
-                    <span>📍</span>
-                    {t.location}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>💰</span>
-                    {t.price} EGP
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>👥</span>
-                    Capacity: {t.capacity ?? '-'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>📅</span>
-                    {new Date(t.startDate).toLocaleDateString()}
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => navigate(`/events-office/trips/edit/${t._id}`)}
-                >
-                  Edit Trip
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </FormLayout>
   );
 }

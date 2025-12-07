@@ -35,6 +35,7 @@ router.post(
   '/events/:eventId/applications',
   auth,
   roleCheck('Vendor'),
+  vendorUpload,
   vendorCtrl.applyToEvent
 );
 
@@ -64,10 +65,10 @@ router.get(
 
 // Cancel a vendor application (only if not paid)
 router.post(
-    '/vendor-applications/:id/cancel',
-    auth,
-    roleCheck('Vendor'),
-    vendorCtrl.cancelVendorApplication
+  '/vendor-applications/:id/cancel',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.cancelVendorApplication
 );
 
 // Delete a cancelled vendor application
@@ -80,41 +81,26 @@ router.delete(
 
 // Vendor applies to GUC loyalty program
 router.post(
-    '/loyalty/apply',
-    auth,
-    roleCheck('Vendor'),
-    vendorCtrl.applyToLoyaltyProgram
+  '/loyalty/apply',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.applyToLoyaltyProgram
 );
 
 // List my loyalty applications
 router.get(
-    '/loyalty/mine',
-    auth,
-    roleCheck('Vendor'),
-    vendorCtrl.listMyLoyaltyApplications
+  '/loyalty/mine',
+  auth,
+  roleCheck('Vendor'),
+  vendorCtrl.listMyLoyaltyApplications
 );
 
 // Cancel loyalty application (only vendor who created it)
 router.post(
-    '/loyalty/:id/cancel',
-    auth,
-    roleCheck('Vendor'),
-    vendorCtrl.cancelLoyaltyApplication
-);
-
-// Delete a cancelled loyalty application
-router.delete(
-    '/loyalty/:id',
-    auth,
-    roleCheck('Vendor'),
-    vendorCtrl.deleteLoyaltyApplication
-);
-// List all vendors that are partners in the GUC loyalty program
-router.get(
-  '/loyalty/partners',
+  '/loyalty/:id/cancel',
   auth,
-  roleCheck('Student', 'Staff', 'EventOffice', 'TA', 'Professor', 'Admin'),
-  vendorCtrl.listLoyaltyPartners
+  roleCheck('Vendor'),
+  vendorCtrl.cancelLoyaltyApplication
 );
 
 router.post(
@@ -123,6 +109,30 @@ router.post(
   roleCheck('Vendor'),
   vendorUpload,
   vendorCtrl.uploadVendorDocuments
+);
+
+// Attendee ID Upload (Post-approval or update)
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const attendeeUploadDir = path.join(__dirname, '..', 'uploads', 'attendees');
+if (!fs.existsSync(attendeeUploadDir)) fs.mkdirSync(attendeeUploadDir, { recursive: true });
+
+const attendeeStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, attendeeUploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `attendee-${req.params.attendeeId}-${Date.now()}${ext}`);
+  }
+});
+const attendeeUpload = multer({ storage: attendeeStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+router.post(
+  '/applications/:applicationId/attendees/:attendeeId/upload-id',
+  auth,
+  roleCheck('Vendor'),
+  attendeeUpload.single('idDocument'),
+  vendorCtrl.uploadAttendeeId
 );
 
 

@@ -19,7 +19,7 @@ try {
 }
 
 const sendVerificationEmail = async (user, token) => {
-  const frontendUrl = process.env.FRONTEND_URL 
+  const frontendUrl = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.replace(/\/$/, '')
     : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
   const verifyFrontendURL = `${frontendUrl}/verify/${token}`;
@@ -128,7 +128,7 @@ const sendVendorApplicationApprovalEmail = async (vendor, application, event) =>
   const eventLocation = event.location || 'TBA';
   const participationFee = application.participationFee || 0;
   const paymentDeadline = application.paymentDeadline ? new Date(application.paymentDeadline).toLocaleDateString() : 'N/A';
-  const frontendUrl = process.env.FRONTEND_URL 
+  const frontendUrl = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.replace(/\/$/, '')
     : (process.env.NODE_ENV === 'production' ? 'https://appify-events.com' : 'http://localhost:3000');
   const paymentUrl = `${frontendUrl}/vendor/payment/${application._id}`;
@@ -396,6 +396,29 @@ const sendCertificateEmail = async (user, workshop) => {
   });
 };
 
+const sendEventReminderEmail = async (user, event, label) => {
+  const timeString = label || 'soon';
+  const eventDate = event.startDate ? new Date(event.startDate).toLocaleString() : 'TBA';
+
+  await transporter.sendMail({
+    from: `"Appify Events" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: `Reminder: ${event.title} starts ${timeString}`,
+    html: `
+        <h3>Event Reminder</h3>
+        <p>Dear ${user.firstName || 'User'},</p>
+        <p>This is a reminder that you are registered for <strong>"${event.title}"</strong>.</p>
+        <div style="background:#f0f9ff; border-left: 4px solid #0ea5e9; padding: 12px; margin: 12px 0;">
+          <p><strong>Starts in:</strong> ${timeString}</p>
+          <p><strong>Date/Time:</strong> ${eventDate}</p>
+          <p><strong>Location:</strong> ${event.location || 'See details'}</p>
+        </div>
+        <p>We look forward to seeing you there!</p>
+        <p>Best regards,<br/>Appify Events Team</p>
+      `,
+  });
+};
+
 module.exports = {
   sendVerificationEmail,
   sendWarningEmail,
@@ -407,4 +430,5 @@ module.exports = {
   sendVendorVisitorPassesEmail,
   sendIndividualVisitorPassEmail,
   sendCertificateEmail,
+  sendEventReminderEmail
 };

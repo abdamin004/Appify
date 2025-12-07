@@ -28,6 +28,7 @@ const Notification = require('../models/Notification');
 const VisitorPass = require('../models/VisitorPass');
 const QRCode = require('qrcode');
 const crypto = require('crypto');
+const XLSX = require('xlsx');
 
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
@@ -221,6 +222,17 @@ module.exports = {
                         reason: blackout.reason
                     }
                 });
+            }
+
+            // Compliance Fix: Only Admin and EventOffice can create Gym Sessions
+            if (type === 'GymSession') {
+                const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+                if (!['admin', 'eventoffice'].includes(userRole)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Only Event Office and Admin users can create Gym Sessions.'
+                    });
+                }
             }
 
             const eventData = {
@@ -498,6 +510,14 @@ module.exports = {
             const eventId = req.params.eventId;
             const userId = req.user._id;
 
+            // Compliance Fix (US 24): Admins and Event Office cannot register for events
+            if (['admin', 'eventoffice'].includes(req.user.role.toLowerCase())) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Admins and Event Office members cannot register for events.'
+                });
+            }
+
             // Find the event
             const event = await Event.findById(eventId);
             if (!event) {
@@ -541,12 +561,21 @@ module.exports = {
                 });
             }
 
-            // Find the user
-            const user = await User.findById(userId);
+            // Use req.user which is already populated by auth middleware (works for both User and Vendor)
+            const user = req.user;
+
             if (!user) {
-                return res.status(404).json({
+                return res.status(401).json({
                     success: false,
-                    message: 'User not found'
+                    message: 'User not authenticated'
+                });
+            }
+
+            // Compliance Fix: Vendors cannot register as attendees (they should request booths)
+            if (user.role && user.role.toLowerCase() === 'vendor') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Vendors cannot register as attendees. You may have already requested a spot, or need to use the Request Spot button.'
                 });
             }
 
@@ -1122,6 +1151,13 @@ module.exports = {
                 return res.status(400).json({ error: 'Cannot delete an event that has already started' });
             }
 
+            // Safety Check: Cannot delete event if users are registered (User Story 48)
+            if (event.registeredUsers && event.registeredUsers.length > 0) {
+                return res.status(400).json({
+                    error: `Cannot delete event with ${event.registeredUsers.length} registered user(s). Please cancel the event instead, or remove users manually.`
+                });
+            }
+
             switch (event.type) {
                 case 'Workshop':
                     await Workshop.findByIdAndDelete(id);
@@ -1351,6 +1387,20 @@ module.exports = {
         }
     },
 
+    async getEventPrice(req, res) {
+        try {
+            const event = await Event.findById(req.params.id);
+            if (!event) return res.status(404).json({ message: 'Event not found' });
+            return res.status(200).json({
+                price: event.ticketPrice || 0,
+                currency: 'EGP',
+                eventType: event.type
+            });
+        } catch (err) {
+            return res.status(500).json({ message: err.message });
+        }
+    },
+
     // Detailed Analytics for Event Creators (Professor/EventOffice)
     async getEventAnalytics(req, res) {
         try {
@@ -1370,8 +1420,43 @@ module.exports = {
             }
 
             const feedbacks = await Feedback.find({ event: eventId }).populate('user', 'firstName lastName');
+            const legacyRatings = await Rating.find({ event: eventId }).populate('user', 'firstName lastName');
 
-            const total = feedbacks.length;
+            // Merge logic: Feedback takes precedence over Rating for the same user
+            const feedbackMap = new Map();
+
+            // 1. Add Legacy Ratings
+            legacyRatings.forEach(r => {
+                const uid = r.user ? r.user._id.toString() : 'unknown';
+                feedbackMap.set(uid, {
+                    type: 'rating',
+                    ratings: { overall: r.rating, content: 0, speaker: 0, organization: 0 },
+                    comment: null,
+                    user: r.user,
+                    date: r.createdAt
+                });
+            });
+
+            // 2. Overwrite with Rich Feedback
+            feedbacks.forEach(f => {
+                const uid = f.user ? f.user._id.toString() : 'unknown-' + f._id;
+                feedbackMap.set(uid, {
+                    type: 'feedback',
+                    ratings: {
+                        overall: f.ratings.overall,
+                        content: f.ratings.content || 0,
+                        speaker: f.ratings.speaker || 0,
+                        organization: f.ratings.organization || 0
+                    },
+                    comment: f.comment,
+                    user: f.user,
+                    date: f.createdAt
+                });
+            });
+
+            const mergedData = Array.from(feedbackMap.values());
+            const total = mergedData.length;
+
             if (total === 0) {
                 return res.status(200).json({
                     success: true,
@@ -1383,28 +1468,47 @@ module.exports = {
 
             // Calculate averages
             const sums = { overall: 0, content: 0, speaker: 0, organization: 0 };
+            // For sub-categories, we only count items that have that category rated (i.e. > 0)
+            const counts = { overall: 0, content: 0, speaker: 0, organization: 0 };
+
             const comments = [];
 
-            feedbacks.forEach(f => {
-                sums.overall += f.ratings.overall || 0;
-                sums.content += f.ratings.content || 0;
-                sums.speaker += f.ratings.speaker || 0;
-                sums.organization += f.ratings.organization || 0;
-                if (f.comment) {
+            mergedData.forEach(item => {
+                // Overall is always present
+                if (item.ratings.overall > 0) {
+                    sums.overall += item.ratings.overall;
+                    counts.overall++;
+                }
+
+                // Sub-metrics
+                if (item.ratings.content > 0) {
+                    sums.content += item.ratings.content;
+                    counts.content++;
+                }
+                if (item.ratings.speaker > 0) {
+                    sums.speaker += item.ratings.speaker;
+                    counts.speaker++;
+                }
+                if (item.ratings.organization > 0) {
+                    sums.organization += item.ratings.organization;
+                    counts.organization++;
+                }
+
+                if (item.comment) {
                     comments.push({
-                        text: f.comment,
-                        user: f.user ? `${f.user.firstName} ${f.user.lastName}` : 'Unknown User',
-                        rating: f.ratings.overall,
-                        date: f.createdAt
+                        text: item.comment,
+                        user: item.user ? `${item.user.firstName} ${item.user.lastName}` : 'Unknown User',
+                        rating: item.ratings.overall,
+                        date: item.date
                     });
                 }
             });
 
             const averages = {
-                overall: Number((sums.overall / total).toFixed(1)),
-                content: Number((sums.content / total).toFixed(1)),
-                speaker: Number((sums.speaker / total).toFixed(1)),
-                organization: Number((sums.organization / total).toFixed(1))
+                overall: counts.overall ? Number((sums.overall / counts.overall).toFixed(1)) : 0,
+                content: counts.content ? Number((sums.content / counts.content).toFixed(1)) : 0,
+                speaker: counts.speaker ? Number((sums.speaker / counts.speaker).toFixed(1)) : 0,
+                organization: counts.organization ? Number((sums.organization / counts.organization).toFixed(1)) : 0
             };
 
             return res.status(200).json({
@@ -1912,48 +2016,143 @@ module.exports = {
 
 
 
-    // POST /events/:id/accommodations
-    async requestDisabilityAccommodation(req, res) {
+
+
+
+
+    // GET /events/accommodations/all
+    // List all accommodation requests for Event Office
+    async getAllAccommodationRequests(req, res) {
         try {
-            const eventId = req.params.id;
-            const userId = req.user._id;
-            const { needsWheelchairAccess, needsSpecialSeating, otherRequests } = req.body;
-
-            // Verify event exists
-            const event = await Event.findById(eventId);
-            if (!event) {
-                return res.status(404).json({ success: false, message: 'Event not found' });
-            }
-
-            // Upsert the accommodation request
-            // If one exists for this user+event, update it. Otherwise create new.
-            const request = await AccommodationRequest.findOneAndUpdate(
-                { user: userId, event: eventId },
-                {
-                    roleAtEvent: req.user.role,
-                    needsWheelchairAccess: !!needsWheelchairAccess,
-                    needsSpecialSeating: !!needsSpecialSeating,
-                    otherRequests: otherRequests || '',
-                    status: 'approved'
-                },
-                { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-            );
+            const requests = await AccommodationRequest.find()
+                .populate('user', 'firstName lastName email idNumber')
+                .populate('event', 'title type startDate')
+                .sort({ createdAt: -1 });
 
             return res.status(200).json({
                 success: true,
-                message: 'Accommodation request updated successfully',
-                data: request
+                count: requests.length,
+                data: requests
             });
-
         } catch (err) {
-            console.error('Error requesting accommodation:', err);
+            console.error('Error fetching accommodation requests:', err);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to save accommodation request'
+                message: 'Failed to fetch accommodation requests',
+                error: err.message
             });
         }
     },
 
+    // PUT /events/accommodations/:requestId/status
+    // Update status (approve/reject)
+    async updateAccommodationStatus(req, res) {
+        try {
+            const { requestId } = req.params;
+            const { status } = req.body;
+
+            if (!['pending', 'approved', 'rejected'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Invalid status' });
+            }
+
+            const request = await AccommodationRequest.findByIdAndUpdate(
+                requestId,
+                { status },
+                { new: true }
+            );
+
+            if (!request) {
+                return res.status(404).json({ success: false, message: 'Request not found' });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: `Accommodation request ${status}`,
+                data: request
+            });
+        } catch (err) {
+            console.error('Error updating accommodation status:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to update request',
+                error: err.message
+            });
+        }
+    },
+
+    async exportEventRegistrations(req, res) {
+        try {
+            const { id } = req.params;
+            const event = await Event.findById(id).populate('registeredUsers', 'firstName lastName email role studentStaffId');
+            if (!event) return res.status(404).json({ message: 'Event not found' });
+
+            // Authorization
+            const userId = req.user._id;
+            const isCreator = event.createdBy && event.createdBy.toString() === userId.toString();
+            // allow strict role check (ignoring case for safety)
+            const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+            const isAdmin = ['admin', 'eventoffice'].includes(userRole);
+
+            if (!isCreator && !isAdmin) {
+                return res.status(403).json({ message: 'Not authorized to export registrations.' });
+            }
+
+            const data = (event.registeredUsers || []).map(u => ({
+                "First Name": u.firstName,
+                "Last Name": u.lastName,
+                "Email": u.email,
+                "Role": u.role,
+                "ID": u.studentStaffId || 'N/A'
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, "Registrations");
+
+            const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+            res.setHeader('Content-Disposition', `attachment; filename="${event.title.replace(/[^a-z0-9]/gi, '_')}_registrations.xlsx"`);
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.send(buffer);
+
+        } catch (err) {
+            console.error('Export error:', err);
+            res.status(500).json({ message: 'Export failed', error: err.message });
+        }
+    },
+
+    // GET /events/:id/qr (Bazaar)
+    async generateBazaarEventQR(req, res) {
+        try {
+            const { id } = req.params;
+            const event = await Event.findById(id);
+            if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
+
+            if (event.type !== 'Bazaar') {
+                return res.status(400).json({ success: false, message: 'QR code generation is only available for Bazaars' });
+            }
+
+            const { generateQRCode } = require('../utils/qrGenerator');
+
+            // Payload: Event ID + Type
+            const payload = JSON.stringify({
+                eventId: event._id,
+                type: 'BazaarCheckIn',
+                title: event.title
+            });
+
+            const qrCode = await generateQRCode(payload);
+
+            return res.json({
+                success: true,
+                qrCode,
+                message: 'Bazaar QR code generated'
+            });
+
+        } catch (err) {
+            return res.status(500).json({ success: false, message: err.message });
+        }
+    }
 };
 
 

@@ -35,10 +35,12 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
 });
 
-// we expect TWO possible fields:
+// we expect possible fields:
 // - taxCard (usually pdf or image)
 // - logo    (image)
+// - attendeeFiles (pdf or image) - one or multiple
 module.exports = upload.fields([
     { name: 'taxCard', maxCount: 1 },
-    { name: 'logo', maxCount: 1 }
+    { name: 'logo', maxCount: 1 },
+    { name: 'attendeeFiles', maxCount: 10 }
 ]);

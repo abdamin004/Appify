@@ -4,6 +4,7 @@ import { createBooth, listBooths, updateEvent } from '../../../services/eventSer
 import RoleSelector from '../RoleSelector';
 import { showToast } from '../../../utils/toast';
 import Input from '../../UI/Input';
+import DateTimePicker from '../../UI/DateTimePicker';
 import Button from '../../UI/Button';
 import FormLayout from '../../UI/FormLayout';
 
@@ -96,18 +97,16 @@ function BoothsManager() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input
+            <DateTimePicker
               label="Start Date/Time *"
-              type="datetime-local"
               value={editData.startDate || ''}
-              onChange={e => setEditData({ ...editData, startDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, startDate: e.target.value?.target?.value || e.target.value })}
               required
             />
-            <Input
+            <DateTimePicker
               label="End Date/Time *"
-              type="datetime-local"
               value={editData.endDate || ''}
-              onChange={e => setEditData({ ...editData, endDate: e.target.value })}
+              onChange={e => setEditData({ ...editData, endDate: e.target.value?.target?.value || e.target.value })}
               required
             />
           </div>
@@ -119,11 +118,10 @@ function BoothsManager() {
               onChange={e => setEditData({ ...editData, location: e.target.value })}
               required
             />
-            <Input
+            <DateTimePicker
               label="Registration Deadline"
-              type="datetime-local"
               value={editData.registrationDeadline || ''}
-              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value })}
+              onChange={e => setEditData({ ...editData, registrationDeadline: e.target.value?.target?.value || e.target.value })}
             />
           </div>
 
@@ -174,18 +172,16 @@ function BoothsManager() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <DateTimePicker
             label="Start Date/Time *"
-            type="datetime-local"
             value={form.startDate}
-            onChange={e => setForm({ ...form, startDate: e.target.value })}
+            onChange={e => setForm({ ...form, startDate: e.target.value?.target?.value || e.target.value })}
             required
           />
-          <Input
+          <DateTimePicker
             label="End Date/Time *"
-            type="datetime-local"
             value={form.endDate}
-            onChange={e => setForm({ ...form, endDate: e.target.value })}
+            onChange={e => setForm({ ...form, endDate: e.target.value?.target?.value || e.target.value })}
             required
           />
         </div>
@@ -198,11 +194,10 @@ function BoothsManager() {
             required
             placeholder="e.g. Hall A, Booth 12"
           />
-          <Input
+          <DateTimePicker
             label="Registration Deadline"
-            type="datetime-local"
             value={form.registrationDeadline}
-            onChange={e => setForm({ ...form, registrationDeadline: e.target.value })}
+            onChange={e => setForm({ ...form, registrationDeadline: e.target.value?.target?.value || e.target.value })}
           />
         </div>
 
@@ -222,64 +217,6 @@ function BoothsManager() {
           </Button>
         </div>
       </form>
-
-      {booths.length > 0 && (
-        <div className="mt-16 pt-10 border-t border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">Existing Booths</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {booths.map((b) => (
-              <div
-                key={b._id || b.id}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all group hover:border-emerald-200"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-bold text-lg text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    {b.title}
-                  </h3>
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${b.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                    {b.status || 'published'}
-                  </span>
-                </div>
-
-                <p className="text-slate-600 text-sm mb-4 line-clamp-2">
-                  {b.shortDescription || 'No description provided.'}
-                </p>
-
-                <div className="space-y-2 text-sm text-slate-500 mb-6">
-                  <div className="flex items-center gap-2">
-                    <span>📍</span> {b.location}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>📅</span> {b.startDate ? new Date(b.startDate).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => {
-                    setEditing(b._id || b.id);
-                    setEditData({
-                      title: b.title,
-                      shortDescription: b.shortDescription,
-                      location: b.location,
-                      startDate: b.startDate ? new Date(b.startDate).toISOString().slice(0, 16) : '',
-                      endDate: b.endDate ? new Date(b.endDate).toISOString().slice(0, 16) : '',
-                      registrationDeadline: b.registrationDeadline ? new Date(b.registrationDeadline).toISOString().slice(0, 16) : '',
-                      status: b.status || 'published'
-                    });
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                  Edit Details
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </FormLayout>
   );
 }
