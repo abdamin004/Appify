@@ -806,16 +806,17 @@ function EventOfficeDashboard() {
       icon: "➕",
       children: [
         { key: "create-bazaar", label: "Bazaar", icon: "🏪", onClick: () => handleCreateEvent('bazaar') },
-        { key: "create-booth", label: "Booth", icon: "🎪", onClick: () => handleCreateEvent('booth') },
+        // Booth moved to top level
         { key: "create-conference", label: "Conference", icon: "🎤", onClick: () => handleCreateEvent('conference') },
         { key: "create-gym", label: "Gym Session", icon: "💪", onClick: () => handleCreateEvent('gym') },
         { key: "create-trip", label: "Trip", icon: "🚌", onClick: () => handleCreateEvent('trip') },
       ]
     },
+    { key: "create-booth", label: "Create Booth", icon: "🎪", onClick: () => handleCreateEvent('booth') },
     { key: "vendor-requests", label: "Vendor Requests", icon: "📝", badge: vendorRequests.length },
     { key: "vendor-documents", label: "Vendor Documents", icon: "📄" },
     { key: "attendees-report", label: "Attendees Report", icon: "📊" },
-    { key: "sales-report", label: "Sales Report", icon: "💰" },
+    { key: "sales-report", label: "Financial Reports", icon: "💰" },
     { key: "gym-sessions", label: "Gym Sessions", icon: "💪" },
     { key: "workshop-approvals", label: "Workshop Approvals", icon: "🎓", badge: pendingWorkshops.length },
     { key: "polls", label: "Booth Polls", icon: "📊" },
@@ -864,7 +865,7 @@ function EventOfficeDashboard() {
               {/* Left Side: Welcome Text */}
               <div className="flex-1 min-w-[300px]">
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
-                  Welcome, Event Office {user.firstName}! 👋
+                  Welcome, {user.firstName}! 👋
                 </h1>
                 <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                   Manage university events, coordinate activities, and oversee vendor applications.
@@ -967,9 +968,12 @@ function EventOfficeDashboard() {
 
         {activeTab === "vendor-requests" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">
-              Pending Vendor Requests
-            </h2>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-800">
+                Pending Vendor Requests
+              </h2>
+              <p className="text-slate-500 mt-1">Review and manage incoming vendor applications</p>
+            </div>
             <div className="mb-8">
               {vendorRequestsError && (
                 <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 mb-4 font-medium">
@@ -1112,9 +1116,12 @@ function EventOfficeDashboard() {
 
         {activeTab === "workshop-approvals" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">
-              Pending Workshop Approvals
-            </h2>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-800">
+                Pending Workshop Approvals
+              </h2>
+              <p className="text-slate-500 mt-1">Review and approve educational workshops</p>
+            </div>
             {pendingWorkshops.length === 0 ? (
               <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                 <div className="text-4xl mb-4 opacity-50">🎓</div>
@@ -1223,26 +1230,47 @@ function EventOfficeDashboard() {
 
         {activeTab === "reminders" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6 shrink-0">
-              <h2 className="text-2xl font-bold text-slate-800">
-                Event Reminders
-              </h2>
+            <div className="mb-6 shrink-0 relative">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-800">
+                  Event Reminders
+                </h2>
+                <p className="text-slate-500 mt-1">Stay on top of upcoming events</p>
+              </div>
               {reminders.filter(n => !n.isRead).length > 0 && (
-                <button
-                  onClick={() => {
-                    reminders.filter(n => !n.isRead).forEach(reminder => {
-                      markReminderRead(reminder.id);
-                    });
-                    fetchReminders();
-                  }}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
-                >
-                  Mark All as Read
-                </button>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden md:block">
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Mark All as Read
+                  </button>
+                </div>
+              )}
+              {/* Mobile button variant */}
+              {reminders.filter(n => !n.isRead).length > 0 && (
+                <div className="mt-4 flex justify-center md:hidden">
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Mark All as Read
+                  </button>
+                </div>
               )}
             </div>
             {reminders.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed m-1">
                 <div className="text-4xl mb-4">⏰</div>
                 <p>No reminders at this time.</p>
               </div>
@@ -1321,11 +1349,14 @@ function EventOfficeDashboard() {
 
         {activeTab === "notifications" && (
           <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800">
-                Notifications
-              </h2>
-              <div className="flex gap-3">
+            <div className="mb-8 relative">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-800 m-0">
+                  Notifications
+                </h2>
+                <p className="text-slate-500 mt-1">Updates and alerts</p>
+              </div>
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex gap-3">
                 {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
                   <button
                     onClick={() => {
@@ -1333,7 +1364,7 @@ function EventOfficeDashboard() {
                       fetchNotifications();
                       showToast.success('All notifications marked as read');
                     }}
-                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm"
                   >
                     Mark All as Read
                   </button>
@@ -1354,9 +1385,41 @@ function EventOfficeDashboard() {
                   </button>
                 )}
               </div>
+              {/* Mobile stacked buttons */}
+              {(notifications.length > 0 || notifications.filter(n => !n.read && !n.isRead).length > 0) && (
+                <div className="flex gap-3 mt-4 justify-center md:hidden">
+                  {notifications.filter(n => !n.read && !n.isRead).length > 0 && (
+                    <button
+                      onClick={() => {
+                        markAllEventOfficeNotificationsRead();
+                        fetchNotifications();
+                        showToast.success('All notifications marked as read');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm"
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirmDialog('Are you sure you want to delete all notifications?', 'Delete All Notifications');
+                        if (confirmed) {
+                          deleteAllEventOfficeNotifications();
+                          fetchNotifications();
+                          showToast.success('All notifications deleted');
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {notifications.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                 <div className="text-4xl mb-4">🔔</div>
                 <p>No notifications at this time.</p>
               </div>
@@ -1437,41 +1500,29 @@ function EventOfficeDashboard() {
 
         {activeTab === "vendor-documents" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Vendor Documents</h2>
-              <p className="text-slate-500">Review and approve vendor documentation</p>
-            </div>
             <VendorDocuments />
           </div>
         )}
 
         {activeTab === "attendees-report" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Attendees Report</h2>
-              <p className="text-slate-500">View attendance statistics</p>
-            </div>
             <AttendeesReport />
           </div>
         )}
 
         {activeTab === "sales-report" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Sales Report</h2>
-              <p className="text-slate-500">Monitor event sales and revenue</p>
-            </div>
             <SalesReport />
           </div>
         )}
 
         {activeTab === "gym-sessions" && (
-          <div className="space-y-6">
-            <div className="mb-2">
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
-              <p className="text-slate-500">Manage gym sessions and schedules</p>
+              <p className="text-slate-500 mt-1">Manage gym sessions and schedules</p>
             </div>
-            <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="">
               {gymSessions.length === 0 ? (
                 <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                   <div className="text-6xl mb-6 opacity-50">🏋️</div>
@@ -1521,11 +1572,7 @@ function EventOfficeDashboard() {
         )}
 
         {activeTab === "polls" && (
-          <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Booth Polls</h2>
-              <p className="text-slate-500">Manage voting for vendor booths</p>
-            </div>
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
             <div id="booth-polls-section">
               <BoothPollManager />
             </div>

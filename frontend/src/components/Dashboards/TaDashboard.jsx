@@ -680,7 +680,7 @@ function TADashboard() {
               {/* Left Side: Welcome Text */}
               <div className="flex-1 min-w-[300px]">
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 leading-tight">
-                  Welcome back, {user.firstName}! 👋
+                  Welcome, {user.firstName}! 👋
                 </h1>
                 <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
                   Discover and register for amazing events happening on campus.
@@ -785,9 +785,11 @@ function TADashboard() {
 
         {activeTab === "favourites" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">My Favourites</h2>
-              <p className="text-slate-500">Events you've saved for later</p>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
+                <p className="text-slate-500 mt-1">Your saved events and workshops</p>
+              </div>
             </div>
             <MyEventsList events={favouriteEvents} />
           </div>
@@ -795,9 +797,11 @@ function TADashboard() {
 
         {activeTab === "registered" && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
-              <p className="text-slate-500">Manage your upcoming activities</p>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
+                <p className="text-slate-500 mt-1">Manage your upcoming activities</p>
+              </div>
             </div>
             {loading ? (
               <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200">
@@ -812,25 +816,46 @@ function TADashboard() {
         )}
 
         {activeTab === "reminders" && (
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800 m-0">Event Reminders</h2>
-              {reminders.filter(n => !n.isRead).length > 0 && (
-                <button
-                  onClick={() => {
-                    reminders.filter(n => !n.isRead).forEach(reminder => {
-                      markReminderRead(reminder.id);
-                    });
-                    fetchReminders();
-                  }}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
-                >
-                  Mark All as Read
-                </button>
-              )}
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="text-center mb-8 relative">
+              <h2 className="text-2xl font-bold text-slate-900">Reminders</h2>
+              <p className="text-slate-500 mt-1">Don't miss your upcoming events</p>
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
+              <div className="md:hidden mt-4 flex justify-center">
+                {reminders.filter(n => !n.isRead).length > 0 && (
+                  <button
+                    onClick={() => {
+                      reminders.filter(n => !n.isRead).forEach(reminder => {
+                        markReminderRead(reminder.id);
+                      });
+                      fetchReminders();
+                    }}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    Mark All as Read
+                  </button>
+                )}
+              </div>
             </div>
             {reminders.length === 0 ? (
-              <p className="text-slate-500 text-base">No reminders at this time.</p>
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">⏰</div>
+                <p>No reminders at this time.</p>
+              </div>
             ) : (
               <div className="flex flex-col gap-4">
                 {reminders.map((reminder) => (
@@ -904,11 +929,11 @@ function TADashboard() {
 
         {activeTab === 'gym-sessions' && (
           <div className="space-y-6">
-            <div className="mb-2">
-              <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
-              <p className="text-slate-500">View schedule and register for sessions</p>
-            </div>
-            <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="bg-white p-6 lg:p-8 rounded-xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
+                <p className="text-slate-500 mt-1">View schedule and register for sessions</p>
+              </div>
               {gymSessionsLoading ? (
                 <div className="text-center py-20">
                   <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
@@ -1064,10 +1089,11 @@ function TADashboard() {
         )}
 
         {activeTab === 'notifications' && (
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-slate-800 m-0">Notifications</h2>
-              <div className="flex gap-4">
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="text-center mb-8 relative">
+              <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+              <p className="text-slate-500 mt-2">Updates about events and activities</p>
+              <div className="flex gap-4 mt-4 md:mt-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 justify-center">
                 {notifications.filter(n => !n.read && !n.isRead && n.type !== 'EventReminder').length > 0 && (
                   <button
                     onClick={() => {
@@ -1098,7 +1124,10 @@ function TADashboard() {
               </div>
             </div>
             {notifications.filter(n => n.type !== 'EventReminder').length === 0 ? (
-              <p className="text-slate-500 text-base">No notifications at this time.</p>
+              <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                <div className="text-4xl mb-4 opacity-50">🔔</div>
+                <p>No notifications at this time.</p>
+              </div>
             ) : (
               <div className="flex flex-col gap-4">
                 {notifications.filter(n => n.type !== 'EventReminder').map((notif) => {
@@ -1178,13 +1207,13 @@ function TADashboard() {
         )}
 
         {activeTab === "loyalty" && (
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
             <LoyaltyPartnersList />
           </div>
         )}
 
         {activeTab === "polls" && (
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
             <StudentPollVoting />
           </div>
         )}

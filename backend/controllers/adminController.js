@@ -12,6 +12,7 @@ const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEm
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
+const BlackoutDate = require('../models/BlackoutDate');
 
 // List all users with optional filtering
 exports.listAllUsers = async (req, res) => {
@@ -1546,4 +1547,145 @@ exports.reviewLoyaltyApplication = async (req, res) => {
       error: error.message
     });
   }
+};
+// =========================
+// System-wide blackout dates
+// =========================
+
+// Create a blackout date
+// POST /api/admin/blackout-dates
+exports.createBlackoutDate = async (req, res) => {
+    try {
+        const { name, reason, startDate, endDate } = req.body;
+
+        if (!name || !startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'name, startDate and endDate are required',
+            });
+        }
+
+        const blackout = new BlackoutDate({
+            name: name.trim(),
+            reason: reason || '',
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            active: true,
+            createdBy: req.user._id,
+        });
+
+        await blackout.save();
+
+        return res.status(201).json({
+            success: true,
+            message: 'Blackout date created successfully',
+            data: blackout,
+        });
+    } catch (error) {
+        console.error('Error in createBlackoutDate:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to create blackout date',
+            error: error.message,
+        });
+    }
+};
+
+// Get blackout dates (optionally filter by ?active=true/false)
+// GET /api/admin/blackout-dates
+exports.getBlackoutDates = async (req, res) => {
+    try {
+        const { active } = req.query;
+        const filter = {};
+
+        if (active === 'true') {
+            filter.active = true;
+        } else if (active === 'false') {
+            filter.active = false;
+        }
+
+        const blackoutDates = await BlackoutDate.find(filter).sort({
+            startDate: 1,
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: blackoutDates,
+        });
+    } catch (error) {
+        console.error('Error in getBlackoutDates:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch blackout dates',
+            error: error.message,
+        });
+    }
+};
+
+// Update a blackout date
+// PUT /api/admin/blackout-dates/:id
+exports.updateBlackoutDate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, reason, startDate, endDate, active } = req.body;
+
+        const blackout = await BlackoutDate.findById(id);
+        if (!blackout) {
+            return res.status(404).json({
+                success: false,
+                message: 'Blackout date not found',
+            });
+        }
+
+        if (name !== undefined) blackout.name = name;
+        if (reason !== undefined) blackout.reason = reason;
+        if (startDate !== undefined) blackout.startDate = new Date(startDate);
+        if (endDate !== undefined) blackout.endDate = new Date(endDate);
+        if (active !== undefined) blackout.active = !!active;
+
+        await blackout.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Blackout date updated successfully',
+            data: blackout,
+        });
+    } catch (error) {
+        console.error('Error in updateBlackoutDate:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update blackout date',
+            error: error.message,
+        });
+    }
+};
+
+// Delete a blackout date
+// DELETE /api/admin/blackout-dates/:id
+exports.deleteBlackoutDate = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const blackout = await BlackoutDate.findById(id);
+        if (!blackout) {
+            return res.status(404).json({
+                success: false,
+                message: 'Blackout date not found',
+            });
+        }
+
+        await blackout.deleteOne();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Blackout date deleted successfully',
+        });
+    } catch (error) {
+        console.error('Error in deleteBlackoutDate:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to delete blackout date',
+            error: error.message,
+        });
+    }
 };

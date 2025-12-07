@@ -14,8 +14,20 @@ const Feedback = require('../models/Feedback');
 const { ObjectId } = require('mongoose').Types;
 const Payment = require('../models/Payment');
 const checkSchedulingConflict = require('../utils/conflictChecker');
-
 const USER_ROLE_OPTIONS = ['Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin', 'Vendor'];
+
+const BlackoutDate = require('../models/BlackoutDate');
+const AccommodationRequest = require('../models/AccommodationRequest');
+const {
+    sendGymSessionCancellationEmail,
+    sendGymSessionUpdateEmail,
+    sendVendorVisitorPassesEmail,
+    sendIndividualVisitorPassEmail
+} = require('../utils/sendEmail');
+const Notification = require('../models/Notification');
+const VisitorPass = require('../models/VisitorPass');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
 
 
 // Helper: attach approved vendor participants (from VendorApplication) to Bazaar/Booth events
@@ -110,7 +122,27 @@ function parseAllowedRoles(input) {
     }
 
     return normalized;
+} 
+// Check if a given event date range falls inside any active blackout date
+async function checkBlackoutForEventRange(startDate, endDate) {
+    if (!startDate) {
+        return null;
+    }
+
+    const eventStart = new Date(startDate);
+    const eventEnd = endDate ? new Date(endDate) : new Date(startDate);
+
+    // Find any active blackout where ranges overlap:
+    // blackout.startDate <= eventEnd AND blackout.endDate >= eventStart
+    const blackout = await BlackoutDate.findOne({
+        active: true,
+        startDate: { $lte: eventEnd },
+        endDate: { $gte: eventStart }
+    });
+
+    return blackout;
 }
+
 
 module.exports = {
     // GET /events/:id - Get a single event by id
@@ -174,6 +206,21 @@ module.exports = {
                         error: 'An event with the same title, location, and start date already exists'
                     });
                 }
+            }
+            // Enforce blackout dates before creating the event
+            const blackout = await checkBlackoutForEventRange(startDate, endDate || startDate);
+            if (blackout) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot create event during a system-wide blackout period.',
+                    blackout: {
+                        id: blackout._id,
+                        name: blackout.name,
+                        startDate: blackout.startDate,
+                        endDate: blackout.endDate,
+                        reason: blackout.reason
+                    }
+                });
             }
 
             const eventData = {
@@ -554,6 +601,28 @@ module.exports = {
             user.registeredEvents.push(eventId);
             await user.save();
 
+            // Handle Disability Accommodations
+            const { needsWheelchairAccess, needsSpecialSeating, otherRequests } = req.body;
+
+            // Check if any accommodation fields are provided and true/non-empty
+            if (needsWheelchairAccess || needsSpecialSeating || (otherRequests && otherRequests.trim().length > 0)) {
+                try {
+                    await AccommodationRequest.create({
+                        user: userId,
+                        event: eventId,
+                        roleAtEvent: user.role, // Assuming user.role is available and valid enum match
+                        needsWheelchairAccess: !!needsWheelchairAccess,
+                        needsSpecialSeating: !!needsSpecialSeating,
+                        otherRequests: otherRequests
+                    });
+                } catch (accErr) {
+                    console.error('Failed to save accommodation request:', accErr);
+                    // Decide if we want to fail the registration or just log it. 
+                    // Usually better to warn, but for now we'll just log so registration succeeds.
+                    // Or we could append a warning to the response.
+                }
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Successfully registered for the event',
@@ -633,6 +702,14 @@ module.exports = {
                 id => id.toString() !== eventId.toString()
             );
             await user.save();
+
+            // Cleanup any accommodation requests
+            try {
+                await AccommodationRequest.deleteOne({ user: userId, event: eventId });
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup accommodation request:', cleanupErr);
+                // Non-critical, just log
+            }
 
             res.status(200).json({
                 success: true,
@@ -733,8 +810,28 @@ module.exports = {
                     break;
             }
 
+            // Enforce blackout dates on updated event dates
+            const updatedStart = startDate || event.startDate;
+            const updatedEnd = endDate || event.endDate || updatedStart;
+
+            const blackoutUpdate = await checkBlackoutForEventRange(updatedStart, updatedEnd);
+            if (blackoutUpdate) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot move or update this event into a system-wide blackout period.',
+                    blackout: {
+                        id: blackoutUpdate._id,
+                        name: blackoutUpdate.name,
+                        startDate: blackoutUpdate.startDate,
+                        endDate: blackoutUpdate.endDate,
+                        reason: blackoutUpdate.reason
+                    }
+                });
+            }
+
             const updatedEvent = await Event.findByIdAndUpdate(id, updatedData, { new: true, runValidators: true })
                 .populate({ path: 'vendors', options: { strictPopulate: false } });
+
 
             // Check if workshop was updated after edit requests were made
             if (event.type === 'Workshop' && description !== undefined) {
@@ -1607,7 +1704,203 @@ module.exports = {
             console.error('generateVendorAttendeePasses error:', error);
             res.status(500).json({ success: false, message: 'Failed to generate attendee QR codes', error: error.message });
         }
+    },
+    // POST /events/:id/accommodations
+    // Allows Student/Staff/TA/Professor to request disability accommodations for an event
+    async requestDisabilityAccommodation(req, res) {
+        try {
+            const eventId = req.params.id;
+            const userId = req.user._id;
+
+            const {
+                needsWheelchairAccess = false,
+                needsSpecialSeating = false,
+                otherRequests
+            } = req.body;
+
+            // Ensure the event exists
+            const event = await Event.findById(eventId);
+            if (!event) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Event not found'
+                });
+            }
+
+            // Only these roles are allowed to make such a request
+            const allowedRoles = ['Student', 'Staff', 'TA', 'Professor'];
+            if (!allowedRoles.includes(req.user.role)) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'Only students, staff, TAs and professors can request disability accommodations for events'
+                });
+            }
+
+            // Optional: enforce that the user is registered for this event
+            if (
+                !event.registeredUsers ||
+                !event.registeredUsers.some(
+                    (u) => u.toString() === userId.toString()
+                )
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        'You must be registered for this event to request disability accommodations'
+                });
+            }
+
+            // Upsert: update existing request if present, otherwise create a new one
+            let request = await AccommodationRequest.findOne({
+                event: eventId,
+                user: userId
+            });
+
+            if (!request) {
+                request = new AccommodationRequest({
+                    event: eventId,
+                    user: userId,
+                    roleAtEvent: req.user.role,
+                    needsWheelchairAccess: Boolean(needsWheelchairAccess),
+                    needsSpecialSeating: Boolean(needsSpecialSeating),
+                    otherRequests: otherRequests || '',
+                    status: 'pending'
+                });
+            } else {
+                request.needsWheelchairAccess = Boolean(needsWheelchairAccess);
+                request.needsSpecialSeating = Boolean(needsSpecialSeating);
+                request.otherRequests =
+                    typeof otherRequests === 'string'
+                        ? otherRequests
+                        : request.otherRequests;
+                request.status = 'pending'; // reset to pending if user changed it
+            }
+
+            await request.save();
+
+            return res.status(201).json({
+                success: true,
+                message:
+                    'Disability accommodation request saved successfully',
+                data: request
+            });
+        } catch (err) {
+            console.error(
+                'Error in requestDisabilityAccommodation:',
+                err
+            );
+            return res.status(500).json({
+                success: false,
+                message:
+                    'Failed to save disability accommodation request',
+                error: err.message
+            });
+        }
+    },
+
+    // POST /events/workshops/:id/resources
+    // Professor uploads resources (PDFs, slides, materials) for a workshop
+    async uploadWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+
+            const workshop = await Workshop.findById(workshopId);
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            // Role is already enforced via route-level roleCheck('Professor')
+
+            const files = req.files || [];
+            if (!files.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No files uploaded'
+                });
+            }
+
+            const newResources = files.map(file => ({
+                filename: file.filename,
+                originalName: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+                url: `/uploads/workshop-resources/${file.filename}`,
+                uploadedAt: new Date()
+            }));
+
+            if (!Array.isArray(workshop.resources)) {
+                workshop.resources = [];
+            }
+            workshop.resources.push(...newResources);
+
+            await workshop.save();
+
+            return res.status(201).json({
+                success: true,
+                message: 'Workshop resources uploaded successfully',
+                data: workshop.resources
+            });
+        } catch (err) {
+            console.error('Error in uploadWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to upload workshop resources',
+                error: err.message
+            });
+        }
+    },
+
+    // GET /events/workshops/:id/resources
+    // Only participants who attended can access the list of resources
+    async getWorkshopResources(req, res) {
+        try {
+            const workshopId = req.params.id;
+            const userId = req.user._id;
+
+            const workshop = await Workshop.findById(workshopId).populate(
+                'attendedParticipants',
+                '_id firstName lastName email'
+            );
+            if (!workshop) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Workshop not found'
+                });
+            }
+
+            const attendedList = Array.isArray(workshop.attendedParticipants)
+                ? workshop.attendedParticipants
+                : [];
+
+            const hasAttended = attendedList.some(
+                (u) => u && u._id && u._id.toString() === userId.toString()
+            );
+
+            if (!hasAttended) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only participants who attended this workshop can access its resources'
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: workshop.resources || []
+            });
+        } catch (err) {
+            console.error('Error in getWorkshopResources:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve workshop resources',
+                error: err.message
+            });
+        }
     }
+
 
 
 };

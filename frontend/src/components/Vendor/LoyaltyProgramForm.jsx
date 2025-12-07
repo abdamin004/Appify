@@ -158,18 +158,18 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="bg-slate-900/50 p-8 rounded-2xl shadow-lg max-w-2xl mx-auto border border-slate-700 backdrop-blur-sm">
+    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
           Apply to GUC Loyalty Program
         </h2>
-        <p className="text-slate-400">
+        <p className="text-slate-500">
           Fill out the form below to apply for the GUC loyalty program. Your application will be reviewed by administrators.
         </p>
       </div>
 
       {vendorInfo?.companyName && (
-        <div className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-xl mb-6 text-sm text-emerald-300 flex items-center gap-2">
+        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl mb-6 text-sm text-emerald-700 flex items-center gap-2">
           <span>✓</span>
           <strong>Organization name auto-filled with your account info</strong>
         </div>
@@ -177,7 +177,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block mb-2 text-slate-300 font-bold">
+          <label className="block mb-2 text-slate-700 font-bold">
             Organization Name *
           </label>
           <input
@@ -186,13 +186,13 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             value={formData.organization}
             onChange={handleChange}
             required
-            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="Enter organization name"
           />
         </div>
 
         <div>
-          <label className="block mb-2 text-slate-300 font-bold">
+          <label className="block mb-2 text-slate-700 font-bold">
             Discount Rate (%) *
           </label>
           <input
@@ -204,7 +204,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             min="0"
             max="100"
             step="0.1"
-            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="e.g., 10, 15, 20"
           />
           <small className="block mt-1 text-slate-500 text-sm">
@@ -213,7 +213,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
         </div>
 
         <div>
-          <label className="block mb-2 text-slate-300 font-bold">
+          <label className="block mb-2 text-slate-700 font-bold">
             Promo Code *
           </label>
           <input
@@ -222,13 +222,13 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             value={formData.promoCode}
             onChange={handleChange}
             required
-            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
             placeholder="e.g., GUC2024, STUDENT10"
           />
         </div>
 
         <div>
-          <label className="block mb-2 text-slate-300 font-bold">
+          <label className="block mb-2 text-slate-700 font-bold">
             Terms and Conditions *
           </label>
           <textarea
@@ -237,7 +237,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
             onChange={handleChange}
             required
             rows="6"
-            className="w-full p-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-y font-sans"
+            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all resize-y font-sans"
             placeholder="Enter the terms and conditions for your loyalty program offer..."
           />
         </div>
@@ -248,7 +248,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="px-6 py-3 bg-transparent border border-slate-600 text-slate-300 rounded-xl font-semibold hover:bg-slate-800 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -256,7 +256,7 @@ const LoyaltyProgramForm = ({ onSuccess, onCancel }) => {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-3 bg-emerald-600 text-white border-none rounded-xl font-bold shadow-lg hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 bg-slate-900 text-white border-none rounded-xl font-bold shadow-lg hover:bg-emerald-600 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Submitting...' : 'Submit Application'}
           </button>

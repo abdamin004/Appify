@@ -46,19 +46,19 @@ export default function CommentModeration() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
-            <p className="text-lg font-medium text-slate-600">Loading comments...</p>
+            <p className="text-lg font-medium text-slate-500">Loading comments...</p>
           </div>
         )}
 
         {error && (
-          <div className="alert alert-error shadow-sm mb-6">
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{error}</span>
           </div>
         )}
 
         {!loading && !error && comments.length === 0 && (
-          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200">
             <div className="text-6xl mb-4">💬</div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No Comments</h3>
             <p className="text-slate-500">There are no comments to moderate at this time.</p>
@@ -70,28 +70,33 @@ export default function CommentModeration() {
             {comments.map(c => (
               <div
                 key={c._id}
-                className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-all"
               >
                 <div className="flex flex-col md:flex-row justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-                      <span className="font-bold text-slate-800">
+                    <div className="flex items-center gap-2 text-sm text-slate-500 mb-3">
+                      <span className="font-bold text-slate-700 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-xs text-emerald-700">
+                          {(c.user?.firstName?.[0] || 'U').toUpperCase()}
+                        </span>
                         {c.user ? `${c.user.firstName || ''} ${c.user.lastName || ''}`.trim() : 'Unknown user'}
                       </span>
                       <span>on</span>
-                      <span className="font-medium text-emerald-600">
+                      <span className="font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
                         {c.event ? c.event.title : 'Unknown event'}
                       </span>
                     </div>
-                    <p className="text-slate-700 leading-relaxed">
-                      {c.content}
-                    </p>
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                      <p className="text-slate-700 leading-relaxed italic">
+                        "{c.content}"
+                      </p>
+                    </div>
                   </div>
 
                   <div className="self-start md:self-center">
                     <button
                       onClick={() => handleDelete(c._id)}
-                      className="btn btn-error btn-sm text-white"
+                      className="btn bg-red-600 hover:bg-red-700 text-white border-none btn-sm"
                     >
                       Delete
                     </button>

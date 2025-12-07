@@ -205,14 +205,14 @@ export default function VendorDocuments() {
               placeholder="Organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
-              className="input input-bordered w-full"
+              className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
             />
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
-            <button type="submit" className="btn btn-primary">Apply Filters</button>
-            <button type="button" onClick={handleReset} className="btn btn-ghost">Reset Filters</button>
-            <div className="ml-auto text-slate-600 font-medium">Total: {count}</div>
+            <button type="submit" className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none">Apply Filters</button>
+            <button type="button" onClick={handleReset} className="btn btn-ghost text-slate-500 hover:text-slate-800">Reset Filters</button>
+            <div className="ml-auto text-slate-500 font-medium">Total: {count}</div>
           </div>
         </form>
 
@@ -220,15 +220,15 @@ export default function VendorDocuments() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
-            <p className="text-lg font-medium text-slate-600">Loading documents...</p>
+            <p className="text-lg font-medium text-slate-500">Loading documents...</p>
           </div>
         ) : error ? (
-          <div className="alert alert-error shadow-sm mb-6">
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{error}</span>
           </div>
         ) : vendorDocuments.length === 0 ? (
-          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200">
             <div className="text-6xl mb-4">📄</div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No Vendor Documents</h3>
             <p className="text-slate-500">No vendor documents found matching your criteria.</p>
@@ -238,7 +238,7 @@ export default function VendorDocuments() {
             {vendorDocuments.map((doc, i) => (
               <div
                 key={doc.applicationId || i}
-                className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all"
               >
                 {/* HEADER */}
                 <div className="mb-6 pb-6 border-b border-slate-100">
@@ -246,7 +246,7 @@ export default function VendorDocuments() {
                     {doc.vendor?.companyName || "Unnamed Vendor"}
                   </h2>
                   <p className="text-slate-500 mt-1">
-                    Application ID: <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{doc.applicationId}</span>
+                    Application ID: <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-emerald-600">{doc.applicationId}</span>
                   </p>
                 </div>
 
@@ -254,7 +254,7 @@ export default function VendorDocuments() {
                   {/* EVENT */}
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-emerald-600">📅</span> Event Details
+                      <span className="text-emerald-500">📅</span> Event Details
                     </h3>
                     <div className="space-y-2 text-sm text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-100">
                       <p><span className="font-semibold text-slate-700">Title:</span> {doc.event?.title || 'N/A'}</p>
@@ -269,7 +269,7 @@ export default function VendorDocuments() {
                   {/* VENDOR */}
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-emerald-600">🏢</span> Vendor Information
+                      <span className="text-emerald-500">🏢</span> Vendor Information
                     </h3>
                     <div className="space-y-3 text-sm text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-100">
                       <p><span className="font-semibold text-slate-700">ID:</span> {doc.vendor?.id || 'N/A'}</p>
@@ -279,42 +279,42 @@ export default function VendorDocuments() {
                         <span className="font-semibold text-slate-700">Tax Card:</span>
                         {doc.vendor?.taxCardAvailable ? (
                           <div className="flex items-center gap-2">
-                            <span className="badge badge-success badge-sm text-white">Available</span>
+                            <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-200">Available</span>
                             <button
                               onClick={() => handleViewDocument(doc.vendor.id, 'taxCard', doc.vendor.companyName || 'vendor')}
-                              className="btn btn-xs btn-outline btn-primary"
+                              className="btn btn-xs btn-outline border-emerald-600 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                             >
                               👁️ View
                             </button>
                             <button
                               onClick={() => handleDownloadDocument(doc.vendor.id, 'taxCard', doc.vendor.companyName || 'vendor')}
-                              className="btn btn-xs btn-primary"
+                              className="btn btn-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                             >
                               ⬇️ Download
                             </button>
                           </div>
-                        ) : <span className="badge badge-ghost badge-sm">Not Provided</span>}
+                        ) : <span className="badge bg-slate-200 text-slate-500 border-none">Not Provided</span>}
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-700">Logo:</span>
                         {doc.vendor?.logoAvailable ? (
                           <div className="flex items-center gap-2">
-                            <span className="badge badge-success badge-sm text-white">Available</span>
+                            <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-200">Available</span>
                             <button
                               onClick={() => handleViewDocument(doc.vendor.id, 'logo', doc.vendor.companyName || 'vendor')}
-                              className="btn btn-xs btn-outline btn-primary"
+                              className="btn btn-xs btn-outline border-emerald-600 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                             >
                               👁️ View
                             </button>
                             <button
                               onClick={() => handleDownloadDocument(doc.vendor.id, 'logo', doc.vendor.companyName || 'vendor')}
-                              className="btn btn-xs btn-primary"
+                              className="btn btn-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                             >
                               ⬇️ Download
                             </button>
                           </div>
-                        ) : <span className="badge badge-ghost badge-sm">Not Provided</span>}
+                        ) : <span className="badge bg-slate-200 text-slate-500 border-none">Not Provided</span>}
                       </div>
                     </div>
                   </div>
@@ -324,7 +324,7 @@ export default function VendorDocuments() {
                   {/* OTHER */}
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-emerald-600">📝</span> Application Details
+                      <span className="text-emerald-500">📝</span> Application Details
                     </h3>
                     <div className="space-y-2 text-sm text-slate-600">
                       <p><span className="font-semibold text-slate-700">Organization:</span> {doc.organization || 'N/A'}</p>
@@ -337,16 +337,16 @@ export default function VendorDocuments() {
                   {/* ATTENDEES */}
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="text-emerald-600">👥</span> Attendees
+                      <span className="text-emerald-500">👥</span> Attendees
                     </h3>
                     <div className="space-y-3">
                       {doc.attendees?.length > 0 ? doc.attendees.map((a, idx) => (
-                        <div key={idx} className="bg-slate-50 p-3 rounded border border-slate-100 text-sm">
-                          <p><span className="font-semibold">Name:</span> {a.name}</p>
-                          <p><span className="font-semibold">Email:</span> {a.email}</p>
-                          <p><span className="font-semibold">ID Number:</span> {a.idNumber}</p>
+                        <div key={idx} className="bg-slate-50 p-3 rounded border border-slate-100 text-sm text-slate-600">
+                          <p><span className="font-semibold text-slate-700">Name:</span> {a.name}</p>
+                          <p><span className="font-semibold text-slate-700">Email:</span> {a.email}</p>
+                          <p><span className="font-semibold text-slate-700">ID Number:</span> {a.idNumber}</p>
                         </div>
-                      )) : <p className="text-slate-500 italic">No attendees listed.</p>}
+                      )) : <p className="text-slate-400 italic">No attendees listed.</p>}
                     </div>
                   </div>
                 </div>

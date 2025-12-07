@@ -886,11 +886,14 @@ function ProfessorDashboard() {
               <EventsList enableFavorites={true} />
             </div>
           )}
+
           {activeTab === "registered" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
-                <p className="text-slate-500">Manage your upcoming activities</p>
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">My Registered Events</h2>
+                  <p className="text-slate-500 mt-1">Manage your upcoming activities</p>
+                </div>
               </div>
               <MyEventsList
                 events={registeredEvents.filter(event => {
@@ -904,18 +907,22 @@ function ProfessorDashboard() {
           )}
           {activeTab === "my-workshops" && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">My Workshops</h2>
-                <p className="text-slate-500">Manage your created workshops and participants</p>
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">My Workshops</h2>
+                  <p className="text-slate-500 mt-1">Manage your hosted workshops and participants</p>
+                </div>
               </div>
               <WorkshopParticipantsView workshops={myWorkshops} />
             </div>
           )}
           {activeTab === 'favourites' && (
             <div className="space-y-6">
-              <div className="mb-2">
-                <h2 className="text-2xl font-bold text-slate-900">My Favourites</h2>
-                <p className="text-slate-500">Events you've saved for later</p>
+              <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Favourites</h2>
+                  <p className="text-slate-500 mt-1">Your saved events and workshops</p>
+                </div>
               </div>
               <MyEventsList events={favouriteEvents} />
             </div>
@@ -924,14 +931,14 @@ function ProfessorDashboard() {
           {
             activeTab === "gym-sessions" && (
               <div className="space-y-6">
-                <div className="mb-2">
-                  <h2 className="text-2xl font-bold text-slate-900">Gym Sessions</h2>
-                  <p className="text-slate-500">View schedule and register for sessions</p>
-                </div>
-                <div className="bg-slate-100 p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+                <div className="bg-white p-6 lg:p-8 rounded-xl shadow-sm border border-slate-200">
+                  <div className="text-center mb-8 relative">
+                    <h2 className="text-2xl font-bold text-slate-800">Gym Sessions</h2>
+                    <p className="text-slate-500 mt-1">View schedule and register for sessions</p>
+                  </div>
                   {gymSessionsLoading ? (
                     <div className="text-center py-20">
-                      <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+                      <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
                       <p className="text-slate-500 text-base">Loading sessions...</p>
                     </div>
                   ) : gymSessionsError ? (
@@ -1087,12 +1094,15 @@ function ProfessorDashboard() {
           }
 
           {activeTab === "edit-requests" && (
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <h2 className="text-2xl font-bold text-slate-800 mb-6">
-                Workshops with Edit Requests
-              </h2>
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">
+                  Workshops with Edit Requests
+                </h2>
+                <p className="text-slate-500">Review pending changes requested by admin</p>
+              </div>
               {getWorkshopsWithEditRequests().length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                   <div className="text-4xl mb-4 opacity-50">✅</div>
                   <p>No pending edit requests from the Events Office.</p>
                 </div>
@@ -1134,10 +1144,11 @@ function ProfessorDashboard() {
           )}
 
           {activeTab === "notifications" && (
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800 m-0">Notifications</h2>
-                <div className="flex gap-3">
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-900">Notifications</h2>
+                <p className="text-slate-500 mt-2">Updates about events and activities</p>
+                <div className="flex gap-3 mt-4 md:mt-0 md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2 justify-center">
                   {notifications.filter(n => !n.isRead).length > 0 && (
                     <button
                       onClick={() => {
@@ -1166,7 +1177,7 @@ function ProfessorDashboard() {
               </div>
 
               {notifications.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                   <div className="text-4xl mb-4 opacity-50">📭</div>
                   <p>No notifications yet.</p>
                 </div>
@@ -1234,25 +1245,47 @@ function ProfessorDashboard() {
           )}
 
           {activeTab === "reminders" && (
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800 m-0">Event Reminders</h2>
-                {reminders.filter(n => !n.isRead).length > 0 && (
-                  <button
-                    onClick={() => {
-                      reminders.filter(n => !n.isRead).forEach(reminder => {
-                        markReminderRead(reminder.id);
-                      });
-                      fetchReminders();
-                    }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+            <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+              <div className="text-center mb-8 relative">
+                <h2 className="text-2xl font-bold text-slate-900">Reminders</h2>
+                <p className="text-slate-500 mt-1">Don't miss your upcoming events</p>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                  {reminders.filter(n => !n.isRead).length > 0 && (
+                    <button
+                      onClick={() => {
+                        reminders.filter(n => !n.isRead).forEach(reminder => {
+                          markReminderRead(reminder.id);
+                        });
+                        fetchReminders();
+                      }}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                </div>
+                {/* Mobile Button */}
+                <div className="md:hidden mt-4 flex justify-center">
+                  {reminders.filter(n => !n.isRead).length > 0 && (
+                    <button
+                      onClick={() => {
+                        reminders.filter(n => !n.isRead).forEach(reminder => {
+                          markReminderRead(reminder.id);
+                        });
+                        fetchReminders();
+                      }}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+                    >
+                      Mark All as Read
+                    </button>
+                  )}
+                </div>
               </div>
               {reminders.length === 0 ? (
-                <p className="text-slate-500 text-base">No reminders at this time.</p>
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  <div className="text-4xl mb-4 opacity-50">⏰</div>
+                  <p>No reminders at this time.</p>
+                </div>
               ) : (
                 <div className="flex flex-col gap-4">
                   {reminders.map((reminder) => (
@@ -1423,7 +1456,7 @@ function ProfessorDashboard() {
           }}
         />
       </>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
 
