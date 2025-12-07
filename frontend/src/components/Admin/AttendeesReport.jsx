@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  colors,
-  spacing,
-  borderRadius,
-  shadows,
-  typography,
-  buttonStyles,
-  inputStyles,
-} from "../../utils/designSystem";
 
 // Full-report component that mirrors the Postman JSON 1:1 and keeps the filters/search working
-export default function AttendeesReport({ hideBackButton = false, backPath = "/Admin" }) {
-  const navigate = useNavigate();
+import DateTimePicker from '../UI/DateTimePicker';
 
+export default function AttendeesReport() {
   // Report pieces (match backend shape)
   const [filtersState, setFiltersState] = useState({});
   const [summary, setSummary] = useState(null);
@@ -168,91 +158,24 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
     setTitleDebounce(e.target.value);
   };
 
-  const content = (
-    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-      <div
-        style={{
-          background: colors.bgCard,
-          borderRadius: borderRadius["2xl"],
-          boxShadow: shadows.lg,
-          padding: spacing["3xl"],
-          marginBottom: spacing.xl,
-          border: `1px solid ${colors.gray200}`,
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: spacing.xl,
-          }}
-        >
-          {!hideBackButton && (
-            <button
-              onClick={() => navigate(backPath)}
-              style={{
-                ...buttonStyles.back,
-                position: "absolute",
-                left: 0,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: colors.bgCard,
-                color: colors.primary,
-                borderColor: colors.primary,
-              }}
-            >
-              ← Back
-            </button>
-          )}
-
-          <h2
-            style={{
-              color: colors.primary,
-              margin: 0,
-              fontSize: typography.fontSize["2xl"],
-              fontWeight: typography.fontWeight.bold,
-              textAlign: "center",
-              textDecoration: "underline",
-              textDecorationColor: colors.primary,
-              textUnderlineOffset: "4px",
-            }}
-          >
-            Attendees Report
-          </h2>
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-slate-800">Attendees Report</h2>
+          <p className="text-slate-500 mt-2 text-lg">Comprehensive overview of event attendance</p>
         </div>
 
         {/* Filters */}
-        <form onSubmit={handleApply} style={{ marginBottom: spacing.xl }}>
-          <h3
-            style={{
-              color: colors.primary,
-              marginTop: 0,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.xl,
-              fontWeight: typography.fontWeight.bold,
-            }}
-          >
-            Filters
-          </h3>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: spacing.lg,
-              marginBottom: spacing.lg,
-            }}
-          >
+        <form onSubmit={handleApply} className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Status
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Status</label>
               <select
                 value={status}
                 onChange={handleStatusChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -264,13 +187,11 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Type
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Type</label>
               <select
                 value={type}
                 onChange={handleTypeChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Types</option>
                 <option value="Workshop">Workshop</option>
@@ -283,53 +204,41 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Name
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Name</label>
               <input
                 type="text"
                 placeholder="Search by event name..."
                 value={titleDebounce}
                 onChange={handleTitleChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Start Date
-              </label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="Start Date"
+                showTime={false}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{ ...inputStyles.base, width: "100%" }}
+                onChange={(e) => setStartDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select start date"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                End Date
-              </label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="End Date"
+                showTime={false}
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{ ...inputStyles.base, width: "100%" }}
+                onChange={(e) => setEndDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select end date"
               />
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: spacing.md }}>
-            <button type="submit" style={{ ...buttonStyles.primary, padding: `${spacing.md} ${spacing.xl}` }}>
-              Apply Filters
-            </button>
-
-            <button type="button" onClick={handleReset} style={{ ...buttonStyles.secondary, padding: `${spacing.md} ${spacing.xl}` }}>
-              Reset Filters
-            </button>
-
-            <div style={{ marginLeft: "auto", alignSelf: "center", color: colors.gray600, fontSize: typography.fontSize.sm }}>
+          <div className="flex flex-wrap gap-3 items-center">
+            <button type="submit" className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none">Apply Filters</button>
+            <button type="button" onClick={handleReset} className="btn btn-ghost text-slate-500 hover:text-slate-800">Reset Filters</button>
+            <div className="ml-auto text-slate-500 text-sm">
               {generatedAt ? `Generated at: ${new Date(generatedAt).toLocaleString()}` : null}
             </div>
           </div>
@@ -337,194 +246,175 @@ export default function AttendeesReport({ hideBackButton = false, backPath = "/A
 
         {/* Loading/Error */}
         {loading ? (
-          <div
-            style={{
-              color: colors.gray500,
-              fontSize: typography.fontSize.base,
-              textAlign: "center",
-              padding: spacing["3xl"],
-            }}
-          >
-            Loading...
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-500">Loading report...</p>
           </div>
         ) : error ? (
-          <div
-            style={{
-              color: colors.error,
-              background: colors.errorLight,
-              padding: spacing.md,
-              borderRadius: borderRadius.md,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.sm,
-            }}
-          >
-            {error}
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
           </div>
         ) : (
-          <>
+          <div className="space-y-8">
             {/* Summary */}
             {summary && (
-              <div
-                style={{
-                  background: colors.white,
-                  borderRadius: borderRadius.xl,
-                  boxShadow: shadows.md,
-                  border: `1px solid ${colors.gray200}`,
-                  padding: spacing["2xl"],
-                  marginBottom: spacing.xl,
-                }}
-              >
-                <h2
-                  style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}
-                >
-                  Summary
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <span className="text-emerald-500">📊</span> Summary
                 </h2>
-                <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}>
-                  <b>Total Events:</b> {summary.totalEvents}
-                </p>
-                <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}>
-                  <b>Total Attendees:</b> {summary.totalAttendees}
-                </p>
-                <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}>
-                  <b>Average Attendees per Event:</b> {summary.averageAttendeesPerEvent}
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.totalEvents}</div>
+                    <div className="text-slate-600 font-medium text-lg">Total Events</div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.totalAttendees}</div>
+                    <div className="text-slate-600 font-medium text-lg">Total Attendees</div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                    <div className="text-4xl font-bold text-emerald-600 mb-2">{summary.averageAttendeesPerEvent}</div>
+                    <div className="text-slate-600 font-medium text-lg">Avg. Attendees/Event</div>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Breakdown by Type */}
-            {breakdownByType.length > 0 &&
-              breakdownByType.map((typeGroup, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: colors.white,
-                    borderRadius: borderRadius.xl,
-                    boxShadow: shadows.md,
-                    border: `1px solid ${colors.gray200}`,
-                    padding: spacing["2xl"],
-                    marginBottom: spacing.xl,
-                  }}
-                >
-                  <h2
-                    style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}
-                  >
-                    {typeGroup.type}
-                  </h2>
-
-                  <p style={{ color: colors.gray700, marginBottom: spacing.sm, fontSize: typography.fontSize.base }}>
-                    <b>Total Events:</b> {typeGroup.totalEvents}
-                  </p>
-                  <p style={{ color: colors.gray700, marginBottom: spacing.lg, fontSize: typography.fontSize.base }}>
-                    <b>Total Attendees:</b> {typeGroup.totalAttendees}
-                  </p>
-
-                  {typeGroup.events.map((event, j) => (
-                    <div key={j} style={{ marginTop: spacing.lg, padding: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
-                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                        <b>Title:</b> {event.title}
-                      </p>
-                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                        <b>Status:</b> {event.status}
-                      </p>
-                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                        <b>Attendees:</b> {event.attendeeCount}
-                      </p>
-                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                        <b>Capacity:</b> {event.capacity}
-                      </p>
-                      <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                        <b>Utilization Rate:</b> {event.utilizationRate}
-                      </p>
+            {breakdownByType.length > 0 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">Breakdown by Type</h2>
+                {breakdownByType.map((typeGroup, i) => (
+                  <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-slate-800">{typeGroup.type}</h3>
+                      <div className="flex gap-4 text-sm">
+                        <span className="badge bg-slate-200 text-slate-700 border-none">Events: {typeGroup.totalEvents}</span>
+                        <span className="badge bg-emerald-100 text-emerald-800 border-none">Attendees: {typeGroup.totalAttendees}</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ))}
+
+                    <div className="overflow-x-auto">
+                      <table className="table w-full">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Attendees</th>
+                            <th>Capacity</th>
+                            <th>Utilization</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {typeGroup.events.map((event, j) => (
+                            <tr key={j} className="hover:bg-slate-50 border-b-slate-100">
+                              <td className="font-medium text-slate-900">{event.title}</td>
+                              <td>
+                                <span className={`badge badge-sm border-none ${event.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                                  event.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                                    event.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                      'bg-slate-100 text-slate-600'
+                                  }`}>
+                                  {event.status}
+                                </span>
+                              </td>
+                              <td className="text-slate-600">{event.attendeeCount}</td>
+                              <td className="text-slate-600">{event.capacity}</td>
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  <progress
+                                    className={`progress w-20 ${parseFloat(event.utilizationRate) > 90 ? 'progress-success' :
+                                      parseFloat(event.utilizationRate) > 50 ? 'progress-warning' : 'progress-error'
+                                      }`}
+                                    value={parseFloat(event.utilizationRate)}
+                                    max="100"
+                                  ></progress>
+                                  <span className="text-xs font-mono text-slate-500">{event.utilizationRate}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Top Events */}
             {topEvents.length > 0 && (
-              <div
-                style={{
-                  background: colors.white,
-                  borderRadius: borderRadius.xl,
-                  boxShadow: shadows.md,
-                  border: `1px solid ${colors.gray200}`,
-                  padding: spacing["2xl"],
-                  marginBottom: spacing.xl,
-                }}
-              >
-                <h2 style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
-                  Top Events
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <span className="text-emerald-500">🏆</span> Top Events
                 </h2>
-                {topEvents.map((event, i) => (
-                  <div key={i} style={{ marginTop: spacing.lg, padding: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Title:</b> {event.title}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Type:</b> {event.type}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Start:</b> {new Date(event.startDate).toLocaleString()}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Attendees:</b> {event.attendeeCount}
-                    </p>
-                  </div>
-                ))}
+                <div className="overflow-x-auto">
+                  <table className="table w-full">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Start Date</th>
+                        <th>Attendees</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topEvents.map((event, i) => (
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-bold text-slate-800">{event.title}</td>
+                          <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{event.type}</span></td>
+                          <td className="text-slate-500 text-sm">{new Date(event.startDate).toLocaleString()}</td>
+                          <td className="font-bold text-emerald-600">{event.attendeeCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
             {/* All Events */}
             {allEvents.length > 0 && (
-              <div
-                style={{
-                  background: colors.white,
-                  borderRadius: borderRadius.xl,
-                  boxShadow: shadows.md,
-                  border: `1px solid ${colors.gray200}`,
-                  padding: spacing["2xl"],
-                  marginBottom: spacing.xl,
-                }}
-              >
-                <h2 style={{ margin: 0, color: colors.primary, marginBottom: spacing.lg, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold }}>
-                  All Events
-                </h2>
-                {allEvents.map((event, i) => (
-                  <div key={i} style={{ marginTop: spacing.lg, padding: spacing.lg, borderTop: `1px solid ${colors.gray200}` }}>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Title:</b> {event.title}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Type:</b> {event.type}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Status:</b> {event.status}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Attendees:</b> {event.attendeeCount}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Capacity:</b> {event.capacity}
-                    </p>
-                    <p style={{ color: colors.gray700, marginBottom: spacing.xs, fontSize: typography.fontSize.base }}>
-                      <b>Utilization Rate:</b> {event.utilizationRate}
-                    </p>
-                  </div>
-                ))}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">All Events</h2>
+                <div className="overflow-x-auto">
+                  <table className="table w-full">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Attendees</th>
+                        <th>Capacity</th>
+                        <th>Utilization</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allEvents.map((event, i) => (
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{event.title}</td>
+                          <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{event.type}</span></td>
+                          <td>
+                            <span className={`badge badge-sm border-none ${event.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                              event.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                                event.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  'bg-slate-100 text-slate-600'
+                              }`}>
+                              {event.status}
+                            </span>
+                          </td>
+                          <td className="text-slate-600">{event.attendeeCount}</td>
+                          <td className="text-slate-600">{event.capacity}</td>
+                          <td className="text-slate-600">{event.utilizationRate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
-          </>
+          </div>
         )}
-      </div>
-    </div>
-  );
-
-  if (hideBackButton) return content;
-
-  return (
-    <div style={{ minHeight: "100vh", background: colors.bgPrimary, position: "relative", overflow: "hidden" }}>
-      <div style={{ paddingTop: spacing["8xl"], padding: `${spacing["8xl"]} ${spacing["2xl"]} ${spacing["6xl"]}`, position: "relative", zIndex: 1 }}>
-        {content}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getActivePolls, voteOnPoll, getUserVoteForPoll } from '../../services/pollService';
+import { showToast } from '../../utils/toast';
 
 const VISITOR_ID_KEY = 'boothPollVisitorId';
 
@@ -59,49 +60,39 @@ function StudentPollVoting() {
     }
   };
 
-  if (loading && polls.length === 0) {
+  const renderContent = () => {
+    if (loading && polls.length === 0) {
+      return (
+        <div className="p-20 text-center text-slate-500">
+          <span className="loading loading-spinner loading-lg text-emerald-500 mb-4"></span>
+          <p>Loading polls...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="p-6 bg-red-50 rounded-xl text-red-600 border border-red-200 flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          {error}
+        </div>
+      );
+    }
+
+    if (polls.length === 0) {
+      return (
+        <div className="py-20 text-center bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+          <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center justify-center gap-2">
+            <span>📊</span> No Active Polls
+          </h3>
+          <p className="text-slate-500">There are currently no active vendor booth polls available for voting.</p>
+          <p className="text-sm text-slate-400 mt-2">Check back later or contact the Event Office for more information.</p>
+        </div>
+      );
+    }
+
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-        Loading polls...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '20px', background: '#fee2e2', borderRadius: '10px', color: '#dc2626' }}>
-        {error}
-      </div>
-    );
-  }
-
-  if (polls.length === 0) {
-    return (
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '60px 40px',
-        borderRadius: '15px',
-        textAlign: 'center',
-        color: '#6b7280',
-      }}>
-        <div style={{ fontSize: '3rem', marginBottom: '15px' }}>📊</div>
-        <h3 style={{ color: '#003366', marginBottom: '10px' }}>No Active Polls</h3>
-        <p>There are currently no active vendor booth polls available for voting.</p>
-        <p style={{ fontSize: '0.9rem', marginTop: '10px' }}>Check back later or contact the Event Office for more information.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: '20px' }}>
-      <h2 style={{ color: '#003366', marginBottom: '25px', fontSize: '1.8rem' }}>
-        📊 Vendor Booth Polls
-      </h2>
-      <p style={{ color: '#6b7280', marginBottom: '30px', fontSize: '0.95rem' }}>
-        Vote for vendors you'd like to see set up booths at upcoming events. Your vote helps decide which vendors will be selected!
-      </p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="flex flex-col gap-10">
         {polls.map(poll => (
           <PollCard
             key={poll._id || poll.id}
@@ -111,6 +102,18 @@ function StudentPollVoting() {
           />
         ))}
       </div>
+    );
+  };
+
+  return (
+    <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+      <div className="text-center mb-8 relative">
+        <h2 className="text-2xl font-bold text-slate-900">Vendor Booth Polls</h2>
+        <p className="text-slate-500 mt-1">
+          Vote for vendors you'd like to see at upcoming events
+        </p>
+      </div>
+      {renderContent()}
     </div>
   );
 }
@@ -134,164 +137,124 @@ function PollCard({ poll, userId, onVote }) {
     // voteCounts uses string IDs, so convert to string for lookup
     const vendorIdStr = String(vendorId);
     // Check both the direct key and try to find by matching _id or id
-    return poll.voteCounts?.[vendorIdStr] || 
-           poll.voteCounts?.[vendorId] || 
-           0;
+    return poll.voteCounts?.[vendorIdStr] ||
+      poll.voteCounts?.[vendorId] ||
+      0;
   };
 
   const totalVotes = poll.totalVotes || 0;
   const maxVotes = Math.max(...poll.vendorApplications.map(va => getVoteCount(va.id)), 0);
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.95)',
-      padding: '25px',
-      borderRadius: '15px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      border: '1px solid #e5e7eb',
-    }}>
-      <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ color: '#003366', margin: '0 0 8px 0', fontSize: '1.3rem' }}>
-          {poll.title}
-        </h3>
+    <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
+      <div className="mb-8 pb-6 border-b border-slate-200">
+        <div className="flex justify-between items-start gap-4 mb-2">
+          <h3 className="text-xl font-bold text-slate-900">
+            {poll.title}
+          </h3>
+          <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wide border border-emerald-200">
+            Active
+          </span>
+        </div>
         {poll.description && (
-          <p style={{ color: '#6b7280', fontSize: '0.95rem', margin: '0 0 12px 0' }}>
+          <p className="text-slate-600 mb-4 leading-relaxed">
             {poll.description}
           </p>
         )}
-        <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#6b7280', flexWrap: 'wrap' }}>
-          <span>📊 <strong>{totalVotes}</strong> total vote{totalVotes !== 1 ? 's' : ''}</span>
-          <span>📅 Created: {new Date(poll.createdAt).toLocaleDateString()}</span>
-          <span style={{
-            padding: '4px 10px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            color: '#10b981',
-            borderRadius: '6px',
-            fontWeight: 600,
-          }}>
-            ✓ Active
+        <div className="flex gap-4 text-sm text-slate-500 flex-wrap items-center">
+          <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-slate-200">
+            📊 <strong>{totalVotes}</strong> total vote{totalVotes !== 1 ? 's' : ''}
+          </span>
+          <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-slate-200">
+            📅 Created: {new Date(poll.createdAt).toLocaleDateString()}
           </span>
         </div>
       </div>
 
-      <div style={{ marginTop: '20px' }}>
-        <h4 style={{ color: '#003366', marginBottom: '15px', fontSize: '1rem' }}>
-          Vote for a Vendor:
+      <div>
+        <h4 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <span>🗳️</span> Vote for a Vendor:
         </h4>
-        {poll.vendorApplications.map((vendorApp, index) => {
-          const vendorAppId = vendorApp._id || vendorApp.id;
-          const voteCount = getVoteCount(vendorAppId);
-          const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
-          const isVoted = userVote === vendorAppId;
+        <div className="grid grid-cols-1 gap-4">
+          {poll.vendorApplications.map((vendorApp, index) => {
+            const vendorAppId = vendorApp._id || vendorApp.id;
+            const voteCount = getVoteCount(vendorAppId);
+            const percentage = totalVotes > 0 ? (voteCount / totalVotes * 100).toFixed(1) : 0;
+            const isVoted = userVote === vendorAppId;
 
-          return (
-            <div
-              key={vendorAppId || index}
-              style={{
-                padding: '18px',
-                marginBottom: '15px',
-                background: isVoted ? 'rgba(212, 175, 55, 0.1)' : '#f9fafb',
-                border: `2px solid ${isVoted ? '#d4af37' : '#e5e7eb'}`,
-                borderRadius: '12px',
-                position: 'relative',
-                transition: 'all 0.2s',
-              }}
-            >
-              {isVoted && (
-                <div style={{
-                  position: 'absolute',
-                  top: '12px',
-                  right: '12px',
-                  background: '#d4af37',
-                  color: '#003366',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                }}>
-                  ✓ Your Vote
-                </div>
-              )}
+            return (
+              <div
+                key={vendorAppId || index}
+                className={`p-6 rounded-xl border-2 transition-all relative ${isVoted
+                  ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'
+                  }`}
+              >
+                {isVoted && (
+                  <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                    <span>✓</span> Your Vote
+                  </div>
+                )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <strong style={{ color: '#003366', fontSize: '1.1rem', display: 'block', marginBottom: '6px' }}>
-                    {vendorApp.organization}
-                  </strong>
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                    <div>Booth Size: {vendorApp.boothSize}</div>
-                    <div>Attendees: {vendorApp.attendees?.length || 0}</div>
-                    {vendorApp.notes && (
-                      <div style={{ marginTop: '6px', fontStyle: 'italic', color: '#9ca3af' }}>
-                        {vendorApp.notes}
+                <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <strong className="text-lg text-slate-900 block mb-2">
+                      {vendorApp.organization}
+                    </strong>
+                    <div className="text-sm text-slate-500 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Booth Size:</span>
+                        <span className="font-medium text-slate-700">{vendorApp.boothSize}</span>
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Attendees:</span>
+                        <span className="font-medium text-slate-700">{vendorApp.attendees?.length || 0}</span>
+                      </div>
+                      {vendorApp.notes && (
+                        <div className="italic text-slate-400 mt-2 bg-slate-50 p-2 rounded text-xs border border-slate-100 inline-block">
+                          "{vendorApp.notes}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleVoteClick(vendorAppId)}
+                    disabled={isVoted}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all min-w-[120px] shadow-sm ${isVoted
+                      ? 'bg-emerald-100 text-emerald-800 cursor-not-allowed opacity-80 border border-emerald-200'
+                      : 'bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-lg hover:-translate-y-0.5'
+                      }`}
+                  >
+                    {isVoted ? '✓ Voted' : 'Vote'}
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span className="text-slate-500 font-medium flex items-center gap-1">
+                      <span>👤</span> {voteCount} vote{voteCount !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-slate-900 font-bold">
+                      {percentage}%
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
+                    <div
+                      className={`h-full transition-all duration-1000 ease-out ${isVoted
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-400'
+                        }`}
+                      style={{ width: `${percentage}%` }}
+                    />
                   </div>
                 </div>
-                <button
-                  onClick={() => handleVoteClick(vendorAppId)}
-                  disabled={isVoted}
-                  style={{
-                    padding: '12px 24px',
-                    background: isVoted
-                      ? 'rgba(212, 175, 55, 0.3)'
-                      : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                    color: '#003366',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    cursor: isVoted ? 'not-allowed' : 'pointer',
-                    fontSize: '0.95rem',
-                    minWidth: '120px',
-                    transition: 'all 0.2s',
-                    opacity: isVoted ? 0.7 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isVoted) {
-                      e.target.style.transform = 'scale(1.05)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'scale(1)';
-                  }}
-                >
-                  {isVoted ? '✓ Voted' : 'Vote'}
-                </button>
               </div>
-
-              <div style={{ marginTop: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#6b7280' }}>
-                    {voteCount} vote{voteCount !== 1 ? 's' : ''}
-                  </span>
-                  <span style={{ color: '#003366', fontWeight: 600 }}>
-                    {percentage}%
-                  </span>
-                </div>
-                <div style={{
-                  width: '100%',
-                  height: '10px',
-                  background: '#e5e7eb',
-                  borderRadius: '5px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    width: `${percentage}%`,
-                    height: '100%',
-                    background: isVoted
-                      ? 'linear-gradient(90deg, #d4af37 0%, #b8941f 100%)'
-                      : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                    transition: 'width 0.3s',
-                  }} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
 export default StudentPollVoting;
-

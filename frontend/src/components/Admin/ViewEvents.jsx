@@ -1,13 +1,9 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import EventList from "../EventList";
 import { deleteEvent } from "../../services/eventService";
 import { showToast, confirmDialog } from "../../utils/toast";
-import { colors, spacing, buttonStyles, typography } from "../../utils/designSystem";
 
 function ViewEvents() {
-  const navigate = useNavigate();
-  
   const handleDeleteEvent = async (id) => {
     const confirmed = await confirmDialog('Delete this event? This cannot be undone.', 'Delete Event');
     if (!confirmed) return;
@@ -21,54 +17,14 @@ function ViewEvents() {
     }
   };
 
-  
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: colors.bgPrimary,
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          paddingTop: spacing['8xl'],
-          padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`,
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          <EventList
-            headerAction={
-              <button
-                onClick={() => navigate('/Admin')}
-                style={{
-                  ...buttonStyles.back,
-                  background: colors.bgCard,
-                  color: colors.primary,
-                  borderColor: colors.primary
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = colors.accent;
-                  e.target.style.color = colors.primary;
-                  e.target.style.borderColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = colors.bgCard;
-                  e.target.style.color = colors.primary;
-                  e.target.style.borderColor = colors.primary;
-                }}
-              >
-                ← Back
-              </button>
-            }
-            onDelete={handleDeleteEvent}
-            enableFavorites={false}
-          />
-        </div>
-      </div>
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+
+
+      <EventList
+        onDelete={handleDeleteEvent}
+        enableFavorites={false}
+      />
     </div>
   );
 }

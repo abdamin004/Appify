@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import "./react-datepicker.css";
 import ChooseRole from "./components/ChooseRole"; // make sure path is correct
 import Login from "./components/Auth/Login";
 import VerifyEmail from "./components/Auth/VerifyEmail";
@@ -41,7 +42,7 @@ import ChatBot from "./components/ChatBot/ChatBot";
 
 
 function App() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleLogin = () => {
     setIsLoggedIn(true);
@@ -69,20 +70,21 @@ function App() {
         bodyClassName="custom-toast-body"
       />
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-      <ChatBot />
-      
+
+
       <div style={{ paddingTop: '70px' }}>
         <Routes>
           <Route path="/" element={<WelcomePage />} />
           <Route path="/ChooseRole" element={<ChooseRole />} />
-          <Route 
-            path="/Login" 
-            element={<Login onLogin={handleLogin} />} 
+          <Route
+            path="/Login"
+            element={<Login onLogin={handleLogin} />}
           />
           <Route path="/verify/:token" element={<VerifyEmail />} />
-          
+
           <Route path="/ChooseRole" element={<ChooseRole />} />
           <Route path="/VendorDashboard" element={<VendorDashboard />} />
+          <Route path="/vendor-dashboard" element={<VendorDashboard />} />
           <Route path="/Student-dashboard" element={<StudentDashboard />} />
           <Route path="/student-dashboard" element={<StudentDashboard />} />
           <Route path="/EventOfficeDashboard" element={<EventOfficeDashboard />} />
@@ -107,8 +109,8 @@ function App() {
           <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/register-events" element={<RegisterEvents />} />
           <Route path="/gym-sessions" element={<GymSessions />} />
-        
-        
+
+
           <Route path="/TaDashboard" element={<TaDashboard />} />
           <Route path="/vendor/request-booth" element={<RequestBooth />} />
           <Route path="/Admin" element={<AdminDashboard />} />

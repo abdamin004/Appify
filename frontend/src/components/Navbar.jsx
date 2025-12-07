@@ -1,13 +1,10 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { colors, spacing, borderRadius, shadows, typography, transitions } from "../utils/designSystem";
+import React, { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
 function Navbar({ onLogout }) {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Check authentication status on every render
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem("token");
@@ -15,31 +12,23 @@ function Navbar({ onLogout }) {
       const hasValidAuth = !!(token && user && user !== 'null' && user !== 'undefined');
       setIsLoggedIn(hasValidAuth);
     };
-    
+
     checkAuth();
-    
-    // Optional: Check more frequently for development
     const interval = setInterval(checkAuth, 1000);
     return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {
-    // Clear all auth data
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setIsLoggedIn(false);
-    
+
     if (onLogout) {
       onLogout();
     }
     navigate("/");
   };
 
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
-
-  // Get user role for dashboard routing
   const getUserRole = () => {
     try {
       const userData = localStorage.getItem("user");
@@ -54,8 +43,7 @@ function Navbar({ onLogout }) {
 
   const getDashboardPath = () => {
     const role = getUserRole();
-    console.log("Current user role:", role);
-    
+
     switch (role) {
       case "vendor": return "/VendorDashboard";
       case "student": return "/student-dashboard";
@@ -68,197 +56,69 @@ function Navbar({ onLogout }) {
     }
   };
 
-  console.log("Navbar auth status:", isLoggedIn);
-
   return (
-    <nav
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        background: colors.bgOverlay,
-        backdropFilter: "blur(12px)",
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        zIndex: 1000,
-        padding: `${spacing.lg} 0`,
-        borderBottom: `1px solid rgba(212, 175, 55, 0.2)`,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1400px",
-          margin: "0 auto",
-          padding: `0 ${spacing['4xl']}`,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div 
-          style={{ display: "flex", alignItems: "center", gap: spacing.lg, cursor: "pointer" }}
-          onClick={() => handleNavigation("/")}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = "0.8";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = "1";
-          }}
-        >
-          <div
-            style={{
-              width: "48px",
-              height: "48px",
-              background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-              borderRadius: borderRadius.xl,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: typography.fontSize['2xl'],
-              boxShadow: shadows.accent,
-            }}
-          >
-            🎓
+    <div className="navbar bg-slate-900/90 backdrop-blur-md fixed top-0 z-50 border-b border-slate-700/50 px-4">
+      <div className="navbar-start">
+        <div className="dropdown">
+          <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h8m-8 6h16" />
+            </svg>
           </div>
-          <h1
-            style={{
-              fontSize: typography.fontSize['2xl'],
-              fontWeight: typography.fontWeight.bold,
-              color: colors.white,
-              margin: 0,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            GUC Events
-          </h1>
+          <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-slate-800 rounded-box w-52 border border-slate-700">
+            {isLoggedIn ? (
+              <>
+                <li><Link to={getDashboardPath()} className="text-white">Dashboard</Link></li>
+                <li><a onClick={handleLogout} className="text-white">Logout</a></li>
+              </>
+            ) : (
+              <>
+                <li><Link to="/Login" className="text-white">Login</Link></li>
+                <li><Link to="/ChooseRole" className="text-white">Sign Up</Link></li>
+              </>
+            )}
+          </ul>
         </div>
-        <div style={{ display: "flex", gap: spacing.lg, alignItems: "center" }}>
+
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+            GUC Events
+          </span>
+        </Link>
+      </div>
+
+      <div className="navbar-end hidden lg:flex">
+        <ul className="menu menu-horizontal px-1 gap-2">
           {isLoggedIn ? (
-            // Logged in: Show Dashboard and Logout buttons
             <>
-              <button
-                onClick={() => handleNavigation(getDashboardPath())}
-                style={{
-                  padding: `${spacing.sm} ${spacing.xl}`,
-                  background: "transparent",
-                  color: colors.accent,
-                  border: `1.5px solid ${colors.accent}`,
-                  borderRadius: borderRadius.lg,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: typography.fontWeight.semibold,
-                  cursor: "pointer",
-                  transition: transitions.fast,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = colors.accent;
-                  e.target.style.color = colors.primary;
-                  e.target.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = "transparent";
-                  e.target.style.color = colors.accent;
-                  e.target.style.transform = 'translateY(0)';
-                }}
-              >
-                <span>📊</span> Dashboard
-              </button>
-              <button
-                onClick={handleLogout}
-                style={{
-                  padding: `${spacing.sm} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-                  color: colors.primary,
-                  border: "none",
-                  borderRadius: borderRadius.lg,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.fast,
-                  boxShadow: '0 2px 6px rgba(212, 175, 55, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-1px)";
-                  e.target.style.boxShadow = '0 4px 10px rgba(212, 175, 55, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0)";
-                  e.target.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.3)';
-                }}
-              >
-                <span>↪️</span> Logout
-              </button>
+              <li>
+                <Link to={getDashboardPath()} className="btn btn-ghost btn-sm text-slate-300 hover:text-white hover:bg-slate-800">
+                  Dashboard
+                </Link>
+              </li>
+              <li>
+                <button onClick={handleLogout} className="btn btn-sm bg-gradient-to-r from-emerald-600 to-teal-500 text-white border-none hover:shadow-lg hover:shadow-emerald-500/50">
+                  Logout
+                </button>
+              </li>
             </>
           ) : (
-            // Not logged in: Show Login and Sign Up buttons
             <>
-              <button
-                onClick={() => handleNavigation("/login")}
-                style={{
-                  padding: `${spacing.sm} ${spacing.xl}`,
-                  background: "transparent",
-                  color: colors.accent,
-                  border: `1.5px solid ${colors.accent}`,
-                  borderRadius: borderRadius.lg,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: typography.fontWeight.semibold,
-                  cursor: "pointer",
-                  transition: transitions.fast,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = colors.accent;
-                  e.target.style.color = colors.primary;
-                  e.target.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = "transparent";
-                  e.target.style.color = colors.accent;
-                  e.target.style.transform = 'translateY(0)';
-                }}
-              >
-                🔑 Login
-              </button>
-              <button
-                onClick={() => handleNavigation("/ChooseRole")}
-                style={{
-                  padding: `${spacing.sm} ${spacing.xl}`,
-                  background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)`,
-                  color: colors.primary,
-                  border: "none",
-                  borderRadius: borderRadius.lg,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: typography.fontWeight.bold,
-                  cursor: "pointer",
-                  transition: transitions.fast,
-                  boxShadow: '0 2px 6px rgba(212, 175, 55, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.xs,
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = "translateY(-1px)";
-                  e.target.style.boxShadow = '0 4px 10px rgba(212, 175, 55, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = "translateY(0)";
-                  e.target.style.boxShadow = '0 2px 6px rgba(212, 175, 55, 0.3)';
-                }}
-              >
-                ➕ Sign Up
-              </button>
+              <li>
+                <Link to="/Login" className="btn btn-ghost btn-sm text-slate-300 hover:text-white hover:bg-slate-800">
+                  Login
+                </Link>
+              </li>
+              <li>
+                <Link to="/ChooseRole" className="btn btn-sm bg-gradient-to-r from-emerald-600 to-teal-500 text-white border-none hover:shadow-lg hover:shadow-emerald-500/50">
+                  Sign Up
+                </Link>
+              </li>
             </>
           )}
-        </div>
+        </ul>
       </div>
-    </nav>
+    </div>
   );
 }
 

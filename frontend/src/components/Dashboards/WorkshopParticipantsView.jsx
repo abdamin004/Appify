@@ -26,21 +26,21 @@ function WorkshopParticipantsView({ workshops }) {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'pending':
-        return { bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.3)', text: '#d97706', label: 'Pending Approval' };
+        return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', label: 'Pending Approval' };
       case 'published':
-        return { bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.3)', text: '#10b981', label: 'Published' };
+        return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', label: 'Published' };
       case 'rejected':
-        return { bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.3)', text: '#ef4444', label: 'Rejected' };
+        return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Rejected' };
       case 'draft':
-        return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280', label: 'Draft' };
+        return { bg: 'bg-slate-100', border: 'border-slate-200', text: 'text-slate-600', label: 'Draft' };
       default:
-        return { bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.3)', text: '#6b7280', label: status || 'Unknown' };
+        return { bg: 'bg-slate-100', border: 'border-slate-200', text: 'text-slate-600', label: status || 'Unknown' };
     }
   };
 
   const fetchParticipants = async (workshopId) => {
     if (participantsData[workshopId]?.loading) return; // Already loading
-    
+
     setParticipantsData(prev => ({
       ...prev,
       [workshopId]: { ...prev[workshopId], loading: true, error: null }
@@ -115,34 +115,16 @@ function WorkshopParticipantsView({ workshops }) {
 
   if (!workshops || !Array.isArray(workshops) || workshops.length === 0) {
     return (
-      <div
-        style={{
-          background: "rgba(255,255,255,0.95)",
-          padding: "60px 40px",
-          borderRadius: "20px",
-          textAlign: "center",
-          boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-        }}
-      >
-        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>🛠️</div>
-        <h3 style={{ fontSize: "1.5rem", color: "#003366", marginBottom: "10px" }}>
-          No Workshops Found
-        </h3>
-        <p style={{ color: "#6b7280" }}>
-          You haven't created any workshops yet.
-        </p>
+      <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+        <div className="text-4xl mb-4 opacity-50">🛠️</div>
+        <h3 className="text-xl font-bold text-slate-800 mb-2">No Workshops Found</h3>
+        <p>You haven't created any workshops yet.</p>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "25px",
-      }}
-    >
+    <div className="flex flex-col gap-6">
       {workshops.map((workshop) => {
         const workshopId = workshop._id || workshop.id;
         const title = workshop.title || "Untitled Workshop";
@@ -160,97 +142,38 @@ function WorkshopParticipantsView({ workshops }) {
         return (
           <div
             key={workshopId}
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              borderRadius: "20px",
-              overflow: "hidden",
-              boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-              transition: "all 0.3s",
-            }}
+            className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-slate-200"
           >
-            <div
-              style={{
-                padding: "25px",
-                borderBottom: isOpen ? "2px solid rgba(212, 175, 55, 0.3)" : "none",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "15px",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: "200px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
-                    <h3
-                      style={{
-                        fontSize: "1.3rem",
-                        fontWeight: "bold",
-                        color: "#003366",
-                        margin: 0,
-                      }}
-                    >
+            <div className={`p-6 ${isOpen ? 'border-b border-slate-200' : ''}`}>
+              <div className="flex justify-between items-center flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <h3 className="text-xl font-bold text-slate-900 m-0">
                       {title}
                     </h3>
-                    <div
-                      style={{
-                        padding: "4px 12px",
-                        background: statusStyle.bg,
-                        border: `1px solid ${statusStyle.border}`,
-                        borderRadius: "12px",
-                        fontSize: "0.75rem",
-                        fontWeight: "700",
-                        color: statusStyle.text,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                      }}
-                    >
+                    <div className={`px-3 py-1 border rounded-xl text-xs font-bold uppercase tracking-wide ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}>
                       {statusStyle.label}
                     </div>
                     {hasEditRequests && (
-                      <div
-                        style={{
-                          padding: "4px 12px",
-                          background: "rgba(245, 158, 11, 0.15)",
-                          border: "1px solid rgba(245, 158, 11, 0.4)",
-                          borderRadius: "12px",
-                          fontSize: "0.75rem",
-                          fontWeight: "700",
-                          color: "#d97706",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
+                      <div className="px-3 py-1 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 flex items-center gap-1.5">
                         <span>✏️</span>
                         <span>{editRequests.length} Edit Request{editRequests.length !== 1 ? 's' : ''}</span>
                       </div>
                     )}
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "6px",
-                      fontSize: "0.9rem",
-                      color: "#6b7280",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div className="flex flex-col gap-1.5 text-sm text-slate-500">
+                    <div className="flex items-center gap-2">
                       <span>👥</span>
                       <span>
-                        Registered: <strong>{registeredCount}</strong>
+                        Registered: <strong className="text-slate-700">{registeredCount}</strong>
                         {capacity > 0 && ` / ${capacity}`}
                       </span>
                     </div>
                     {remainingSpots !== null && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div className="flex items-center gap-2">
                         <span>✅</span>
                         <span>
-                          Remaining Spots: <strong style={{ color: remainingSpots > 0 ? "#10b981" : "#ef4444" }}>
+                          Remaining Spots: <strong className={remainingSpots > 0 ? "text-emerald-600" : "text-red-500"}>
                             {remainingSpots}
                           </strong>
                         </span>
@@ -258,49 +181,19 @@ function WorkshopParticipantsView({ workshops }) {
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={() => navigate(`/professor/workshops?edit=${workshopId}`)}
-                    style={{
-                      padding: "12px 24px",
-                      background: "#f59e0b",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: "12px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                      boxShadow: "0 2px 4px rgba(245, 158, 11, 0.2)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "#d97706";
-                      e.target.style.transform = "translateY(-1px)";
-                      e.target.style.boxShadow = "0 4px 8px rgba(245, 158, 11, 0.3)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "#f59e0b";
-                      e.target.style.transform = "translateY(0)";
-                      e.target.style.boxShadow = "0 2px 4px rgba(245, 158, 11, 0.2)";
-                    }}
+                    className="px-6 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold cursor-pointer transition-all shadow-sm hover:bg-slate-800 hover:-translate-y-0.5"
                   >
                     ✏️ Edit Workshop
                   </button>
                   <button
                     onClick={() => toggleParticipants(workshopId)}
-                    style={{
-                      padding: "12px 24px",
-                      background: isOpen
-                        ? "linear-gradient(135deg, #d4af37 0%, #b8941f 100%)"
-                        : "rgba(212, 175, 55, 0.15)",
-                      color: isOpen ? "#003366" : "#b8941f",
-                      border: isOpen ? "none" : "2px solid rgba(212, 175, 55, 0.3)",
-                      borderRadius: "12px",
-                      fontSize: "0.95rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      transition: "all 0.3s",
-                    }}
+                    className={`px-6 py-3 rounded-xl text-sm font-bold cursor-pointer transition-all border ${isOpen
+                      ? "bg-slate-100 text-slate-500 border-slate-200"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
                   >
                     {isOpen ? "Hide Participants" : "View Participants"}
                   </button>
@@ -309,107 +202,48 @@ function WorkshopParticipantsView({ workshops }) {
             </div>
 
             {hasEditRequests && (
-              <div
-                style={{
-                  padding: "20px 25px",
-                  background: "rgba(245, 158, 11, 0.08)",
-                  borderTop: "2px solid rgba(245, 158, 11, 0.3)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showEditRequestsForThis ? "15px" : "0" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontSize: "1.2rem" }}>✏️</span>
-                    <h4
-                      style={{
-                        fontSize: "1rem",
-                        fontWeight: "700",
-                        color: "#d97706",
-                        margin: 0,
-                      }}
-                    >
+              <div className="p-6 bg-amber-50 border-t border-amber-100">
+                <div className={`flex justify-between items-center ${showEditRequestsForThis ? 'mb-4' : ''}`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">✏️</span>
+                    <h4 className="text-base font-bold text-amber-800 m-0">
                       Edit Requests from Events Office ({editRequests.length})
                     </h4>
                   </div>
                   <button
                     onClick={() => setShowEditRequests(prev => ({ ...prev, [workshopId]: !prev[workshopId] }))}
-                    style={{
-                      padding: "8px 16px",
-                      background: showEditRequestsForThis ? "rgba(245, 158, 11, 0.2)" : "transparent",
-                      border: "1px solid rgba(245, 158, 11, 0.4)",
-                      borderRadius: "8px",
-                      fontSize: "0.85rem",
-                      fontWeight: "600",
-                      color: "#d97706",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "rgba(245, 158, 11, 0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!showEditRequestsForThis) {
-                        e.target.style.background = "transparent";
-                      }
-                    }}
+                    className={`px-4 py-2 border rounded-lg text-sm font-medium cursor-pointer transition-all ${showEditRequestsForThis
+                      ? "bg-amber-100 border-amber-200 text-amber-900"
+                      : "bg-transparent border-amber-200 text-amber-700 hover:bg-amber-100"
+                      }`}
                   >
                     {showEditRequestsForThis ? "Hide Requests" : "Show Requests"}
                   </button>
                 </div>
                 {showEditRequestsForThis && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div className="flex flex-col gap-3">
                     {editRequests.map((editRequest, idx) => (
                       <div
                         key={idx}
-                        style={{
-                          padding: "15px",
-                          background: "white",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(245, 158, 11, 0.3)",
-                        }}
+                        className="p-4 bg-white rounded-xl border border-amber-200 shadow-sm"
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                          <strong style={{ color: "#d97706", fontSize: "0.85rem" }}>
+                        <div className="flex justify-between items-center mb-2">
+                          <strong className="text-amber-800 text-sm">
                             Request from Events Office
                           </strong>
-                          <span style={{ color: "#6b7280", fontSize: "0.75rem" }}>
+                          <span className="text-slate-400 text-xs">
                             {editRequest.timestamp}
                           </span>
                         </div>
-                        <p
-                          style={{
-                            color: "#374151",
-                            margin: 0,
-                            lineHeight: "1.6",
-                            whiteSpace: "pre-wrap",
-                            fontSize: "0.9rem",
-                          }}
-                        >
+                        <p className="text-slate-700 m-0 leading-relaxed whitespace-pre-wrap text-sm">
                           {editRequest.request}
                         </p>
                       </div>
                     ))}
-                    <div style={{ marginTop: "8px" }}>
+                    <div className="mt-2">
                       <button
                         onClick={() => navigate(`/professor/workshops?edit=${workshopId}`)}
-                        style={{
-                          padding: "10px 20px",
-                          background: "#f59e0b",
-                          color: "#ffffff",
-                          border: "none",
-                          borderRadius: "8px",
-                          fontSize: "0.9rem",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.background = "#d97706";
-                          e.target.style.transform = "translateY(-1px)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.background = "#f59e0b";
-                          e.target.style.transform = "translateY(0)";
-                        }}
+                        className="px-5 py-2.5 bg-amber-500 text-white border-none rounded-lg text-sm font-bold cursor-pointer transition-all hover:bg-amber-600 hover:-translate-y-0.5 shadow-sm"
                       >
                         ✏️ Edit Workshop to Address Requests
                       </button>
@@ -420,110 +254,49 @@ function WorkshopParticipantsView({ workshops }) {
             )}
 
             {isOpen && (
-              <div
-                style={{
-                  padding: "25px",
-                  background: "rgba(212, 175, 55, 0.05)",
-                  borderTop: "2px solid rgba(212, 175, 55, 0.2)",
-                }}
-              >
+              <div className="p-6 bg-slate-50 border-t border-slate-200">
                 {data?.loading ? (
-                  <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>⏳</div>
-                    Loading participants...
+                  <div className="text-center p-6 text-slate-500">
+                    <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+                    <p>Loading participants...</p>
                   </div>
                 ) : data?.error ? (
-                  <div style={{ textAlign: "center", padding: "20px", color: "#ef4444" }}>
-                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>❌</div>
+                  <div className="text-center p-6 text-red-600 bg-red-50 rounded-xl border border-red-200">
+                    <div className="text-3xl mb-3">❌</div>
                     {data.error}
                   </div>
                 ) : data?.participants && data.participants.length > 0 ? (
                   <div>
-                    <h4
-                      style={{
-                        fontSize: "1.1rem",
-                        fontWeight: "700",
-                        color: "#003366",
-                        marginBottom: "15px",
-                      }}
-                    >
+                    <h4 className="text-lg font-bold text-slate-800 mb-4">
                       Participants ({data.registeredCount})
                     </h4>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "12px",
-                        maxHeight: "400px",
-                        overflowY: "auto",
-                      }}
-                    >
+                    <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2">
                       {data.participants.map((participant, index) => (
                         <div
                           key={participant.id || index}
-                          style={{
-                            padding: "15px",
-                            background: "white",
-                            borderRadius: "10px",
-                            border: "1px solid rgba(212, 175, 55, 0.2)",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: "15px",
-                          }}
+                          className="p-4 bg-white rounded-xl border border-slate-200 flex justify-between items-center gap-4 shadow-sm"
                         >
-                          <div style={{ flex: 1 }}>
-                            <div
-                              style={{
-                                fontWeight: "600",
-                                color: "#003366",
-                                marginBottom: "4px",
-                              }}
-                            >
+                          <div className="flex-1">
+                            <div className="font-bold text-slate-800 mb-1">
                               {participant.name}
                             </div>
-                            <div
-                              style={{
-                                fontSize: "0.85rem",
-                                color: "#6b7280",
-                              }}
-                            >
+                            <div className="text-sm text-slate-500">
                               {participant.email}
                             </div>
                           </div>
-                          <div
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(212, 175, 55, 0.15)",
-                              color: "#b8941f",
-                              borderRadius: "8px",
-                              fontSize: "0.85rem",
-                              fontWeight: "600",
-                            }}
-                          >
+                          <div className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold">
                             #{index + 1}
                           </div>
                         </div>
                       ))}
                     </div>
                     {data.remainingSpots !== null && (
-                      <div
-                        style={{
-                          marginTop: "20px",
-                          padding: "15px",
-                          background: data.remainingSpots > 0 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                          borderRadius: "10px",
-                          border: `2px solid ${data.remainingSpots > 0 ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "1.1rem",
-                            fontWeight: "700",
-                            color: data.remainingSpots > 0 ? "#10b981" : "#ef4444",
-                          }}
-                        >
+                      <div className={`mt-5 p-4 rounded-xl border text-center ${data.remainingSpots > 0
+                        ? "bg-emerald-50 border-emerald-200"
+                        : "bg-red-50 border-red-200"
+                        }`}>
+                        <div className={`text-lg font-bold ${data.remainingSpots > 0 ? "text-emerald-700" : "text-red-700"
+                          }`}>
                           {data.remainingSpots > 0
                             ? `${data.remainingSpots} Spot${data.remainingSpots !== 1 ? "s" : ""} Remaining`
                             : "Workshop is Full"}
@@ -532,9 +305,9 @@ function WorkshopParticipantsView({ workshops }) {
                     )}
                   </div>
                 ) : (
-                  <div style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}>
-                    <div style={{ fontSize: "2rem", marginBottom: "10px" }}>👥</div>
-                    No participants registered yet.
+                  <div className="text-center p-10 text-slate-500">
+                    <div className="text-4xl mb-4 opacity-50">👥</div>
+                    <p className="font-medium">No participants registered yet.</p>
                   </div>
                 )}
               </div>
@@ -547,4 +320,3 @@ function WorkshopParticipantsView({ workshops }) {
 }
 
 export default WorkshopParticipantsView;
-

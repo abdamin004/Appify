@@ -12,23 +12,24 @@ const { sendVerificationEmail, sendWarningEmail, sendVendorApplicationApprovalEm
 const Comment = require('../models/Comment');
 const VendorApplication = require('../models/VendorApplication');
 const Notification = require('../models/Notification');
+const BlackoutDate = require('../models/BlackoutDate');
 
 // List all users with optional filtering
 exports.listAllUsers = async (req, res) => {
   try {
     const { role, isVerified, isBlocked, search } = req.query;
     const filter = {};
-    
+
     if (role) filter.role = role;
-    
+
     if (isVerified !== undefined) {
       filter.isVerified = isVerified === 'true';
     }
-    
+
     if (isBlocked !== undefined) {
       filter.isBlocked = isBlocked === 'true';
     }
-    
+
     if (search) {
       filter.$or = [
         { firstName: { $regex: search, $options: 'i' } },
@@ -36,11 +37,11 @@ exports.listAllUsers = async (req, res) => {
         { email: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     const users = await User.find(filter)
       .select('-password')
       .sort({ createdAt: -1 });
-    
+
     // Map users to include verificationTokenSent flag (without exposing the actual token)
     const usersWithStatus = users.map(user => {
       const userObj = user.toObject();
@@ -50,259 +51,259 @@ exports.listAllUsers = async (req, res) => {
       delete userObj.verificationToken;
       return userObj;
     });
-    
-    res.status(200).json({ 
-      success: true, 
-      count: usersWithStatus.length, 
-      users: usersWithStatus 
+
+    res.status(200).json({
+      success: true,
+      count: usersWithStatus.length,
+      users: usersWithStatus
     });
   } catch (error) {
     console.error('Error fetching users:', error);
-    res.status(500).json({ 
-      message: 'Error fetching users', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching users',
+      error: error.message
     });
   }
 };
 
 exports.assignUserRole = async (req, res) => {
-    try {
-        const { userId, role } = req.body;
+  try {
+    const { userId, role } = req.body;
 
-        if (!userId || !role) {
-            return res.status(400).json({
-                message: 'Both userId and role are required fields.'
-            });
-        }
-
-        const validRoles = ['Student','Staff', 'TA', 'Professor','Admin','EventOffice'];
-        if (!validRoles.includes(role)) {
-            return res.status(400).json({
-                message: `Invalid role '${role}'. Valid roles are: ${validRoles.join(', ')}.`
-            });
-        }
-
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({
-                message: `No user found with the provided ID (${userId}).`
-            });
-        }
-
-        const previousRole = user.role;
-        user.role = role;
-        
-        // For Staff, TA, and Professor: generate verification token and send email after admin approval
-        // Students get email on signup, so no need to send again
-        // Admin and EventOffice don't need email verification
-        const rolesRequiringEmailVerification = ['Staff', 'TA', 'Professor'];
-        let emailSent = false;
-        let message = '';
-        
-        if (rolesRequiringEmailVerification.includes(role)) {
-            // Check if verification email was already sent (token exists) AND role hasn't changed
-            // If role changed, allow sending new verification email for the new role
-            if (user.verificationToken && previousRole === role) {
-                // Email already sent for this role, don't resend - return error
-                return res.status(400).json({
-                    message: `Verification email was already sent to ${user.email} for role '${role}'. User must verify their email first before a new verification email can be sent.`,
-                    user: {
-                        id: user._id,
-                        email: user.email,
-                        role: user.role,
-                        isVerified: user.isVerified,
-                        verificationTokenSent: true
-                    }
-                });
-            } else {
-                // Either no token exists, or role changed - generate new token and send email
-                if (previousRole !== role && user.verificationToken) {
-                    // Role changed, clear old token
-                    user.verificationToken = undefined;
-                }
-                // Generate new verification token and send email
-                const verificationToken = crypto.randomBytes(32).toString('hex');
-                user.verificationToken = verificationToken;
-                // Don't set isVerified to true yet - user needs to verify email first
-                user.isVerified = false;
-                
-                await user.save();
-                
-                // Send verification email
-                try {
-                    await sendVerificationEmail(user, verificationToken);
-                    emailSent = true;
-                    message = `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`;
-                } catch (emailError) {
-                    console.error('Error sending verification email:', emailError);
-                    message = `Role '${role}' assigned successfully, but failed to send verification email. Please try again.`;
-                    // Continue even if email fails
-                }
-            }
-        } else if (role === 'Student') {
-            // For Students: they already got email on signup, just keep their current verification status
-            // Don't change isVerified or verificationToken - let them verify via email they already received
-            await user.save();
-            message = `Role '${role}' assigned successfully.`;
-        } else {
-            // For Admin and EventOffice, verify immediately without email
-            user.isVerified = true;
-            user.verificationToken = undefined;
-            await user.save();
-            message = `Role '${role}' assigned successfully.`;
-        }
-
-        return res.status(200).json({
-            message: message,
-            user: {
-                id: user._id,
-                email: user.email,
-                role: user.role,
-                isVerified: user.isVerified,
-                verificationTokenSent: emailSent || !!user.verificationToken
-            }
-        });
-
-    } catch (error) {
-        console.error('Error assigning user role:', error);
-        return res.status(500).json({
-            message: 'Internal Server Error while assigning role.',
-            error: error.message
-        });
+    if (!userId || !role) {
+      return res.status(400).json({
+        message: 'Both userId and role are required fields.'
+      });
     }
+
+    const validRoles = ['Student', 'Staff', 'TA', 'Professor', 'Admin', 'EventOffice'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Invalid role '${role}'. Valid roles are: ${validRoles.join(', ')}.`
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: `No user found with the provided ID (${userId}).`
+      });
+    }
+
+    const previousRole = user.role;
+    user.role = role;
+
+    // For Staff, TA, and Professor: generate verification token and send email after admin approval
+    // Students get email on signup, so no need to send again
+    // Admin and EventOffice don't need email verification
+    const rolesRequiringEmailVerification = ['Staff', 'TA', 'Professor'];
+    let emailSent = false;
+    let message = '';
+
+    if (rolesRequiringEmailVerification.includes(role)) {
+      // Check if verification email was already sent (token exists) AND role hasn't changed
+      // If role changed, allow sending new verification email for the new role
+      if (user.verificationToken && previousRole === role) {
+        // Email already sent for this role, don't resend - return error
+        return res.status(400).json({
+          message: `Verification email was already sent to ${user.email} for role '${role}'. User must verify their email first before a new verification email can be sent.`,
+          user: {
+            id: user._id,
+            email: user.email,
+            role: user.role,
+            isVerified: user.isVerified,
+            verificationTokenSent: true
+          }
+        });
+      } else {
+        // Either no token exists, or role changed - generate new token and send email
+        if (previousRole !== role && user.verificationToken) {
+          // Role changed, clear old token
+          user.verificationToken = undefined;
+        }
+        // Generate new verification token and send email
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        user.verificationToken = verificationToken;
+        // Don't set isVerified to true yet - user needs to verify email first
+        user.isVerified = false;
+
+        await user.save();
+
+        // Send verification email
+        try {
+          await sendVerificationEmail(user, verificationToken);
+          emailSent = true;
+          message = `Role '${role}' assigned successfully. Verification email sent to ${user.email}.`;
+        } catch (emailError) {
+          console.error('Error sending verification email:', emailError);
+          message = `Role '${role}' assigned successfully, but failed to send verification email. Please try again.`;
+          // Continue even if email fails
+        }
+      }
+    } else if (role === 'Student') {
+      // For Students: they already got email on signup, just keep their current verification status
+      // Don't change isVerified or verificationToken - let them verify via email they already received
+      await user.save();
+      message = `Role '${role}' assigned successfully.`;
+    } else {
+      // For Admin and EventOffice, verify immediately without email
+      user.isVerified = true;
+      user.verificationToken = undefined;
+      await user.save();
+      message = `Role '${role}' assigned successfully.`;
+    }
+
+    return res.status(200).json({
+      message: message,
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+        verificationTokenSent: emailSent || !!user.verificationToken
+      }
+    });
+
+  } catch (error) {
+    console.error('Error assigning user role:', error);
+    return res.status(500).json({
+      message: 'Internal Server Error while assigning role.',
+      error: error.message
+    });
+  }
 };
 
 // ✅ FIXED: Removed manual hashing
 exports.createAdminAccount = async (req, res) => {
-    try {
-        const { firstName, lastName, email, password, role } = req.body;
+  try {
+    const { firstName, lastName, email, password, role } = req.body;
 
-        if (!firstName || !lastName || !email || !password || !role) {
-            return res.status(400).json({ message: 'All fields are required.' });
-        }
-
-        const allowedRoles = ['Admin', 'EventOffice'];
-        if (!allowedRoles.includes(role)) {
-            return res.status(400).json({
-                message: `Invalid role '${role}'. Only 'Admin' and 'EventOffice' roles can be created.`
-            });
-        }
-
-        // Enforce GUC email for these roles
-        const emailLower = (email || '').toLowerCase();
-        if (!emailLower.endsWith('@guc.edu.eg')) {
-            return res.status(400).json({
-                message: 'Please use a GUC email when creating Admin/EventOffice accounts.'
-            });
-        }
-
-        const existingUser = await User.findOne({ email: emailLower });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User already exists with this email.' });
-        }
-
-        // ✅ FIXED: Pass plain password, let User model pre-save hook hash it
-        const newUser = await User.create({
-            firstName,
-            lastName,
-            email: emailLower,
-            password,  // Plain text - will be hashed by pre-save hook
-            role,
-            isVerified: true,
-            verificationToken: undefined
-        });
-
-        return res.status(201).json({
-            success: true,
-            message: `${role} account created successfully.`,
-            user: {
-                id: newUser._id,
-                name: `${newUser.firstName} ${newUser.lastName}`,
-                email: newUser.email,
-                role: newUser.role
-            }
-        });
-    } catch (error) {
-        console.error('Error creating admin account:', error);
-        return res.status(500).json({
-            message: 'Internal Server Error while creating admin account.',
-            error: error.message
-        });
+    if (!firstName || !lastName || !email || !password || !role) {
+      return res.status(400).json({ message: 'All fields are required.' });
     }
+
+    const allowedRoles = ['Admin', 'EventOffice'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Invalid role '${role}'. Only 'Admin' and 'EventOffice' roles can be created.`
+      });
+    }
+
+    // Enforce GUC email for these roles
+    const emailLower = (email || '').toLowerCase();
+    if (!emailLower.endsWith('@guc.edu.eg')) {
+      return res.status(400).json({
+        message: 'Please use a GUC email when creating Admin/EventOffice accounts.'
+      });
+    }
+
+    const existingUser = await User.findOne({ email: emailLower });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email.' });
+    }
+
+    // ✅ FIXED: Pass plain password, let User model pre-save hook hash it
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email: emailLower,
+      password,  // Plain text - will be hashed by pre-save hook
+      role,
+      isVerified: true,
+      verificationToken: undefined
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `${role} account created successfully.`,
+      user: {
+        id: newUser._id,
+        name: `${newUser.firstName} ${newUser.lastName}`,
+        email: newUser.email,
+        role: newUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Error creating admin account:', error);
+    return res.status(500).json({
+      message: 'Internal Server Error while creating admin account.',
+      error: error.message
+    });
+  }
 };
 
 exports.deleteAdminAccount = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        const user = await User.findById(id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        if (!['Admin', 'EventOffice'].includes(user.role)) {
-            return res.status(403).json({
-                message: `Cannot delete user with role '${user.role}'. Only Admin or EventOffice accounts can be deleted.`
-            });
-        }
-
-        await User.findByIdAndDelete(id);
-        res.status(200).json({
-            success: true,
-            message: `${user.role} account (${user.email}) deleted successfully.`,
-        });
-    } catch (error) {
-        console.error('Error deleting admin account:', error);
-        res.status(500).json({
-            message: 'Internal Server Error while deleting account.',
-            error: error.message,
-        });
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
     }
+
+    if (!['Admin', 'EventOffice'].includes(user.role)) {
+      return res.status(403).json({
+        message: `Cannot delete user with role '${user.role}'. Only Admin or EventOffice accounts can be deleted.`
+      });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.status(200).json({
+      success: true,
+      message: `${user.role} account (${user.email}) deleted successfully.`,
+    });
+  } catch (error) {
+    console.error('Error deleting admin account:', error);
+    res.status(500).json({
+      message: 'Internal Server Error while deleting account.',
+      error: error.message,
+    });
+  }
 };
 
 exports.blockUser = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { action } = req.body;
+  try {
+    const { id } = req.params;
+    const { action } = req.body;
 
-        if (!['block', 'unblock'].includes(action)) {
-            return res.status(400).json({
-                message: "Invalid action. Use 'block' or 'unblock'."
-            });
-        }
-
-        const user = await User.findById(id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        user.isBlocked = action === 'block';
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: `User ${user.email} has been ${action === 'block' ? 'blocked' : 'unblocked'} successfully.`,
-            user: {
-                id: user._id,
-                email: user.email,
-                isBlocked: user.isBlocked
-            }
-        });
-
-    } catch (error) {
-        console.error('Error blocking user:', error);
-        res.status(500).json({
-            message: 'Internal Server Error while blocking/unblocking user.',
-            error: error.message
-        });
+    if (!['block', 'unblock'].includes(action)) {
+      return res.status(400).json({
+        message: "Invalid action. Use 'block' or 'unblock'."
+      });
     }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    user.isBlocked = action === 'block';
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${user.email} has been ${action === 'block' ? 'blocked' : 'unblocked'} successfully.`,
+      user: {
+        id: user._id,
+        email: user.email,
+        isBlocked: user.isBlocked
+      }
+    });
+
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    res.status(500).json({
+      message: 'Internal Server Error while blocking/unblocking user.',
+      error: error.message
+    });
+  }
 };
 
 exports.deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
     const comment = await Comment.findById(id).populate('user', 'email firstName lastName');
-    
+
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found.' });
     }
@@ -313,7 +314,7 @@ exports.deleteComment = async (req, res) => {
 
     // Delete the comment
     await Comment.findByIdAndDelete(id);
-    
+
     // Send warning email with the populated user (don't fail if email fails)
     if (user && user.email) {
       try {
@@ -369,7 +370,7 @@ exports.reviewVendorApplication = async (req, res) => {
     const app = await VendorApplication.findById(id)
       .populate('event', 'title type startDate endDate location')
       .populate('vendorUser', 'email companyName');
-    
+
     if (!app) return res.status(404).json({ message: 'Application not found' });
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
@@ -377,7 +378,7 @@ exports.reviewVendorApplication = async (req, res) => {
     app.reviewer = req.user._id;
     app.reviewedAt = new Date();
     if (notes) app.notes = notes;
-    
+
     // If approving, calculate participation fee and set payment deadline
     if (action === 'approve') {
       const { calculateParticipationFee } = require('../utils/paymentCalculator');
@@ -389,7 +390,7 @@ exports.reviewVendorApplication = async (req, res) => {
       app.paid = false; // Reset payment status
       app.paidAt = undefined;
     }
-    
+
     await app.save();
 
     const notifType = action === 'approve' ? 'VendorApplicationApproved' : 'VendorApplicationRejected';
@@ -502,8 +503,8 @@ exports.getUnreadNotificationsCount = async (req, res) => {
   try {
     const userId = req.user._id;
     const pendingOnly = (req.query.pendingOnly || '').toString().toLowerCase() === 'true';
-    
-    const filter = { 
+
+    const filter = {
       recipientsRoles: { $in: ['Admin', 'EventOffice'] },
       $or: [
         { 'userStatus.userId': { $ne: userId } },
@@ -511,7 +512,7 @@ exports.getUnreadNotificationsCount = async (req, res) => {
         { 'userStatus': { $size: 0 } }
       ]
     };
-    
+
     // Exclude notifications deleted by this user
     filter.$and = [
       {
@@ -521,14 +522,14 @@ exports.getUnreadNotificationsCount = async (req, res) => {
         ]
       }
     ];
-    
+
     // If pendingOnly is true, only count VendorApplicationSubmitted notifications
     if (pendingOnly) {
       filter.type = 'VendorApplicationSubmitted';
     }
 
     const notifications = await Notification.find(filter);
-    
+
     // Filter by user status in memory for accurate count
     const unreadCount = notifications.filter(notif => {
       const userStatus = notif.userStatus?.find(s => String(s.userId) === String(userId));
@@ -537,8 +538,8 @@ exports.getUnreadNotificationsCount = async (req, res) => {
       return !userStatus.isRead;
     }).length;
 
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       unreadCount,
       pendingVendorRequests: pendingOnly ? unreadCount : undefined
     });
@@ -552,14 +553,14 @@ exports.markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
-    
+
     const notif = await Notification.findById(id);
     if (!notif) return res.status(404).json({ message: 'Notification not found' });
-    
+
     // Check if user status already exists
     const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
     const now = new Date();
-    
+
     if (userStatusIndex >= 0) {
       // Update existing user status
       notif.userStatus[userStatusIndex].isRead = true;
@@ -575,9 +576,9 @@ exports.markNotificationRead = async (req, res) => {
         isDeleted: false
       });
     }
-    
+
     await notif.save();
-    
+
     res.status(200).json({ success: true, notification: notif });
   } catch (error) {
     console.error('Error marking notification read:', error);
@@ -589,7 +590,7 @@ exports.markAllAdminNotificationsRead = async (req, res) => {
   try {
     const userId = req.user._id;
     const now = new Date();
-    
+
     // Find all notifications for Admin/EventOffice that are not deleted by this user
     const notifications = await Notification.find({
       recipientsRoles: { $in: ['Admin', 'EventOffice'] },
@@ -598,12 +599,12 @@ exports.markAllAdminNotificationsRead = async (req, res) => {
         { 'userStatus': { $not: { $elemMatch: { userId: userId, isDeleted: true } } } }
       ]
     });
-    
+
     let updatedCount = 0;
-    
+
     for (const notif of notifications) {
       const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
-      
+
       if (userStatusIndex >= 0) {
         // Update existing user status
         if (!notif.userStatus[userStatusIndex].isRead) {
@@ -623,10 +624,10 @@ exports.markAllAdminNotificationsRead = async (req, res) => {
         });
         updatedCount++;
       }
-      
+
       await notif.save();
     }
-    
+
     res.status(200).json({ success: true, updated: updatedCount });
   } catch (error) {
     console.error('Error marking all notifications read:', error);
@@ -639,15 +640,15 @@ exports.listAdminNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
     const userRole = req.user.role;
-    
+
     // Find notifications for Admin/EventOffice roles
     const notifications = await Notification.find({
       recipientsRoles: { $in: ['Admin', 'EventOffice'] }
     })
-    .populate('application', 'organization vendorUser event')
-    .populate('event', 'title type startDate endDate')
-    .sort({ createdAt: -1 });
-    
+      .populate('application', 'organization vendorUser event')
+      .populate('event', 'title type startDate endDate')
+      .sort({ createdAt: -1 });
+
     // Filter by user status - exclude deleted, include all others
     const filteredNotifications = notifications
       .filter(notif => {
@@ -662,11 +663,11 @@ exports.listAdminNotifications = async (req, res) => {
           readAt: userStatus?.readAt || null
         };
       });
-    
-    res.status(200).json({ 
-      success: true, 
+
+    res.status(200).json({
+      success: true,
       count: filteredNotifications.length,
-      notifications: filteredNotifications 
+      notifications: filteredNotifications
     });
   } catch (error) {
     console.error('Error listing notifications:', error);
@@ -679,20 +680,20 @@ exports.deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
-    
+
     const notif = await Notification.findById(id);
     if (!notif) return res.status(404).json({ message: 'Notification not found' });
-    
+
     // Check if user has permission to see this notification
     const userRole = req.user.role;
     if (!notif.recipientsRoles.includes(userRole)) {
       return res.status(403).json({ message: 'You do not have permission to delete this notification' });
     }
-    
+
     // Check if user status already exists
     const userStatusIndex = notif.userStatus.findIndex(s => String(s.userId) === String(userId));
     const now = new Date();
-    
+
     if (userStatusIndex >= 0) {
       // Update existing user status
       notif.userStatus[userStatusIndex].isDeleted = true;
@@ -706,9 +707,9 @@ exports.deleteNotification = async (req, res) => {
         deletedAt: now
       });
     }
-    
+
     await notif.save();
-    
+
     res.status(200).json({ success: true, message: 'Notification deleted successfully' });
   } catch (error) {
     console.error('Error deleting notification:', error);
@@ -735,22 +736,22 @@ exports.listAllComments = async (req, res) => {
 exports.getAttendeesReport = async (req, res) => {
   try {
     const { status, type, startDate, endDate, title, eventName } = req.query;
-    
+
     // Build filter
     const filter = {};
-    
+
     // Filter by status
     if (status) filter.status = status;
-    
+
     // Filter by event type
     if (type) filter.type = type;
-    
+
     // Filter by event name/title (case-insensitive partial match)
     const searchName = title || eventName;
     if (searchName) {
       filter.title = { $regex: searchName, $options: 'i' };
     }
-    
+
     // Filter by date range
     if (startDate || endDate) {
       filter.startDate = {};
@@ -797,12 +798,12 @@ exports.getAttendeesReport = async (req, res) => {
         location: event.location,
         capacity: event.capacity || 0,
         attendeeCount: attendeeCount,
-        utilizationRate: event.capacity > 0 
+        utilizationRate: event.capacity > 0
           ? ((attendeeCount / event.capacity) * 100).toFixed(2) + '%'
           : 'N/A',
         isFull: event.capacity > 0 && attendeeCount >= event.capacity
       };
-      
+
       eventDetails.push(eventDetail);
       eventsByType[event.type].events.push(eventDetail);
     });
@@ -811,7 +812,7 @@ exports.getAttendeesReport = async (req, res) => {
     const breakdownByType = Object.values(eventsByType);
 
     // Calculate average attendees per event
-    const averageAttendeesPerEvent = totalEvents > 0 
+    const averageAttendeesPerEvent = totalEvents > 0
       ? (totalAttendees / totalEvents).toFixed(2)
       : 0;
 
@@ -843,10 +844,10 @@ exports.getAttendeesReport = async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating attendees report:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Internal Server Error', 
-      error: error.message 
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };
@@ -855,13 +856,13 @@ exports.getAttendeesReport = async (req, res) => {
 exports.getSalesReport = async (req, res) => {
   try {
     const { status, type, startDate, endDate, title, eventName, sortBy, sortOrder } = req.query;
-    
+
     // Pricing configuration for vendor booths (can be moved to config file)
     const BOOTH_PRICING = {
       '2x2': 500,  // $500 for 2x2 booth
       '4x4': 1000  // $1000 for 4x4 booth
     };
-    
+
     // Build filter for events
     const eventFilter = {};
     if (status) eventFilter.status = status;
@@ -875,13 +876,13 @@ exports.getSalesReport = async (req, res) => {
       if (startDate) eventFilter.startDate.$gte = new Date(startDate);
       if (endDate) eventFilter.startDate.$lte = new Date(endDate);
     }
-    
+
     // Validate sort parameters
     const validSortOrders = ['asc', 'desc', 'ascending', 'descending'];
-    const sortDirection = validSortOrders.includes(sortOrder?.toLowerCase()) 
-      ? sortOrder.toLowerCase() 
+    const sortDirection = validSortOrders.includes(sortOrder?.toLowerCase())
+      ? sortOrder.toLowerCase()
       : 'desc'; // default to descending (highest revenue first)
-    
+
     // Normalize sort direction
     const isAscending = sortDirection === 'asc' || sortDirection === 'ascending';
 
@@ -890,123 +891,110 @@ exports.getSalesReport = async (req, res) => {
       .select('title type status startDate endDate location registeredUsers')
       .sort({ startDate: -1 });
 
-    // Calculate Trip revenue (price × registered users)
-    const tripEvents = await Trip.find(eventFilter)
-      .select('title type status startDate endDate location price registeredUsers')
-      .populate('registeredUsers', 'firstName lastName email')
-      .sort({ startDate: -1 });
+    // Calculate Trip revenue from actual payments
+    const Payment = require('../models/Payment');
 
-    let tripRevenue = 0;
-    const tripDetails = [];
-    
-    tripEvents.forEach(trip => {
-      const attendeeCount = trip.registeredUsers ? trip.registeredUsers.length : 0;
-      const revenue = (trip.price || 0) * attendeeCount;
-      tripRevenue += revenue;
-      
-      tripDetails.push({
-        eventId: trip._id,
-        title: trip.title,
-        type: trip.type,
-        status: trip.status,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
-        location: trip.location,
-        price: trip.price || 0,
-        attendeeCount: attendeeCount,
-        revenue: revenue
-      });
+    // 1. Find all relevant Trip events first
+    const tripEventQuery = { type: 'Trip' };
+    if (type) tripEventQuery.type = type; // Redundant if hardcoded limit, but good for safety
+    if (status) tripEventQuery.status = status;
+    if (searchName) tripEventQuery.title = { $regex: searchName, $options: 'i' };
+    if (startDate) tripEventQuery.startDate = { $gte: new Date(startDate) };
+    if (endDate) tripEventQuery.startDate = { ...tripEventQuery.startDate, $lte: new Date(endDate) };
+
+    const tripEvents = await Event.find(tripEventQuery).lean();
+    const tripEventIds = tripEvents.map(e => e._id);
+
+    // 2. Find all payments for these events
+    const tripPayments = await Payment.find({
+      event: { $in: tripEventIds },
+      status: 'paid',
+      method: { $in: ['wallet', 'card'] }
+    }).populate('user', 'firstName lastName email').lean();
+
+    // 3. Map events to revenue
+    const tripDetails = tripEvents.map(event => {
+      const eventPayments = tripPayments.filter(p => String(p.event) === String(event._id));
+      const revenue = eventPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      return {
+        eventId: event._id,
+        title: event.title,
+        type: event.type,
+        status: event.status,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        price: event.price || 0,
+        attendeeCount: event.registeredUsers ? event.registeredUsers.length : 0,
+        revenue: revenue,
+        payments: eventPayments.map(p => ({
+          paymentId: p._id,
+          user: p.user ? `${p.user.firstName} ${p.user.lastName}` : 'Unknown',
+          email: p.user ? p.user.email : '',
+          amount: Number(p.amount || 0),
+          date: p.createdAt,
+          method: p.method
+        }))
+      };
     });
+
+    const tripRevenue = tripDetails.reduce((sum, item) => sum + item.revenue, 0);
+
 
     // Calculate Workshop revenue from actual payments
     const Workshop = require('../models/Workshop');
-    const Payment = require('../models/Payment');
-    
-    // Get all paid workshop payments
-    const workshopPaymentFilter = {
+
+    // 1. Find all relevant Workshop events
+    const workshopEventQuery = { type: 'Workshop' };
+    if (type) workshopEventQuery.type = type;
+    if (status) workshopEventQuery.status = status;
+    if (searchName) workshopEventQuery.title = { $regex: searchName, $options: 'i' };
+    if (startDate) workshopEventQuery.startDate = { $gte: new Date(startDate) };
+    if (endDate) workshopEventQuery.startDate = { ...workshopEventQuery.startDate, $lte: new Date(endDate) };
+
+    const workshopEvents = await Event.find(workshopEventQuery).lean();
+    const workshopEventIds = workshopEvents.map(e => e._id);
+
+    // 2. Find payments
+    const workshopPayments = await Payment.find({
+      event: { $in: workshopEventIds },
       status: 'paid',
       method: { $in: ['wallet', 'card'] }
-    };
-    
-    if (startDate || endDate) {
-      workshopPaymentFilter.createdAt = {};
-      if (startDate) workshopPaymentFilter.createdAt.$gte = new Date(startDate);
-      if (endDate) workshopPaymentFilter.createdAt.$lte = new Date(endDate);
-    }
-    
-    const workshopPayments = await Payment.find(workshopPaymentFilter)
-      .populate('event', 'title type status startDate endDate location requiredBudget capacity fundingSource extraRequiredResourses')
-      .populate('user', 'firstName lastName email')
-      .sort({ createdAt: -1 });
-    
-    // Filter to only Workshop events and apply filters
-    const filteredWorkshopPayments = workshopPayments.filter(payment => {
-      if (!payment.event || payment.event.type !== 'Workshop') return false;
-      
-      // Apply event filters
-      if (type && payment.event.type !== type) return false;
-      if (status && payment.event.status !== status) return false;
-      if (searchName && !payment.event.title.toLowerCase().includes(searchName.toLowerCase())) return false;
-      if (startDate && new Date(payment.event.startDate) < new Date(startDate)) return false;
-      if (endDate && new Date(payment.event.startDate) > new Date(endDate)) return false;
-      
-      return true;
+    }).populate('user', 'firstName lastName email').lean();
+
+    // 3. Map events
+    const workshopDetails = workshopEvents.map(event => {
+      const eventPayments = workshopPayments.filter(p => String(p.event) === String(event._id));
+      const revenue = eventPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      return {
+        eventId: event._id,
+        title: event.title,
+        type: event.type,
+        status: event.status,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        location: event.location,
+        requiredBudget: event.requiredBudget || 0,
+        capacity: event.capacity || 0,
+        fundingSource: event.fundingSource || '',
+        payments: eventPayments.map(p => ({
+          paymentId: p._id,
+          user: p.user ? `${p.user.firstName} ${p.user.lastName}` : 'Unknown',
+          email: p.user ? p.user.email : '',
+          amount: Number(p.amount || 0),
+          date: p.createdAt,
+          method: p.method
+        })),
+        totalRevenue: revenue,
+        attendeeCount: event.registeredUsers ? event.registeredUsers.length : 0
+      };
     });
-    
-    let workshopRevenue = 0;
-    const workshopDetails = [];
-    const workshopRevenueByEvent = {};
-    
-    filteredWorkshopPayments.forEach(payment => {
-      if (!payment.event) return;
-      
-      const amount = Number(payment.amount || 0);
-      workshopRevenue += amount;
-      
-      const eventKey = String(payment.event._id);
-      if (!workshopRevenueByEvent[eventKey]) {
-        workshopRevenueByEvent[eventKey] = {
-          eventId: payment.event._id,
-          title: payment.event.title,
-          type: payment.event.type,
-          status: payment.event.status,
-          startDate: payment.event.startDate,
-          endDate: payment.event.endDate,
-          location: payment.event.location,
-          requiredBudget: payment.event.requiredBudget || 0,
-          capacity: payment.event.capacity || 0,
-          fundingSource: payment.event.fundingSource || '',
-          payments: [],
-          totalRevenue: 0,
-          attendeeCount: 0
-        };
-      }
-      
-      workshopRevenueByEvent[eventKey].payments.push({
-        paymentId: payment._id,
-        userId: payment.user?._id,
-        userName: payment.user ? `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 'Unknown',
-        amount: amount,
-        method: payment.method || 'unknown',
-        paidAt: payment.createdAt
-      });
-      workshopRevenueByEvent[eventKey].totalRevenue += amount;
-      workshopRevenueByEvent[eventKey].attendeeCount += 1;
-      
-      workshopDetails.push({
-        paymentId: payment._id,
-        eventId: payment.event._id,
-        eventTitle: payment.event.title,
-        eventType: payment.event.type,
-        userId: payment.user?._id,
-        userName: payment.user ? `${payment.user.firstName || ''} ${payment.user.lastName || ''}`.trim() : 'Unknown',
-        amount: amount,
-        method: payment.method || 'unknown',
-        paidAt: payment.createdAt
-      });
-    });
-    
-    const workshopRevenueByEventArray = Object.values(workshopRevenueByEvent);
+
+    const workshopRevenue = workshopDetails.reduce((sum, item) => sum + item.totalRevenue, 0);
+
+    const workshopRevenueByEventArray = workshopDetails;
 
     // Calculate Vendor Application revenue (booth fees for paid applications)
     const vendorAppFilter = {};
@@ -1015,7 +1003,7 @@ exports.getSalesReport = async (req, res) => {
       if (startDate) vendorAppFilter.createdAt.$gte = new Date(startDate);
       if (endDate) vendorAppFilter.createdAt.$lte = new Date(endDate);
     }
-    
+
     // Only count paid and approved applications
     vendorAppFilter.paid = true;
     vendorAppFilter.status = 'approved';
@@ -1030,7 +1018,7 @@ exports.getSalesReport = async (req, res) => {
 
     vendorApplications.forEach(app => {
       if (!app.event) return; // Skip if event is deleted
-      
+
       // Apply event filters if specified
       if (type && app.event.type !== type) return;
       if (status && app.event.status !== status) return;
@@ -1055,7 +1043,7 @@ exports.getSalesReport = async (req, res) => {
           totalRevenue: 0
         };
       }
-      
+
       vendorRevenueByEvent[eventKey].applications.push({
         applicationId: app._id,
         organization: app.organization,
@@ -1088,7 +1076,7 @@ exports.getSalesReport = async (req, res) => {
 
     // Revenue breakdown by event type
     const revenueByType = {};
-    
+
     tripDetails.forEach(trip => {
       if (!revenueByType[trip.type]) {
         revenueByType[trip.type] = { type: trip.type, revenue: 0, count: 0 };
@@ -1130,7 +1118,7 @@ exports.getSalesReport = async (req, res) => {
         source: 'Workshop',
         attendeeCount: w.attendeeCount
       })),
-      ...vendorRevenueByEventArray.map(v => ({ 
+      ...vendorRevenueByEventArray.map(v => ({
         eventId: v.eventId,
         title: v.title,
         type: v.type,
@@ -1143,43 +1131,43 @@ exports.getSalesReport = async (req, res) => {
         applicationCount: v.applications.length
       }))
     ];
-    
+
     // Sort by revenue based on sortOrder parameter
     if (sortBy === 'revenue' || !sortBy) {
       allRevenueEvents.sort((a, b) => {
-        return isAscending 
+        return isAscending
           ? a.revenue - b.revenue  // ascending (least to greatest)
           : b.revenue - a.revenue;  // descending (greatest to least)
       });
     }
-    
+
     // Apply limit for top events (only if not sorting, or if explicitly requested)
     if (!sortBy || sortBy === 'revenue') {
       allRevenueEvents = allRevenueEvents.slice(0, 10);
     }
-    
+
     // Sort trip details by revenue
     if (sortBy === 'revenue' || !sortBy) {
       tripDetails.sort((a, b) => {
-        return isAscending 
+        return isAscending
           ? a.revenue - b.revenue
           : b.revenue - a.revenue;
       });
     }
-    
+
     // Sort vendor revenue by event revenue
     if (sortBy === 'revenue' || !sortBy) {
       vendorRevenueByEventArray.sort((a, b) => {
-        return isAscending 
+        return isAscending
           ? a.totalRevenue - b.totalRevenue
           : b.totalRevenue - a.totalRevenue;
       });
     }
-    
+
     // Sort workshop revenue by event revenue
     if (sortBy === 'revenue' || !sortBy) {
       workshopRevenueByEventArray.sort((a, b) => {
-        return isAscending 
+        return isAscending
           ? a.totalRevenue - b.totalRevenue
           : b.totalRevenue - a.totalRevenue;
       });
@@ -1227,10 +1215,10 @@ exports.getSalesReport = async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating sales report:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Internal Server Error', 
-      error: error.message 
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };
@@ -1239,13 +1227,13 @@ exports.getSalesReport = async (req, res) => {
 exports.getVendorDocuments = async (req, res) => {
   try {
     const { eventId, organization, vendorId } = req.query;
-    
+
     // Build filter for approved vendor applications to Bazaar or Booth events
     const appFilter = {
       status: 'approved',
       event: { $exists: true }
     };
-    
+
     if (eventId) appFilter.event = eventId;
     if (organization) appFilter.organization = { $regex: organization, $options: 'i' };
     if (vendorId) appFilter.vendorUser = vendorId;
@@ -1257,7 +1245,7 @@ exports.getVendorDocuments = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Filter to only Bazaar and Booth events
-    const filteredApplications = applications.filter(app => 
+    const filteredApplications = applications.filter(app =>
       app.event && (app.event.type === 'Bazaar' || app.event.type === 'Booth')
     );
 
@@ -1298,10 +1286,10 @@ exports.getVendorDocuments = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching vendor documents:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Internal Server Error', 
-      error: error.message 
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };
@@ -1310,41 +1298,41 @@ exports.getVendorDocuments = async (req, res) => {
 exports.downloadVendorDocument = async (req, res) => {
   try {
     const { vendorId, documentType } = req.params;
-    
+
     if (!['taxCard', 'logo'].includes(documentType)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Invalid document type. Use "taxCard" or "logo"' 
+        message: 'Invalid document type. Use "taxCard" or "logo"'
       });
     }
 
     // Get vendor
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Vendor not found' 
+        message: 'Vendor not found'
       });
     }
 
     // Get document URL
     const documentUrl = documentType === 'taxCard' ? vendor.taxCardUrl : vendor.logoUrl;
-    
+
     if (!documentUrl) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: `${documentType === 'taxCard' ? 'Tax card' : 'Logo'} not found for this vendor` 
+        message: `${documentType === 'taxCard' ? 'Tax card' : 'Logo'} not found for this vendor`
       });
     }
 
     // Construct full file path
     const filePath = path.join(__dirname, '..', documentUrl);
-    
+
     // Check if file exists
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Document file not found on server' 
+        message: 'Document file not found on server'
       });
     }
 
@@ -1356,10 +1344,10 @@ exports.downloadVendorDocument = async (req, res) => {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg'
     };
-    
+
     // Check if download is requested (via query parameter)
     const shouldDownload = req.query.download === 'true';
-    
+
     // Get filename for download
     const filename = `${vendor.companyName || 'vendor'}_${documentType}${ext}`;
     const contentType = contentTypes[ext] || 'application/octet-stream';
@@ -1377,13 +1365,13 @@ exports.downloadVendorDocument = async (req, res) => {
     // Stream the file
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
-    
+
   } catch (error) {
     console.error('Error downloading vendor document:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Internal Server Error', 
-      error: error.message 
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };
@@ -1392,13 +1380,13 @@ exports.downloadVendorDocument = async (req, res) => {
 exports.listLoyaltyApplications = async (req, res) => {
   try {
     const { status } = req.query; // pending, approved, rejected, or undefined (all)
-    
+
     const filter = status ? { status } : {};
-    
+
     const applications = await LoyaltyApplication.find(filter)
       .populate('vendorUser', 'email companyName')
       .sort({ createdAt: -1 });
-    
+
     res.status(200).json({
       success: true,
       applications
@@ -1420,31 +1408,31 @@ exports.exportEventRegistrations = async (req, res) => {
     const event = await Event.findById(eventId)
       .populate('registeredUsers', 'firstName lastName email role studentStaffId')
       .select('title type startDate endDate location registeredUsers');
-    
+
     if (!event) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Event not found' 
+        message: 'Event not found'
       });
     }
-    
+
     // Exclude conferences as per requirement
     if (event.type === 'Conference') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Cannot export registrations for Conference events' 
+        message: 'Cannot export registrations for Conference events'
       });
     }
-    
+
     const registeredUsers = event.registeredUsers || [];
-    
+
     if (registeredUsers.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'No registered users found for this event' 
+        message: 'No registered users found for this event'
       });
     }
-    
+
     // Prepare Excel data
     const excelData = registeredUsers.map((user, index) => ({
       'No.': index + 1,
@@ -1455,11 +1443,11 @@ exports.exportEventRegistrations = async (req, res) => {
       'Role': user.role || '',
       'Student/Staff ID': user.studentStaffId || ''
     }));
-    
+
     // Create workbook and worksheet
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(excelData);
-    
+
     // Set column widths
     worksheet['!cols'] = [
       { wch: 5 },   // No.
@@ -1470,29 +1458,29 @@ exports.exportEventRegistrations = async (req, res) => {
       { wch: 15 },  // Role
       { wch: 18 }   // Student/Staff ID
     ];
-    
+
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Registered Users');
-    
+
     // Generate Excel buffer
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    
+
     // Generate filename
     const filename = `${event.title.replace(/[^a-z0-9]/gi, '_')}_Registrations_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
+
     // Set response headers
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.setHeader('Content-Length', excelBuffer.length);
     res.setHeader('Cache-Control', 'no-cache');
-    
+
     // Send the Excel file
     res.send(excelBuffer);
   } catch (error) {
     console.error('Error exporting event registrations:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Internal Server Error', 
-      error: error.message 
+      message: 'Internal Server Error',
+      error: error.message
     });
   }
 };
@@ -1502,14 +1490,14 @@ exports.reviewLoyaltyApplication = async (req, res) => {
   try {
     const { id } = req.params;
     const { action, notes } = req.body; // action: 'approve' or 'reject'
-    
+
     if (!['approve', 'reject'].includes(action)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid action. Must be "approve" or "reject"'
       });
     }
-    
+
     const application = await LoyaltyApplication.findById(id);
     if (!application) {
       return res.status(404).json({
@@ -1517,22 +1505,22 @@ exports.reviewLoyaltyApplication = async (req, res) => {
         message: 'Loyalty application not found'
       });
     }
-    
+
     if (application.status !== 'pending') {
       return res.status(400).json({
         success: false,
         message: `Application is already ${application.status}`
       });
     }
-    
+
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
     application.status = newStatus;
     application.notes = notes || '';
     application.reviewedAt = new Date();
     application.reviewedBy = req.user.id; // Assuming req.user is set by auth middleware
-    
+
     await application.save();
-    
+
     res.status(200).json({
       success: true,
       message: `Application ${newStatus} successfully`,
@@ -1544,6 +1532,147 @@ exports.reviewLoyaltyApplication = async (req, res) => {
       success: false,
       message: 'Internal Server Error',
       error: error.message
+    });
+  }
+};
+// =========================
+// System-wide blackout dates
+// =========================
+
+// Create a blackout date
+// POST /api/admin/blackout-dates
+exports.createBlackoutDate = async (req, res) => {
+  try {
+    const { name, reason, startDate, endDate } = req.body;
+
+    if (!name || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'name, startDate and endDate are required',
+      });
+    }
+
+    const blackout = new BlackoutDate({
+      name: name.trim(),
+      reason: reason || '',
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      active: true,
+      createdBy: req.user._id,
+    });
+
+    await blackout.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Blackout date created successfully',
+      data: blackout,
+    });
+  } catch (error) {
+    console.error('Error in createBlackoutDate:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create blackout date',
+      error: error.message,
+    });
+  }
+};
+
+// Get blackout dates (optionally filter by ?active=true/false)
+// GET /api/admin/blackout-dates
+exports.getBlackoutDates = async (req, res) => {
+  try {
+    const { active } = req.query;
+    const filter = {};
+
+    if (active === 'true') {
+      filter.active = true;
+    } else if (active === 'false') {
+      filter.active = false;
+    }
+
+    const blackoutDates = await BlackoutDate.find(filter).sort({
+      startDate: 1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: blackoutDates,
+    });
+  } catch (error) {
+    console.error('Error in getBlackoutDates:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch blackout dates',
+      error: error.message,
+    });
+  }
+};
+
+// Update a blackout date
+// PUT /api/admin/blackout-dates/:id
+exports.updateBlackoutDate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, reason, startDate, endDate, active } = req.body;
+
+    const blackout = await BlackoutDate.findById(id);
+    if (!blackout) {
+      return res.status(404).json({
+        success: false,
+        message: 'Blackout date not found',
+      });
+    }
+
+    if (name !== undefined) blackout.name = name;
+    if (reason !== undefined) blackout.reason = reason;
+    if (startDate !== undefined) blackout.startDate = new Date(startDate);
+    if (endDate !== undefined) blackout.endDate = new Date(endDate);
+    if (active !== undefined) blackout.active = !!active;
+
+    await blackout.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Blackout date updated successfully',
+      data: blackout,
+    });
+  } catch (error) {
+    console.error('Error in updateBlackoutDate:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update blackout date',
+      error: error.message,
+    });
+  }
+};
+
+// Delete a blackout date
+// DELETE /api/admin/blackout-dates/:id
+exports.deleteBlackoutDate = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const blackout = await BlackoutDate.findById(id);
+    if (!blackout) {
+      return res.status(404).json({
+        success: false,
+        message: 'Blackout date not found',
+      });
+    }
+
+    await blackout.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Blackout date deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error in deleteBlackoutDate:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete blackout date',
+      error: error.message,
     });
   }
 };

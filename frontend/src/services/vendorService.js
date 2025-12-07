@@ -6,7 +6,20 @@ async function fetchJson(url, opts = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, Object.assign({}, opts, { headers }));
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw data;
+  if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
+    throw data;
+  }
   return data;
 }
 
@@ -15,6 +28,7 @@ export const applyToEvent = (eventId, payload) => fetchJson(`${API_BASE}/vendor/
 export const listOrganizations = () => fetchJson(`${API_BASE}/vendor/organizations`);
 export const listUpcomingBazaars = () => fetchJson(`${API_BASE}/vendor/bazaars/upcoming`);
 export const listUpcomingBooths = () => fetchJson(`${API_BASE}/vendor/booths/upcoming`);
+export const listMyApplications = () => fetchJson(`${API_BASE}/vendor/applications/mine`);
 export const cancelVendorApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/vendor-applications/${applicationId}/cancel`, { method: 'POST' });
 export const deleteVendorApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/vendor-applications/${applicationId}`, { method: 'DELETE' });
 export const applyToLoyaltyProgram = (payload) => fetchJson(`${API_BASE}/vendor/loyalty/apply`, { method: 'POST', body: JSON.stringify(payload) });
@@ -22,11 +36,11 @@ export const listMyLoyaltyApplications = () => fetchJson(`${API_BASE}/vendor/loy
 export const cancelLoyaltyApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/loyalty/${applicationId}/cancel`, { method: 'POST' });
 export const deleteLoyaltyApplication = (applicationId) => fetchJson(`${API_BASE}/vendor/loyalty/${applicationId}`, { method: 'DELETE' });
 
-const vendorService = { 
-  requestBooth, 
-  applyToEvent, 
-  listOrganizations, 
-  listUpcomingBazaars, 
+const vendorService = {
+  requestBooth,
+  applyToEvent,
+  listOrganizations,
+  listUpcomingBazaars,
   listUpcomingBooths,
   cancelVendorApplication,
   deleteVendorApplication,

@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
-import { showToast, confirmDialog } from '../../utils/toast';
-import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles } from '../../utils/designSystem';
-import { 
-  createStudentNotification, 
-  createStaffNotification, 
+import { showToast } from '../../utils/toast';
+import {
+  createStudentNotification,
+  createStaffNotification,
   createTaNotification,
-  createProfessorNotification 
+  createProfessorNotification
 } from '../../services/notificationService';
 
 export default function LoyaltyApplications() {
-  const navigate = useNavigate();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,15 +36,15 @@ export default function LoyaltyApplications() {
     try {
       // Find the application in the current list to get full details
       const currentApp = apps.find(a => String(a._id) === String(id));
-      
+
       const result = await adminService.reviewLoyaltyApplication(id, action, notes || '');
       showToast.success(`Application ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
-      
+
       // If approved, create frontend notifications for all user roles
       if (action === 'approve') {
         // Use the application from result, or fall back to currentApp, or reload to get fresh data
         let app = result?.application || currentApp;
-        
+
         // If we still don't have the app, reload the list to get fresh data
         if (!app) {
           try {
@@ -57,12 +54,12 @@ export default function LoyaltyApplications() {
             console.error('Error reloading application:', reloadErr);
           }
         }
-        
+
         // If we still don't have app data, use currentApp or form data from the UI
         if (!app && currentApp) {
           app = currentApp;
         }
-        
+
         if (app) {
           const orgName = app.organization || app.vendorUser?.companyName || 'A vendor';
           const discountRate = app.discountRate;
@@ -71,7 +68,7 @@ export default function LoyaltyApplications() {
             ? `${discountRate}%`
             : 'a special';
           const promoInfo = promoCode ? ` Use code ${promoCode}.` : '';
-          
+
           const notification = {
             type: 'LoyaltyPartnerAdded',
             message: `${orgName} has joined the GUC loyalty program offering ${discountInfo} off.${promoInfo}`,
@@ -80,31 +77,24 @@ export default function LoyaltyApplications() {
             promoCode: promoCode,
             date: new Date().toISOString(),
           };
-          
+
           // Create notifications for all user roles
           try {
-            const studentNotif = createStudentNotification(notification);
-            const staffNotif = createStaffNotification(notification);
-            const taNotif = createTaNotification(notification);
-            
-            if (!studentNotif || !staffNotif || !taNotif) {
-              console.warn('Some notification creations returned undefined');
-            }
-            
+            createStudentNotification(notification);
+            createStaffNotification(notification);
+            createTaNotification(notification);
+
             // Create notifications for all professors
             try {
               const professors = await adminService.listAllUsers('Professor');
               const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-              
-              let professorCount = 0;
+
               professorList.forEach(professor => {
                 const professorId = String(professor._id || professor.id);
                 if (professorId) {
                   createProfessorNotification(professorId, notification);
-                  professorCount++;
                 }
               });
-              console.log(`Created notifications for ${professorCount} professors`);
             } catch (profErr) {
               console.error('Could not create professor loyalty notifications:', profErr);
               // Fall back to localStorage method
@@ -121,21 +111,19 @@ export default function LoyaltyApplications() {
                 console.error('Could not create professor notifications from localStorage:', localStorageErr);
               }
             }
-            
+
             // Dispatch event to refresh notifications in all dashboards
             window.dispatchEvent(new CustomEvent('loyaltyPartnerAdded', { detail: { notification } }));
-            
-            console.log('Loyalty notifications created successfully for:', { orgName, discountRate, promoCode });
+
           } catch (notifErr) {
             console.error('Error creating loyalty notifications:', notifErr);
             showToast.error('Notifications created but some may have failed');
           }
         } else {
-          console.error('Could not find application data to create notifications. Result:', result, 'CurrentApp:', currentApp);
           showToast.warning('Application approved but notifications may not have been created');
         }
       }
-      
+
       load();
     } catch (err) {
       console.error('Error reviewing loyalty application:', err);
@@ -144,256 +132,139 @@ export default function LoyaltyApplications() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'], marginBottom: spacing.xl }}>
-            <div style={{ 
-              position: 'relative',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: spacing.xl
-            }}>
-              <button
-                onClick={() => navigate('/Admin')}
-                style={{
-                  ...buttonStyles.back,
-                  position: 'absolute',
-                  left: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: colors.bgCard,
-                  color: colors.primary,
-                  borderColor: colors.primary
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = colors.accent;
-                  e.target.style.color = colors.primary;
-                  e.target.style.borderColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = colors.bgCard;
-                  e.target.style.color = colors.primary;
-                  e.target.style.borderColor = colors.primary;
-                }}
+    <div className="max-w-5xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-slate-800">Loyalty Program Applications</h2>
+          <p className="text-slate-500 mt-2">Manage loyalty partner requests</p>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-8 justify-center">
+          {['pending', 'approved', 'rejected', 'all'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm capitalize transition-all ${filter === f
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-500">Loading applications...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {!loading && !error && apps.length === 0 && (
+          <div className="text-center py-16 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="text-6xl mb-4">📋</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No Applications Found</h3>
+            <p className="text-slate-500">No {filter === 'all' ? '' : filter} loyalty applications found.</p>
+          </div>
+        )}
+
+        {!loading && !error && apps.length > 0 && (
+          <div className="grid grid-cols-1 gap-6">
+            {apps.map((app) => (
+              <div
+                key={app._id}
+                className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-all"
               >
-                ← Back
-              </button>
-              <h2 style={{ 
-                color: colors.primary, 
-                margin: 0,
-                fontSize: typography.fontSize['2xl'],
-                fontWeight: typography.fontWeight.bold,
-                textAlign: 'center',
-                textDecoration: 'underline',
-                textDecorationColor: colors.primary,
-                textUnderlineOffset: '4px'
-              }}>Loyalty Program Applications</h2>
-            </div>
-            
-            {/* Filter Tabs */}
-            <div style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.xl, flexWrap: 'wrap' }}>
-              {['pending', 'approved', 'rejected', 'all'].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  style={{
-                    padding: `${spacing.sm} ${spacing.lg}`,
-                    background: filter === f ? `linear-gradient(135deg, ${colors.accent} 0%, ${colors.accentDark} 100%)` : 'transparent',
-                    color: filter === f ? colors.primary : colors.gray500,
-                    border: `2px solid ${filter === f ? colors.accent : colors.gray200}`,
-                    borderRadius: borderRadius.md,
-                    fontWeight: typography.fontWeight.bold,
-                    cursor: 'pointer',
-                    textTransform: 'capitalize',
-                    fontSize: typography.fontSize.sm,
-                    transition: transitions.fast
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="text-xl font-bold text-slate-800">
+                        {app.vendorUser?.companyName || app.organization || 'Vendor'}
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${app.status === 'approved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                        app.status === 'rejected' ? 'bg-red-100 text-red-800 border border-red-200' :
+                          'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}>
+                        {app.status || 'PENDING'}
+                      </span>
+                    </div>
 
-            {loading && (
-              <div style={{ 
-                color: colors.gray500, 
-                fontSize: typography.fontSize.base,
-                textAlign: 'center',
-                padding: spacing['3xl']
-              }}>Loading...</div>
-            )}
-            {error && (
-              <div style={{ 
-                color: colors.error, 
-                background: colors.errorLight,
-                padding: spacing.md,
-                borderRadius: borderRadius.md,
-                marginBottom: spacing.lg,
-                fontSize: typography.fontSize.sm
-              }}>{error}</div>
-            )}
-            
-            {!loading && !error && apps.length === 0 && (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: spacing['5xl'], 
-                color: colors.gray500 
-              }}>
-                <div style={{ fontSize: typography.fontSize['4xl'], marginBottom: spacing.lg }}>📋</div>
-                <h3 style={{
-                  color: colors.primary,
-                  fontSize: typography.fontSize.xl,
-                  fontWeight: typography.fontWeight.bold,
-                  marginBottom: spacing.sm
-                }}>No Applications Found</h3>
-                <p style={{
-                  fontSize: typography.fontSize.base,
-                  color: colors.gray500,
-                  margin: 0
-                }}>No {filter === 'all' ? '' : filter} loyalty applications found.</p>
-              </div>
-            )}
-
-            {!loading && !error && apps.length > 0 && (
-              <div style={{ display: 'grid', gap: spacing.lg }}>
-                {apps.map((app) => (
-                  <div
-                    key={app._id}
-                    style={{
-                      padding: spacing.xl,
-                      background: colors.white,
-                      borderRadius: borderRadius.xl,
-                      border: `2px solid ${colors.gray200}`,
-                      boxShadow: shadows.sm,
-                      transition: transitions.fast
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = shadows.md;
-                      e.currentTarget.style.borderColor = colors.accent;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = shadows.sm;
-                      e.currentTarget.style.borderColor = colors.gray200;
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                          <h3 style={{ color: '#003366', margin: 0, fontSize: '1.3rem', fontWeight: 700 }}>
-                            {app.vendorUser?.companyName || app.organization || 'Vendor'}
-                          </h3>
-                          <span
-                            style={{
-                              padding: '4px 12px',
-                              borderRadius: 6,
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              background:
-                                app.status === 'approved'
-                                  ? 'rgba(34, 197, 94, 0.15)'
-                                  : app.status === 'rejected'
-                                  ? 'rgba(239, 68, 68, 0.15)'
-                                  : 'rgba(251, 191, 36, 0.15)',
-                              color:
-                                app.status === 'approved'
-                                  ? '#22c55e'
-                                  : app.status === 'rejected'
-                                  ? '#ef4444'
-                                  : '#f59e0b',
-                            }}
-                          >
-                            {app.status?.toUpperCase() || 'PENDING'}
-                          </span>
-                        </div>
-                        <div style={{ color: '#374151', fontSize: '0.9rem', marginTop: 8 }}>
-                          <div><strong>Organization:</strong> {app.organization}</div>
-                          <div style={{ marginTop: 4 }}><strong>Vendor Email:</strong> {app.vendorUser?.email || 'N/A'}</div>
-                          <div style={{ marginTop: 4 }}>
-                            <strong>Discount Rate:</strong>{' '}
-                            <span style={{ color: '#10b981', fontWeight: 700, fontSize: '1.1rem' }}>{app.discountRate}%</span>
-                          </div>
-                          <div style={{ marginTop: 4 }}>
-                            <strong>Promo Code:</strong>{' '}
-                            <code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4, fontFamily: 'monospace', fontWeight: 700 }}>
-                              {app.promoCode}
-                            </code>
-                          </div>
-                          {app.termsAndConditions && (
-                            <details style={{ marginTop: 12 }}>
-                              <summary style={{ cursor: 'pointer', color: '#003366', fontWeight: 600 }}>
-                                Terms & Conditions
-                              </summary>
-                              <div
-                                style={{
-                                  marginTop: 8,
-                                  padding: 12,
-                                  background: '#f9fafb',
-                                  borderRadius: 6,
-                                  whiteSpace: 'pre-wrap',
-                                  fontSize: '0.9rem',
-                                  color: '#374151',
-                                }}
-                              >
-                                {app.termsAndConditions}
-                              </div>
-                            </details>
-                          )}
-                          {app.createdAt && (
-                            <div style={{ marginTop: 8, color: '#9ca3af', fontSize: '0.85rem' }}>
-                              Applied: {new Date(app.createdAt).toLocaleString()}
-                            </div>
-                          )}
-                          {app.reviewedAt && (
-                            <div style={{ marginTop: 4, color: '#9ca3af', fontSize: '0.85rem' }}>
-                              Reviewed: {new Date(app.reviewedAt).toLocaleString()}
-                            </div>
-                          )}
-                          {app.notes && (
-                            <div style={{ marginTop: 8, padding: 8, background: '#fef3c7', borderRadius: 6, fontSize: '0.85rem' }}>
-                              <strong>Review Notes:</strong> {app.notes}
-                            </div>
-                          )}
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
+                      <div>
+                        <p><span className="font-semibold text-slate-700">Organization:</span> {app.organization}</p>
+                        <p className="mt-1"><span className="font-semibold text-slate-700">Vendor Email:</span> {app.vendorUser?.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p>
+                          <span className="font-semibold text-slate-700">Discount Rate:</span>{' '}
+                          <span className="text-emerald-600 font-bold text-lg">{app.discountRate}%</span>
+                        </p>
+                        <p className="mt-1 flex items-center gap-2">
+                          <span className="font-semibold text-slate-700">Promo Code:</span>{' '}
+                          <code className="bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-emerald-600 border border-slate-200">
+                            {app.promoCode}
+                          </code>
+                        </p>
                       </div>
                     </div>
-                    {app.status === 'pending' && (
-                      <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-                        <button
-                          onClick={() => handleReview(app._id, 'approve')}
-                          style={{
-                            ...buttonStyles.primary,
-                            background: colors.success,
-                            color: colors.white,
-                            borderColor: colors.success,
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            fontSize: typography.fontSize.sm
-                          }}
-                        >
-                          ✓ Approve
-                        </button>
-                        <button
-                          onClick={() => handleReview(app._id, 'reject')}
-                          style={{
-                            ...buttonStyles.outline,
-                            background: colors.error,
-                            color: colors.white,
-                            borderColor: colors.error,
-                            padding: `${spacing.sm} ${spacing.lg}`,
-                            fontSize: typography.fontSize.sm
-                          }}
-                        >
-                          ✗ Reject
-                        </button>
+
+                    {app.termsAndConditions && (
+                      <details className="group">
+                        <summary className="cursor-pointer text-emerald-600 font-semibold hover:text-emerald-700 transition-colors list-none flex items-center gap-2">
+                          <span className="group-open:rotate-90 transition-transform">▶</span> Terms & Conditions
+                        </summary>
+                        <div className="mt-2 p-4 bg-slate-50 rounded-lg text-sm text-slate-600 whitespace-pre-wrap border border-slate-200">
+                          {app.termsAndConditions}
+                        </div>
+                      </details>
+                    )}
+
+                    <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-2 border-t border-slate-100">
+                      {app.createdAt && (
+                        <span>Applied: {new Date(app.createdAt).toLocaleString()}</span>
+                      )}
+                      {app.reviewedAt && (
+                        <span>Reviewed: {new Date(app.reviewedAt).toLocaleString()}</span>
+                      )}
+                    </div>
+
+                    {app.notes && (
+                      <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-sm text-amber-800">
+                        <span className="font-bold">Review Notes:</span> {app.notes}
                       </div>
                     )}
                   </div>
-                ))}
+
+                  {app.status === 'pending' && (
+                    <div className="flex flex-row md:flex-col gap-3 self-start md:self-center min-w-[120px]">
+                      <button
+                        onClick={() => handleReview(app._id, 'approve')}
+                        className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none btn-sm w-full"
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={() => handleReview(app._id, 'reject')}
+                        className="btn bg-red-600 hover:bg-red-700 text-white border-none btn-sm w-full"
+                      >
+                        ✗ Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

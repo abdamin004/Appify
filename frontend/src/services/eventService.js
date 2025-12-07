@@ -8,7 +8,7 @@ export async function exportEventRegistrations(eventId) {
     throw new Error('You must be logged in to export registrations');
   }
 
-  const response = await fetch(`${API_BASE}/admin/events/${eventId}/export-registrations`, {
+  const response = await fetch(`${API_BASE}/events/${eventId}/export/registrations`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`
@@ -55,6 +55,18 @@ async function http(method, url, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      // Only redirect if we're in a browser environment
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     let msg = `Request failed (${res.status})`;
     try {
       const data = await res.json();
@@ -93,6 +105,11 @@ export function createWorkshop(payload) {
 
 export function createConference(payload) {
   return http('POST', `${API_BASE}/events/create`, { ...payload, type: 'Conference', createdBy: currentUserId() });
+}
+
+// Request disability accommodations for an event
+export function requestDisabilityAccommodation(eventId, payload) {
+  return http('POST', `${API_BASE}/events/${eventId}/accommodations`, payload);
 }
 
 // Update any event by id
@@ -144,8 +161,8 @@ export function publicRegisterForEvent(eventId, payload) {
 }
 
 // Authenticated registration (adds to registeredUsers/user.registeredEvents)
-export function registerForEvent(eventId) {
-  return http('POST', `${API_BASE}/events/register/${eventId}`);
+export function registerForEvent(eventId, payload) {
+  return http('POST', `${API_BASE}/events/register/${eventId}`, payload);
 }
 
 // Gym sessions
@@ -188,6 +205,17 @@ export async function getEventById(id) {
 
   const res = await fetch(`${API_BASE}/events/${id}`, { headers });
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     const text = await res.text();
     let errorMsg = `Failed to load event (${res.status})`;
     try {
@@ -206,43 +234,65 @@ export async function getEventById(id) {
 }
 export async function getEventComments(id) {
   // Backend requires auth, so use http helper which includes token
-  const res = await http('GET', `${API_BASE}/events/${id}/comments`);
-  // Backend returns { success: true, comments: [...], count: X }
-  // Return comments array for compatibility
-  return Array.isArray(res) ? res : (res?.comments || []);
+  try {
+    const res = await http('GET', `${API_BASE}/events/${id}/comments`);
+    // Backend returns { success: true, comments: [...], count: X }
+    // Return comments array for compatibility
+    return Array.isArray(res) ? res : (res?.comments || []);
+  } catch (error) {
+    // If it's a 401 error, the http helper already handled redirect
+    // Just return empty array to prevent further errors
+    if (error.message?.includes('Session expired')) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getEventRatings(id) {
   // Backend requires auth, so use http helper which includes token
-  const res = await http('GET', `${API_BASE}/events/${id}/ratings`);
-  // Backend returns { success: true, averageRating: X, ratings: [...], count: X }
-  // Convert to expected format: { average: X, ratings: [...], count: X, histogram: {} }
-  if (Array.isArray(res)) {
-    // If it's already an array (old format), convert it
-    const count = res.length;
-    const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
-    const average = count > 0 ? total / count : 0;
+  try {
+    const res = await http('GET', `${API_BASE}/events/${id}/ratings`);
+    // Backend returns { success: true, averageRating: X, ratings: [...], count: X }
+    // Convert to expected format: { average: X, ratings: [...], count: X, histogram: {} }
+    if (Array.isArray(res)) {
+      // If it's already an array (old format), convert it
+      const count = res.length;
+      const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
+      const average = count > 0 ? total / count : 0;
+      const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
+        acc[v] = res.filter(r => (r.rating || r.value) === v).length;
+        return acc;
+      }, {});
+      return { average, count, ratings: res, histogram };
+    }
+    // New format: { success: true, averageRating: X, ratings: [...], count: X }
+    const average = res.averageRating ?? res.average ?? 0;
+    const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
+    const ratings = res.ratings || [];
     const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
-      acc[v] = res.filter(r => (r.rating || r.value) === v).length;
+      acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
       return acc;
     }, {});
-    return { average, count, ratings: res, histogram };
+    return { average, count, ratings, histogram };
+  } catch (error) {
+    // If it's a 401 error, the http helper already handled redirect
+    // Just return default values to prevent further errors
+    if (error.message?.includes('Session expired')) {
+      return { average: 0, count: 0, ratings: [], histogram: {} };
+    }
+    throw error;
   }
-  // New format: { success: true, averageRating: X, ratings: [...], count: X }
-  const average = res.averageRating ?? res.average ?? 0;
-  const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
-  const ratings = res.ratings || [];
-  const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
-    acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
-    return acc;
-  }, {});
-  return { average, count, ratings, histogram };
 }
 
-export function rateEvent(id, value) {
-  // Backend expects POST /events/:id/ratings with { rating: value }
-  // Frontend was calling /events/:id/rate with { value }
-  return http('POST', `${API_BASE}/events/${id}/ratings`, { rating: value });
+export function rateEvent(id, data) {
+  // Backend expects POST /events/:id/ratings with { ratings: {...}, comment } (New) or { rating: value } (Legacy)
+  const payload = typeof data === 'object' ? data : { rating: data };
+  return http('POST', `${API_BASE}/events/${id}/ratings`, payload);
+}
+
+export function getEventAnalytics(id) {
+  return http('GET', `${API_BASE}/events/${id}/analytics`);
 }
 
 // Comments (auth required to add/delete)
@@ -417,6 +467,29 @@ export function rejectWorkshop(workshopId) {
   return http('PUT', `${API_BASE}/events/workshops/${workshopId}/review`, { action: 'reject' });
 }
 
+// Workshop Resources
+export function uploadWorkshopResource(workshopId, formData) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  // Note: We do NOT set Content-Type header manually for FormData, fetch does it automatically with boundary
+  return fetch(`${API_BASE}/events/workshops/${workshopId}/resources`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData
+  }).then(async res => {
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `Upload failed (${res.status})`);
+    }
+    return res.json();
+  });
+}
+
+export function getWorkshopResources(workshopId) {
+  return http('GET', `${API_BASE}/events/workshops/${workshopId}/resources`);
+}
+
 // Archive event (mark as completed)
 export function archiveEvent(eventId) {
   return updateEvent(eventId, { status: 'completed' });
@@ -468,7 +541,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
       const adminService = await import('./adminService');
       const professors = await adminService.listAllUsers('Professor');
       const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-      
+
       // Create notification for each professor
       professorList.forEach(professor => {
         const professorId = String(professor._id || professor.id);
@@ -511,5 +584,54 @@ export async function notifyAllUsersAboutNewEvent(event) {
     window.dispatchEvent(new CustomEvent('newEventCreated', { detail: { event } }));
   } catch (err) {
     console.error('Error creating notifications for new event:', err);
+  }
+}
+
+// Accommodation Management
+export async function listAccommodationRequests() {
+
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/events/accommodations/all`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to list accommodation requests');
+  return data.data;
+}
+
+export async function updateAccommodationRequest(requestId, status) {
+
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/events/accommodations/${requestId}/status`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ status })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to update request');
+  return data.data;
+}
+
+export async function getEventPrice(id) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`${API_BASE}/events/${id}/price`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch price');
+    const data = await res.json();
+    return data.price || 0;
+  } catch (err) {
+    // Fallback: get full event and check ticketPrice
+    try {
+      const evt = await getEventById(id);
+      return evt.ticketPrice || 0;
+    } catch {
+      return 0;
+    }
   }
 }

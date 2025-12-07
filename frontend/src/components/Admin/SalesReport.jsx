@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { colors, spacing, borderRadius, shadows, typography, buttonStyles, inputStyles } from "../../utils/designSystem";
+import DateTimePicker from '../UI/DateTimePicker';
 
-export default function SalesReport({ hideBackButton = false, backPath = '/Admin' }) {
-  const navigate = useNavigate();
+export default function SalesReport() {
   const [summary, setSummary] = useState(null);
   const [sales, setSales] = useState({
     revenueByType: [],
@@ -149,40 +147,24 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
 
   const formatDate = (d) => d ? new Date(d).toLocaleString() : "N/A";
 
-  const content = (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ background: colors.bgCard, borderRadius: borderRadius['2xl'], boxShadow: shadows.lg, padding: spacing['3xl'], marginBottom: spacing.xl, border: `1px solid ${colors.gray200}` }}>
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xl }}>
-          {!hideBackButton && (
-            <button onClick={() => navigate(backPath)} style={{ ...buttonStyles.back, position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)' }}>
-              ← Back
-            </button>
-          )}
-          <h2 style={{ color: colors.primary, margin: 0, fontSize: typography.fontSize['2xl'], fontWeight: typography.fontWeight.bold }}>Sales Report</h2>
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-slate-800">Financial Reports</h2>
+          <p className="text-slate-500 mt-2 text-lg">Financial overview and revenue analysis</p>
         </div>
 
         {/* Filters */}
-        <form onSubmit={handleApply} style={{ marginBottom: spacing.xl }}>
-          <h3
-            style={{
-              color: colors.primary,
-              marginTop: 0,
-              marginBottom: spacing.lg,
-              fontSize: typography.fontSize.xl,
-              fontWeight: typography.fontWeight.bold,
-            }}
-          >
-            Filters
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: spacing.lg, marginBottom: spacing.lg }}>
+        <form onSubmit={handleApply} className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Type
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Type</label>
               <select
                 value={type}
                 onChange={handleTypeChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Types</option>
                 <option value="Workshop">Workshop</option>
@@ -195,26 +177,22 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Name
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Name</label>
               <input
                 type="text"
                 placeholder="Search by event name..."
                 value={titleDebounce}
                 onChange={handleTitleChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="input input-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Event Status
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Event Status</label>
               <select
                 value={status}
                 onChange={handleStatusChange}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -226,141 +204,256 @@ export default function SalesReport({ hideBackButton = false, backPath = '/Admin
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Start Date
-              </label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="Start Date"
+                showTime={false}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{ ...inputStyles.base, width: "100%" }}
+                onChange={(e) => setStartDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select start date"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                End Date
-              </label>
-              <input
-                type="date"
+              <DateTimePicker
+                label="End Date"
+                showTime={false}
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{ ...inputStyles.base, width: "100%" }}
+                onChange={(e) => setEndDate(e.target.value ? e.target.value.slice(0, 10) : '')}
+                placeholder="Select end date"
               />
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: spacing.xs, color: colors.gray700, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium }}>
-                Sort Order
-              </label>
+              <label className="label text-slate-600 text-sm font-medium">Sort Order</label>
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                style={{ ...inputStyles.base, width: "100%" }}
+                className="select select-bordered w-full bg-white border-slate-300 text-slate-700 focus:border-emerald-500"
               >
                 <option value="desc">Revenue: High → Low</option>
                 <option value="asc">Revenue: Low → High</option>
               </select>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: spacing.md }}>
-            <button type="submit" style={{ ...buttonStyles.primary, padding: `${spacing.md} ${spacing.xl}` }}>Apply Filters</button>
-            <button type="button" onClick={handleReset} style={{ ...buttonStyles.secondary, padding: `${spacing.md} ${spacing.xl}` }}>Reset Filters</button>
+          <div className="flex flex-wrap gap-3 items-center">
+            <button type="submit" className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-none">Apply Filters</button>
+            <button type="button" onClick={handleReset} className="btn btn-ghost text-slate-500 hover:text-slate-800">Reset Filters</button>
           </div>
         </form>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: spacing['3xl'], color: colors.gray500 }}>Loading...</div>
+          <div className="flex flex-col items-center justify-center py-12">
+            <span className="loading loading-spinner loading-lg text-emerald-600 mb-4"></span>
+            <p className="text-lg font-medium text-slate-500">Loading report...</p>
+          </div>
         ) : error ? (
-          <div style={{ background: colors.errorLight, color: colors.error, padding: spacing.md, borderRadius: borderRadius.md }}>{error}</div>
+          <div className="alert alert-error bg-red-50 border-red-100 text-red-600 shadow-sm mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
+          </div>
         ) : (
-          <>
+          <div className="space-y-8">
             {/* Summary */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Summary</h3>
-              <p><b>Total Revenue:</b> {summary.totalRevenue ?? 0} EGP</p>
-              <p><b>Trip Revenue:</b> {summary.tripRevenue ?? 0} EGP</p>
-              <p><b>Vendor Revenue:</b> {summary.vendorRevenue ?? 0} EGP</p>
-              <p><b>Total Trip Events:</b> {summary.totalTripEvents ?? 0}</p>
-              <p><b>Total Vendor Applications:</b> {summary.totalVendorApplications ?? 0}</p>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className="text-emerald-500">💰</span> Summary
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
+                  <div className="text-base text-emerald-700 font-medium mb-1">Total Revenue</div>
+                  <div className="text-4xl font-bold text-emerald-600">{summary?.totalRevenue ?? 0} EGP</div>
+                </div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Trip Revenue</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.tripRevenue ?? 0} EGP</div>
+                </div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Vendor Revenue</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.vendorRevenue ?? 0} EGP</div>
+                </div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Total Trip Events</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.totalTripEvents ?? 0}</div>
+                </div>
+                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
+                  <div className="text-base text-slate-500 font-medium mb-1">Total Vendor Applications</div>
+                  <div className="text-3xl font-bold text-slate-800">{summary?.totalVendorApplications ?? 0}</div>
+                </div>
+              </div>
             </div>
 
             {/* Revenue by Type */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Revenue by Type</h3>
-              {sales.revenueByType.length > 0 ? sales.revenueByType.map((r, i) => (
-                <div key={i} style={{ padding: spacing.lg, borderTop: i > 0 ? `1px solid ${colors.gray200}` : 'none' }}>
-                  <p><b>Type:</b> {r.type}</p>
-                  <p><b>Revenue:</b> {r.revenue} EGP</p>
-                  <p><b>Count:</b> {r.count}</p>
-                </div>
-              )) : <p style={{ color: colors.gray500 }}>No revenue data available.</p>}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 p-4 border-b border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800">Revenue by Type</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table w-full">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                      <th>Type</th>
+                      <th>Count</th>
+                      <th className="text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.revenueByType.length > 0 ? sales.revenueByType.map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                        <td className="font-medium text-slate-900">{r.type}</td>
+                        <td className="text-slate-600">{r.count}</td>
+                        <td className="text-right font-bold text-emerald-600">{r.revenue} EGP</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="3" className="text-center text-slate-500 py-4">No revenue data available.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Trip Events */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Trip Events Revenue</h3>
-              {sales.tripEvents.length > 0 ? sales.tripEvents.map((ev, i) => (
-                <div key={i} style={{ padding: spacing.lg, borderTop: i > 0 ? `1px solid ${colors.gray200}` : 'none' }}>
-                  <p><b>Title:</b> {ev.title}</p>
-                  <p><b>Status:</b> {ev.status}</p>
-                  <p><b>Start:</b> {formatDate(ev.startDate)}</p>
-                  <p><b>End:</b> {formatDate(ev.endDate)}</p>
-                  <p><b>Location:</b> {ev.location}</p>
-                  <p><b>Price:</b> {ev.price}</p>
-                  <p><b>Attendees:</b> {ev.attendeeCount}</p>
-                  <p><b>Revenue:</b> {ev.revenue}</p>
-                </div>
-              )) : <p style={{ color: colors.gray500 }}>No trip events available.</p>}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 p-4 border-b border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800">Trip Events Revenue</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table w-full">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                      <th>Title</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Attendees</th>
+                      <th className="text-right">Price</th>
+                      <th className="text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.tripEvents.length > 0 ? sales.tripEvents.map((ev, i) => (
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                        <td className="font-medium text-slate-900">{ev.title}</td>
+                        <td>
+                          <span className={`badge badge-sm border-none ${ev.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
+                            ev.status === 'draft' ? 'bg-slate-100 text-slate-600' :
+                              ev.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-600'
+                            }`}>
+                            {ev.status}
+                          </span>
+                        </td>
+                        <td className="text-sm text-slate-500">{formatDate(ev.startDate)}</td>
+                        <td className="text-slate-600">{ev.attendeeCount}</td>
+                        <td className="text-right text-slate-600">{ev.price} EGP</td>
+                        <td className="text-right font-bold text-emerald-600">{ev.revenue} EGP</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="6" className="text-center text-slate-500 py-4">No trip events available.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* Vendor Events */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Vendor Event Revenue</h3>
-              {sales.vendorEvents.length > 0 ? sales.vendorEvents.map((v, i) => (
-                <div key={i} style={{ padding: spacing.lg, borderTop: i > 0 ? `1px solid ${colors.gray200}` : 'none' }}>
-                  <p><b>Event:</b> {v.title}</p>
-                  <p><b>Revenue:</b> {v.revenue}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Vendor Events */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 p-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-800">Vendor Event Revenue</h3>
                 </div>
-              )) : <p style={{ color: colors.gray500 }}>No vendor events available.</p>}
-            </div>
+                <div className="overflow-x-auto">
+                  <table className="table w-full">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                        <th>Event</th>
+                        <th className="text-right">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.vendorEvents.length > 0 ? sales.vendorEvents.map((v, i) => (
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{v.title}</td>
+                          <td className="text-right font-bold text-emerald-600">{v.revenue} EGP</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="2" className="text-center text-slate-500 py-4">No vendor events available.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-            {/* Vendor Applications */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Vendor Applications</h3>
-              {sales.vendorApplications.length > 0 ? sales.vendorApplications.map((a, i) => (
-                <div key={i} style={{ padding: spacing.lg, borderTop: i > 0 ? `1px solid ${colors.gray200}` : 'none' }}>
-                  <p><b>Vendor:</b> {a.vendorName}</p>
-                  <p><b>Revenue:</b> {a.revenue}</p>
+              {/* Vendor Applications */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-50 p-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-800">Vendor Applications</h3>
                 </div>
-              )) : <p style={{ color: colors.gray500 }}>No vendor applications available.</p>}
+                <div className="overflow-x-auto">
+                  <table className="table w-full">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                        <th>Vendor</th>
+                        <th className="text-right">Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.vendorApplications.length > 0 ? sales.vendorApplications.map((a, i) => (
+                        <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                          <td className="font-medium text-slate-900">{a.vendorName}</td>
+                          <td className="text-right font-bold text-emerald-600">{a.revenue} EGP</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="2" className="text-center text-slate-500 py-4">No vendor applications available.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             {/* Top Revenue Events */}
-            <div style={{ background: colors.white, borderRadius: borderRadius.xl, boxShadow: shadows.md, padding: spacing['2xl'], marginBottom: spacing.xl }}>
-              <h3 style={{ color: colors.primary, marginBottom: spacing.lg }}>Top Revenue Events</h3>
-              {sales.topRevenueEvents.length > 0 ? sales.topRevenueEvents.map((ev, i) => (
-                <div key={i} style={{ padding: spacing.lg, borderTop: i > 0 ? `1px solid ${colors.gray200}` : 'none' }}>
-                  <p><b>Title:</b> {ev.title}</p>
-                  <p><b>Type:</b> {ev.type}</p>
-                  <p><b>Revenue:</b> {ev.revenue}</p>
-                  <p><b>Source:</b> {ev.source}</p>
-                </div>
-              )) : <p style={{ color: colors.gray500 }}>No top revenue events available.</p>}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-slate-50 p-4 border-b border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800">Top Revenue Events</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="table w-full">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 border-b-slate-200">
+                      <th>Title</th>
+                      <th>Type</th>
+                      <th>Source</th>
+                      <th className="text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.topRevenueEvents.length > 0 ? sales.topRevenueEvents.map((ev, i) => (
+                      <tr key={i} className="hover:bg-slate-50 border-b-slate-100">
+                        <td className="font-bold text-slate-800">{ev.title}</td>
+                        <td><span className="badge bg-slate-100 text-slate-600 border-none badge-sm">{ev.type}</span></td>
+                        <td><span className="badge bg-emerald-100 text-emerald-800 border-none badge-sm">{ev.source}</span></td>
+                        <td className="text-right font-bold text-emerald-600">{ev.revenue} EGP</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="4" className="text-center text-slate-500 py-4">No top revenue events available.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
   );
-
-  if (hideBackButton) return content;
-
-  return (
-    <div style={{ minHeight: '100vh', background: colors.bgPrimary, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ paddingTop: spacing['8xl'], padding: `${spacing['8xl']} ${spacing['2xl']} ${spacing['6xl']}`, position: 'relative', zIndex: 1 }}>
-        {content}
-      </div>
-    </div>
-  );
 }
+

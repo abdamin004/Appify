@@ -111,7 +111,7 @@ function AttendeeIDUpload() {
       if (res.ok) {
         const data = await res.json();
         const idUrl = data.idUrl || data.idDocumentUrl || `/uploads/attendees/${file.name}`;
-        
+
         // Update local state
         setUploadedIds(prev => ({
           ...prev,
@@ -145,7 +145,7 @@ function AttendeeIDUpload() {
       } else {
         // If backend endpoint doesn't exist, simulate upload
         const idUrl = `/uploads/attendees/${Date.now()}_${file.name}`;
-        
+
         setUploadedIds(prev => ({
           ...prev,
           [applicationId]: {
@@ -215,265 +215,155 @@ function AttendeeIDUpload() {
 
   return (
     <div>
-      <div style={{ 
-        marginBottom: '30px'
-      }}>
-        <h2 style={{ color: '#003366', margin: 0, marginBottom: '10px' }}>Upload Attendee IDs</h2>
-        <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
-          Upload ID documents for individuals attending for the entire duration of bazaar or booth setup.
-        </p>
+      <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200 mb-8">
+        <div className="text-center mb-8 relative">
+          <h2 className="text-2xl font-bold text-slate-900">Attendee IDs</h2>
+          <p className="text-slate-500 mt-1">Upload ID cards for your booth attendees to GUC security.</p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block mb-2 font-bold text-slate-700">
+            Select Event & Application
+          </label>
+          <select
+            value={selectedApplication?._id || ''}
+            onChange={(e) => {
+              const appId = e.target.value;
+              const app = approvedApplications.find(a => (a._id || a.id) === appId);
+              setSelectedApplication(app || null);
+            }}
+            className="select select-bordered w-full bg-white border-slate-300 text-slate-900 focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="">-- Select an approved application --</option>
+            {approvedApplications.map(app => {
+              const event = app.event;
+              const eventTitle = event?.title || 'Unknown Event';
+              return (
+                <option key={app._id || app.id} value={app._id || app.id}>
+                  {eventTitle} ({app.organization})
+                </option>
+              );
+            })}
+          </select>
+          {approvedApplications.length === 0 && (
+            <p className="mt-2 text-sm text-slate-500">
+              No approved applications found. Your applications must be approved first.
+            </p>
+          )}
+        </div>
       </div>
 
-      {message.text && (
-        <div style={{
-          padding: '12px 20px',
-          marginBottom: '20px',
-          borderRadius: '8px',
-          background: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          color: message.type === 'success' ? '#22c55e' : '#ef4444',
-          border: `1px solid ${message.type === 'success' ? '#22c55e' : '#ef4444'}`,
-        }}>
-          {message.text}
-        </div>
-      )}
+      {selectedApplication && (
+        <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-slate-200">
+          <div className="text-center mb-8">
+            <h3 className="text-xl font-bold text-slate-800">
+              Upload IDs for {selectedApplication.event?.title}
+            </h3>
+            <p className="text-slate-500 text-sm">
+              Please upload a valid ID (National ID or Passport) for each attendee.
+            </p>
+          </div>
 
-      {approvedApplications.length === 0 ? (
-        <div style={{
-          background: 'rgba(255,255,255,0.95)',
-          padding: '60px 40px',
-          borderRadius: '15px',
-          textAlign: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          <div style={{ fontSize: '3rem', marginBottom: '20px' }}>📋</div>
-          <h3 style={{ fontSize: '1.5rem', color: '#003366', marginBottom: '10px' }}>
-            No Approved Applications
-          </h3>
-          <p style={{ color: '#6b7280' }}>
-            You don't have any approved applications yet. Once your application is approved, you can upload attendee IDs here.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-          {approvedApplications.map((app) => (
-            <div
-              key={app._id}
-              style={{
-                background: 'rgba(255,255,255,0.95)',
-                padding: '25px',
-                borderRadius: '15px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              }}
-            >
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ color: '#003366', margin: 0, marginBottom: '8px', fontSize: '1.3rem' }}>
-                  {app.event?.title || 'Event'}
-                </h3>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  <span style={{
-                    padding: '4px 12px',
-                    background: 'rgba(34, 197, 94, 0.15)',
-                    color: '#22c55e',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                  }}>
-                    {app.event?.type || 'Event'}
-                  </span>
-                  {app.event?.startDate && (
-                    <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                      📅 {new Date(app.event.startDate).toLocaleDateString()}
-                    </span>
-                  )}
-                  {app.organization && (
-                    <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                      🏢 {app.organization}
-                    </span>
-                  )}
-                </div>
-                {app.event?.type === 'Booth' && app.setupDurationWeeks && (
-                  <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
-                    Duration: {app.setupDurationWeeks} week(s) | Location: {app.setupLocation || 'TBA'}
-                  </p>
-                )}
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(selectedApplication.attendees || []).map((attendee, index) => {
+              const attendeeId = attendee._id || attendee.id || `att-${index}`;
+              const hasFile = !!attendeeFiles[attendeeId];
+              const idUrl = getAttendeeIdUrl(selectedApplication._id || selectedApplication.id, attendeeId);
+              const preview = attendeePreviews[attendeeId];
 
-              {(!app.attendees || app.attendees.length === 0) ? (
-                <div style={{
-                  padding: '20px',
-                  background: '#f9fafb',
-                  borderRadius: '8px',
-                  textAlign: 'center',
-                  color: '#6b7280',
-                }}>
-                  No attendees registered for this application.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {app.attendees.map((attendee, idx) => {
-                    const attendeeId = attendee._id || attendee.id || `attendee_${idx}`;
-                    const idUrl = getAttendeeIdUrl(app._id, attendeeId);
-                    const hasFile = !!attendeeFiles[attendeeId];
-                    const preview = attendeePreviews[attendeeId];
+              return (
+                <div key={index} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                  <div className="mb-4">
+                    <h4 className="font-bold text-slate-900">{attendee.name}</h4>
+                    <p className="text-xs text-slate-500 mb-1">{attendee.email}</p>
+                    <p className="text-xs text-slate-500">ID: {attendee.idNumber}</p>
+                  </div>
 
-                    return (
-                      <div
-                        key={attendeeId}
-                        style={{
-                          padding: '20px',
-                          background: '#f9fafb',
-                          borderRadius: '10px',
-                          border: '1px solid #e5e7eb',
-                        }}
+                  <div className="space-y-3">
+                    {/* Hidden File Input */}
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      id={`file-${attendeeId}`}
+                      className="hidden"
+                      onChange={(e) => handleFileSelect(attendeeId, e)}
+                    />
+
+                    {!hasFile && !idUrl && (
+                      <label
+                        htmlFor={`file-${attendeeId}`}
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 hover:border-emerald-400 transition-all group"
                       >
-                        <div style={{ marginBottom: '15px' }}>
-                          <h4 style={{ color: '#003366', margin: 0, marginBottom: '8px' }}>
-                            {attendee.name || `Attendee ${idx + 1}`}
-                          </h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.9rem', color: '#6b7280' }}>
-                            <span>📧 {attendee.email || 'No email'}</span>
-                            <span>🆔 ID Number: {attendee.idNumber || 'Not provided'}</span>
+                        <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">📤</div>
+                        <span className="text-xs font-bold text-slate-400 group-hover:text-emerald-600">Upload ID</span>
+                      </label>
+                    )}
+
+                    {hasFile && (
+                      <div className="relative">
+                        <div className="p-3 bg-white border border-emerald-200 rounded-xl shadow-sm text-center">
+                          <div className="text-xs text-emerald-600 font-bold mb-1">Pass to Upload</div>
+                          <div className="text-sm text-slate-700 truncate px-2 mb-2">{attendeeFiles[attendeeId].name}</div>
+
+                          {preview && (
+                            <img src={preview} alt="Preview" className="h-20 mx-auto object-contain mb-2 rounded border border-slate-100" />
+                          )}
+
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => {
+                                setAttendeeFiles(prev => { const n = { ...prev }; delete n[attendeeId]; return n; });
+                                setAttendeePreviews(prev => { const n = { ...prev }; delete n[attendeeId]; return n; });
+                              }}
+                              className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded hover:bg-red-200 font-bold"
+                            >Remove</button>
+                            <button
+                              onClick={() => handleUpload(selectedApplication._id || selectedApplication.id, attendeeId, attendee)}
+                              disabled={loading}
+                              className="px-2 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700 font-bold"
+                            >Upload</button>
                           </div>
                         </div>
-
-                        {idUrl ? (
-                          <div style={{ marginBottom: '15px' }}>
-                            <div style={{
-                              padding: '12px',
-                              background: 'rgba(34, 197, 94, 0.1)',
-                              borderRadius: '8px',
-                              marginBottom: '10px',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}>
-                              <span style={{ color: '#22c55e', fontWeight: 600, fontSize: '0.9rem' }}>
-                                ✓ ID Document Uploaded
-                              </span>
-                              <button
-                                onClick={() => handleRemoveId(app._id, attendeeId, attendee.name)}
-                                style={{
-                                  padding: '6px 12px',
-                                  background: '#fee2e2',
-                                  color: '#dc2626',
-                                  border: '1px solid #fecaca',
-                                  borderRadius: '6px',
-                                  fontSize: '0.85rem',
-                                  fontWeight: '600',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                            {idUrl.endsWith('.pdf') || idUrl.includes('.pdf') ? (
-                              <a
-                                href={`${baseUrl}${idUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-block',
-                                  padding: '8px 16px',
-                                  background: 'rgba(59, 130, 246, 0.1)',
-                                  color: '#3b82f6',
-                                  borderRadius: '6px',
-                                  textDecoration: 'none',
-                                  fontWeight: 600,
-                                  fontSize: '0.9rem',
-                                }}
-                              >
-                                📄 View PDF
-                              </a>
-                            ) : (
-                              <img
-                                src={`${baseUrl}${idUrl}`}
-                                alt={`ID for ${attendee.name}`}
-                                style={{
-                                  maxWidth: '200px',
-                                  maxHeight: '150px',
-                                  border: '2px solid #e5e7eb',
-                                  borderRadius: '8px',
-                                  padding: '8px',
-                                  background: 'white',
-                                }}
-                              />
-                            )}
-                          </div>
-                        ) : (
-                          <div>
-                            {preview && (
-                              <div style={{ marginBottom: '15px' }}>
-                                <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>Preview:</p>
-                                <img
-                                  src={preview}
-                                  alt="Preview"
-                                  style={{
-                                    maxWidth: '200px',
-                                    maxHeight: '150px',
-                                    border: '2px solid #e5e7eb',
-                                    borderRadius: '8px',
-                                    padding: '8px',
-                                    background: 'white',
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <label
-                                style={{
-                                  padding: '10px 20px',
-                                  background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                                  color: '#003366',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontWeight: '600',
-                                  fontSize: '0.9rem',
-                                  display: 'inline-block',
-                                }}
-                              >
-                                📎 {hasFile ? 'Change File' : 'Select ID Document'}
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/jpg,application/pdf"
-                                  onChange={(e) => handleFileSelect(attendeeId, e)}
-                                  style={{ display: 'none' }}
-                                />
-                              </label>
-                              {hasFile && (
-                                <button
-                                  onClick={() => handleUpload(app._id, attendeeId, attendee)}
-                                  disabled={loading}
-                                  style={{
-                                    padding: '10px 20px',
-                                    background: loading ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                    fontWeight: '600',
-                                    fontSize: '0.9rem',
-                                  }}
-                                >
-                                  {loading ? 'Uploading...' : '📤 Upload ID'}
-                                </button>
-                              )}
-                            </div>
-                            {hasFile && (
-                              <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '8px', margin: 0 }}>
-                                Selected: {attendeeFiles[attendeeId]?.name}
-                              </p>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
+                    )}
+
+                    {idUrl && !hasFile && (
+                      <div className="relative">
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm text-center">
+                          <div className="text-xs text-emerald-700 font-bold mb-1 flex items-center justify-center gap-1">
+                            <span>✓</span> Uploaded
+                          </div>
+
+                          <div className="flex gap-2 justify-center mt-2">
+                            <a
+                              href={`${baseUrl}${idUrl}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-600 underline font-bold"
+                            >View</a>
+                            <button
+                              onClick={() => handleRemoveId(selectedApplication._id || selectedApplication.id, attendeeId, attendee.name)}
+                              className="text-xs text-red-500 underline font-bold"
+                            >Remove</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
+
+      {!selectedApplication && approvedApplications.length > 0 && (
+        <div className="bg-white p-12 rounded-2xl text-center shadow-sm border border-slate-200 text-slate-400">
+          <div className="text-4xl mb-4 opacity-50">👆</div>
+          <p>Select an application above to manage attendee IDs</p>
+        </div>
+      )}
+
     </div>
   );
 }

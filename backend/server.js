@@ -7,7 +7,7 @@ const path = require('path');
 const connectDB = require('./config/db');
 const { connectQdrant } = require('./config/qdrant');
 
-// Connect to database
+// Connect to database (non-blocking - server will start even if DB connection fails initially)
 connectDB().then(async () => {
   // initialize a default admin if none exists
   try {
@@ -42,14 +42,19 @@ connectDB().then(async () => {
     console.error('Qdrant connection failed:', err);
   }
 }).catch(err => {
-  console.error('Failed to connect to DB on startup:', err);
+  console.error('Failed to connect to DB on startup:', err.message);
+  console.log('Server will continue running and will retry connection...');
+  // Don't exit - let server start and retry connection later
 });
 
 // Initialize express app
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // serve static files from uploads folder Then URLs like /uploads/vendors/<filename> will be accessible.
@@ -81,7 +86,7 @@ require('./cron/eventReminderCron')(); // Start the event reminder cron job
 require('./cron/workshopCertificateCron')(); // Send workshop certificates after completion
 // Start server
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(` Server running on port ${PORT}`);
   console.log(` JWT_SECRET is ${process.env.JWT_SECRET ? 'SET' : 'NOT SET'}`);
 });

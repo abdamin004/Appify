@@ -2,16 +2,16 @@
 // Centralized design tokens for consistent UI across the application
 
 export const colors = {
-  // Primary Colors
-  primary: '#003366',        // Deep blue
-  primaryDark: '#000d1a',    // Very dark blue
-  primaryLight: '#004080',   // Lighter blue
-  
-  // Accent Colors
-  accent: '#b8941f',         // Gold (dimmer)
-  accentDark: '#9a7a1a',     // Darker gold
-  accentLight: '#c9a845',    // Lighter gold (dimmer)
-  
+  // Primary Colors - Emerald
+  primary: '#059669',        // Emerald 600
+  primaryDark: '#047857',    // Emerald 700
+  primaryLight: '#10b981',   // Emerald 500
+
+  // Accent Colors - Teal
+  accent: '#14b8a6',         // Teal 500
+  accentDark: '#0d9488',     // Teal 600
+  accentLight: '#2dd4bf',    // Teal 400
+
   // Neutral Colors
   white: '#ffffff',
   gray50: '#f9fafb',
@@ -24,7 +24,7 @@ export const colors = {
   gray700: '#374151',
   gray800: '#1f2937',
   gray900: '#111827',
-  
+
   // Status Colors
   success: '#10b981',
   successLight: '#d1fae5',
@@ -34,11 +34,11 @@ export const colors = {
   warningLight: '#fef3c7',
   info: '#3b82f6',
   infoLight: '#dbeafe',
-  
+
   // Background Colors
-  bgPrimary: 'linear-gradient(135deg, #003366 0%, #000d1a 100%)',
+  bgPrimary: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
   bgCard: 'rgba(255, 255, 255, 0.85)',
-  bgOverlay: 'rgba(0, 51, 102, 0.95)',
+  bgOverlay: 'rgba(5, 150, 105, 0.95)',
 };
 
 export const spacing = {
@@ -68,11 +68,11 @@ export const borderRadius = {
 
 export const shadows = {
   sm: '0 1px 2px rgba(0, 0, 0, 0.05)',
-  md: '0 4px 12px rgba(0, 51, 102, 0.15)',
+  md: '0 4px 12px rgba(5, 150, 105, 0.15)',
   lg: '0 8px 25px rgba(0, 0, 0, 0.3)',
-  xl: '0 12px 24px rgba(212, 175, 55, 0.25)',
-  accent: '0 4px 15px rgba(212, 175, 55, 0.4)',
-  accentHover: '0 6px 20px rgba(212, 175, 55, 0.6)',
+  xl: '0 12px 24px rgba(20, 184, 166, 0.25)',
+  accent: '0 4px 15px rgba(20, 184, 166, 0.4)',
+  accentHover: '0 6px 20px rgba(20, 184, 166, 0.6)',
 };
 
 export const typography = {

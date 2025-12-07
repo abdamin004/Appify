@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getAllPolls, 
-  createPoll, 
-  updatePoll, 
-  deletePoll, 
-  voteOnPoll, 
-  getUserVoteForPoll,
-  getActivePolls,
-  getVendorApplicationsForPoll
+import {
+  getAllPolls,
+  createPoll,
+  updatePoll,
+  deletePoll,
+  voteOnPoll,
+  getUserVoteForPoll
 } from '../../services/pollService';
 import adminService from '../../services/adminService';
 import { showToast, confirmDialog } from '../../utils/toast';
+import Input from '../UI/Input';
+import Button from '../UI/Button';
 
 function BoothPollManager() {
   const [polls, setPolls] = useState([]);
@@ -75,7 +75,7 @@ function BoothPollManager() {
     try {
       // Prepare data in the format expected by the backend API
       const vendorApplicationIds = selectedRequests.map(req => req._id || req.id);
-      
+
       // Set voting dates (default to now + 7 days for end date)
       const votingStartDate = new Date();
       const votingEndDate = new Date();
@@ -145,7 +145,7 @@ function BoothPollManager() {
   };
 
   // Filter out any non-pending applications (safety check - only pending should be used in polls)
-  const pendingOnlyRequests = vendorRequests.filter(req => 
+  const pendingOnlyRequests = vendorRequests.filter(req =>
     (req.status || 'pending') === 'pending'
   );
 
@@ -169,97 +169,57 @@ function BoothPollManager() {
 
   return (
     <div id="booth-polls-section">
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '30px'
-      }}>
-        <h2 style={{ color: '#003366', margin: 0 }}>Booth Request Polls</h2>
-        <button
-          onClick={() => setShowCreatePoll(!showCreatePoll)}
-          style={{
-            padding: '12px 24px',
-            background: 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-            color: '#003366',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-          }}
-        >
-          + Create New Poll
-        </button>
+      <div className="relative flex justify-center items-center mb-8">
+        <h2 className="text-2xl font-bold text-slate-800 m-0">Booth Request Polls</h2>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+          <Button
+            onClick={() => setShowCreatePoll(!showCreatePoll)}
+            className="bg-slate-900 text-white hover:bg-emerald-600"
+          >
+            + Create New Poll
+          </Button>
+        </div>
       </div>
 
       {showCreatePoll && (
-        <div style={{
-          background: 'rgba(255,255,255,0.95)',
-          padding: '25px',
-          borderRadius: '15px',
-          marginBottom: '30px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        }}>
-          <h3 style={{ color: '#003366', marginBottom: '20px' }}>Create New Poll</h3>
-          
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#003366', fontWeight: 600 }}>
-              Poll Title *
-            </label>
-            <input
-              type="text"
+        <div className="bg-white p-8 rounded-2xl mb-8 shadow-sm border border-slate-200">
+          <h3 className="text-xl font-bold text-slate-800 mb-6">Create New Poll</h3>
+
+          <div className="mb-6">
+            <Input
+              label="Poll Title *"
               value={pollTitle}
               onChange={(e) => setPollTitle(e.target.value)}
               placeholder="e.g., Vendor Selection for Spring Bazaar"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-              }}
             />
           </div>
 
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#003366', fontWeight: 600 }}>
-              Description
+          <div className="mb-6">
+            <label className="label">
+              <span className="label-text font-bold text-slate-700">Description</span>
             </label>
             <textarea
               value={pollDescription}
               onChange={(e) => setPollDescription(e.target.value)}
               placeholder="Optional description for the poll"
               rows={3}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '0.95rem',
-              }}
+              className="textarea textarea-bordered w-full focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-white text-slate-800"
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#003366', fontWeight: 600 }}>
+          <div className="mb-8">
+            <label className="block mb-2 text-slate-800 font-bold">
               Select Vendor Requests (at least 2) *
             </label>
-            <div style={{
-              maxHeight: '300px',
-              overflowY: 'auto',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '10px',
-            }}>
+            <div className="max-h-[300px] overflow-y-auto border border-slate-200 rounded-xl p-4 bg-slate-50">
               {conflictingEvents.length === 0 ? (
-                <p style={{ color: '#6b7280', textAlign: 'center', padding: '20px' }}>
+                <p className="text-slate-500 text-center py-8">
                   No events with multiple vendor requests found. Create events with multiple vendor applications first.
                 </p>
               ) : (
                 conflictingEvents.map(({ eventId, event, requests }) => (
-                  <div key={eventId} style={{ marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid #e5e7eb' }}>
-                    <h4 style={{ color: '#003366', marginBottom: '10px' }}>
+                  <div key={eventId} className="mb-6 pb-4 border-b border-slate-200 last:border-0 last:mb-0 last:pb-0">
+                    <h4 className="text-slate-800 font-bold mb-3">
                       {event?.title || 'Unknown Event'} ({requests.length} requests)
                     </h4>
                     {requests.map(req => {
@@ -271,38 +231,27 @@ function BoothPollManager() {
                             handleToggleRequest(req);
                             if (!selectedEventId) setSelectedEventId(eventId);
                           }}
-                          style={{
-                            padding: '12px',
-                            marginBottom: '8px',
-                            background: isSelected ? 'rgba(212, 175, 55, 0.15)' : '#f9fafb',
-                            border: `2px solid ${isSelected ? '#d4af37' : '#e5e7eb'}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                          }}
+                          className={`p-4 mb-2 rounded-xl cursor-pointer transition-all border-2 ${isSelected
+                            ? 'bg-emerald-50 border-emerald-500'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div className="flex justify-between items-center">
                             <div>
-                              <strong style={{ color: '#003366' }}>{req.organization}</strong>
-                              <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '4px' }}>
+                              <strong className="text-slate-800 block">{req.organization}</strong>
+                              <div className="text-sm text-slate-500 mt-1">
                                 Booth Size: {req.boothSize} • Attendees: {req.attendees?.length || 0}
                               </div>
                             </div>
-                            <div style={{
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              border: `2px solid ${isSelected ? '#d4af37' : '#9ca3af'}`,
-                              background: isSelected ? '#d4af37' : 'transparent',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                              {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected
+                              ? 'border-emerald-500 bg-emerald-500'
+                              : 'border-slate-300 bg-transparent'
+                              }`}>
+                              {isSelected && <span className="text-white text-xs font-bold">✓</span>}
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
-                            Status: {req.status ? req.status.charAt(0).toUpperCase() + req.status.slice(1) : 'pending'}
+                          <div className="text-xs text-slate-400 mt-2 font-medium uppercase tracking-wider">
+                            Status: {req.status ? req.status : 'pending'}
                           </div>
                         </div>
                       );
@@ -312,32 +261,25 @@ function BoothPollManager() {
               )}
             </div>
             {selectedRequests.length > 0 && (
-              <p style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.85rem' }}>
+              <p className="mt-2 text-slate-500 text-sm font-medium">
                 {selectedRequests.length} vendor request(s) selected
               </p>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
+          <div className="flex gap-3">
+            <Button
               onClick={handleCreatePoll}
               disabled={!pollTitle.trim() || selectedRequests.length < 2}
-              style={{
-                padding: '12px 24px',
-                background: (!pollTitle.trim() || selectedRequests.length < 2) 
-                  ? '#9ca3af' 
-                  : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                color: '#003366',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 700,
-                cursor: (!pollTitle.trim() || selectedRequests.length < 2) ? 'not-allowed' : 'pointer',
-                fontSize: '0.95rem',
-              }}
+              className={(!pollTitle.trim() || selectedRequests.length < 2)
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed border-none hover:bg-slate-300'
+                : 'bg-emerald-600 hover:bg-emerald-700 border-none'
+              }
             >
               Create Poll
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => {
                 setShowCreatePoll(false);
                 setPollTitle('');
@@ -345,47 +287,33 @@ function BoothPollManager() {
                 setSelectedRequests([]);
                 setSelectedEventId('');
               }}
-              style={{
-                padding: '12px 24px',
-                background: '#e5e7eb',
-                color: '#003366',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-              }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       <div>
-        <h3 style={{ color: '#003366', marginBottom: '20px' }}>
+        <h3 className="text-xl font-bold text-slate-800 mb-6">
           Active Polls ({polls.filter(p => p.status === 'active').length})
         </h3>
         {polls.length === 0 ? (
-          <div style={{
-            background: 'rgba(255,255,255,0.95)',
-            padding: '40px',
-            borderRadius: '15px',
-            textAlign: 'center',
-            color: '#6b7280',
-          }}>
+          <div className="bg-slate-50 p-12 rounded-2xl text-center border border-slate-200 border-dashed text-slate-500">
             <p>No polls created yet. Create a poll to start voting on vendor requests.</p>
           </div>
         ) : (
-          polls.map(poll => (
-            <PollCard 
-              key={poll._id || poll.id} 
-              poll={poll} 
-              onClose={() => handleClosePoll(poll._id || poll.id)}
-              onDelete={() => handleDeletePoll(poll._id || poll.id)}
-              onRefresh={loadPolls}
-            />
-          ))
+          <div className="flex flex-col gap-6">
+            {polls.map(poll => (
+              <PollCard
+                key={poll._id || poll.id}
+                poll={poll}
+                onClose={() => handleClosePoll(poll._id || poll.id)}
+                onDelete={() => handleDeletePoll(poll._id || poll.id)}
+                onRefresh={loadPolls}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -429,72 +357,48 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
   }), 0);
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.95)',
-      padding: '25px',
-      borderRadius: '15px',
-      marginBottom: '20px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ color: '#003366', margin: '0 0 8px 0' }}>{poll.title}</h3>
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex justify-between items-start mb-6 gap-4">
+        <div className="flex-1">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">{poll.title}</h3>
           {poll.description && (
-            <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: '0 0 10px 0' }}>
+            <p className="text-slate-600 mb-3">
               {poll.description}
             </p>
           )}
-          <div style={{ display: 'flex', gap: '15px', fontSize: '0.85rem', color: '#6b7280' }}>
-            <span>📊 Total Votes: {totalVotes}</span>
-            <span>📅 Created: {new Date(poll.createdAt).toLocaleDateString()}</span>
-            <span style={{
-              padding: '4px 8px',
-              background: poll.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-              color: poll.status === 'active' ? '#10b981' : '#6b7280',
-              borderRadius: '6px',
-              fontWeight: 600,
-            }}>
+          <div className="flex gap-4 text-sm text-slate-500 flex-wrap items-center">
+            <span className="flex items-center gap-1">📊 Total Votes: {totalVotes}</span>
+            <span className="flex items-center gap-1">📅 Created: {new Date(poll.createdAt).toLocaleDateString()}</span>
+            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${poll.status === 'active'
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-100 text-slate-500'
+              }`}>
               {poll.status === 'active' ? 'Active' : 'Closed'}
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           {poll.status === 'active' && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                background: '#e5e7eb',
-                color: '#003366',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
             >
               Close Poll
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onDelete}
-            style={{
-              padding: '8px 16px',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
           >
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div style={{ marginTop: '20px' }}>
+      <div className="flex flex-col gap-3">
         {poll.vendorApplications.map((vendorApp, index) => {
           const vendorAppId = vendorApp._id || vendorApp.id;
           const voteCount = getVoteCount(vendorAppId);
@@ -505,89 +409,63 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
           return (
             <div
               key={vendorAppId || index}
-              style={{
-                padding: '15px',
-                marginBottom: '12px',
-                background: isVoted ? 'rgba(212, 175, 55, 0.1)' : '#f9fafb',
-                border: `2px solid ${isVoted ? '#d4af37' : '#e5e7eb'}`,
-                borderRadius: '10px',
-                position: 'relative',
-              }}
+              className={`p-4 rounded-xl border-2 transition-all relative ${isVoted
+                ? 'bg-emerald-50 border-emerald-500'
+                : 'bg-slate-50 border-slate-200'
+                }`}
             >
               {isWinner && (
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  background: '#10b981',
-                  color: 'white',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                }}>
+                <div className="absolute top-3 right-3 bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold shadow-sm">
                   🏆 Winner
                 </div>
               )}
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+
+              <div className="flex justify-between items-center mb-3 flex-wrap gap-4">
                 <div>
-                  <strong style={{ color: '#003366', fontSize: '1.1rem' }}>
+                  <strong className="text-lg text-slate-800 block">
                     {vendorApp.organization}
                   </strong>
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '4px' }}>
+                  <div className="text-sm text-slate-500 mt-1">
                     Booth Size: {vendorApp.boothSize} • Attendees: {vendorApp.attendees?.length || 0}
                   </div>
                   {vendorApp.notes && (
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+                    <div className="text-xs text-slate-400 mt-1 italic">
                       {vendorApp.notes}
                     </div>
                   )}
                 </div>
                 {poll.status === 'active' && (
-                  <button
+                  <Button
                     onClick={() => handleVote(vendorAppId)}
                     disabled={isVoted}
-                    style={{
-                      padding: '10px 20px',
-                      background: isVoted 
-                        ? 'rgba(212, 175, 55, 0.3)' 
-                        : 'linear-gradient(135deg, #d4af37 0%, #b8941f 100%)',
-                      color: '#003366',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      cursor: isVoted ? 'not-allowed' : 'pointer',
-                      fontSize: '0.9rem',
-                    }}
+                    size="sm"
+                    className={isVoted
+                      ? 'bg-emerald-100 text-emerald-800 border-none hover:bg-emerald-100 opacity-70'
+                      : 'bg-slate-900 hover:bg-emerald-600 border-none'
+                    }
                   >
                     {isVoted ? '✓ Voted' : 'Vote'}
-                  </button>
+                  </Button>
                 )}
               </div>
 
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+              <div className="mt-2">
+                <div className="flex justify-between mb-1 text-xs font-medium">
+                  <span className="text-slate-500">
                     {voteCount} vote{voteCount !== 1 ? 's' : ''}
                   </span>
-                  <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 600 }}>
+                  <span className="text-slate-700">
                     {percentage}%
                   </span>
                 </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  background: '#e5e7eb',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    width: `${percentage}%`,
-                    height: '100%',
-                    background: isWinner ? '#10b981' : 'linear-gradient(90deg, #d4af37 0%, #b8941f 100%)',
-                    transition: 'width 0.3s',
-                  }} />
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${isWinner
+                      ? 'bg-emerald-500'
+                      : 'bg-emerald-500'
+                      }`}
+                    style={{ width: `${percentage}%` }}
+                  />
                 </div>
               </div>
             </div>
@@ -599,4 +477,3 @@ function PollCard({ poll, onClose, onDelete, onRefresh }) {
 }
 
 export default BoothPollManager;
-
