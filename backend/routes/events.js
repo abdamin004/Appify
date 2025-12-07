@@ -6,7 +6,7 @@ const uploadWorkshopResources = require('../middleware/workshopResourcesUpload')
 const router = express.Router();
 
 // Create event
-router.post('/create', auth, roleCheck('Admin', 'EventOffice' , 'Professor'), eventController.createEvent);
+router.post('/create', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.createEvent);
 
 // Update event
 router.put('/update/:id', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.updateEvent);
@@ -53,6 +53,9 @@ router.get('/sort', eventController.sortEvents);
 // Get registered events
 router.get('/registered', auth, eventController.getRegisteredEvents);
 
+// Get events created by current user
+router.get('/my-events', auth, roleCheck('Professor', 'EventOffice', 'Admin'), eventController.getMyCreatedEvents);
+
 // POST /events/register/:eventId - Register for an event
 router.post('/register/:eventId', auth, eventController.registerForEvent);
 
@@ -76,12 +79,15 @@ router.post(
   roleCheck('Admin', 'EventOffice'),
   eventController.generateVendorAttendeePasses
 );
+// Event Analytics
+router.get('/:id/analytics', auth, roleCheck('Professor', 'EventOffice', 'Admin'), eventController.getEventAnalytics);
+
 // Get single event by ID (must be before /:id/comments and /:id/ratings)
 router.get('/:id', eventController.getEventById);
 
-router.get('/:id/comments',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventComments);
+router.get('/:id/comments', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getEventComments);
 // View all ratings on an event
-router.get('/:id/ratings',auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'),eventController.getEventRatings);
+router.get('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventOffice', 'Admin'), eventController.getEventRatings);
 
 // Add a rating on an event (ONLY after event has ended)
 router.post('/:id/ratings', auth, roleCheck('Student', 'Staff', 'TA', 'Professor', 'EventsOffice', 'Admin'), eventController.addEventRating);

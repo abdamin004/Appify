@@ -7,6 +7,17 @@ async function fetchJson(url, opts = {}) {
   const res = await fetch(url, Object.assign({}, opts, { headers }));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     // Include status code in error for better handling
     const error = new Error(data.message || data.error || `Request failed with status ${res.status}`);
     error.status = res.status;

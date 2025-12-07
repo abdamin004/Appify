@@ -55,6 +55,18 @@ async function http(method, url, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      // Only redirect if we're in a browser environment
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     let msg = `Request failed (${res.status})`;
     try {
       const data = await res.json();
@@ -188,6 +200,17 @@ export async function getEventById(id) {
 
   const res = await fetch(`${API_BASE}/events/${id}`, { headers });
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     const text = await res.text();
     let errorMsg = `Failed to load event (${res.status})`;
     try {
@@ -206,43 +229,65 @@ export async function getEventById(id) {
 }
 export async function getEventComments(id) {
   // Backend requires auth, so use http helper which includes token
-  const res = await http('GET', `${API_BASE}/events/${id}/comments`);
-  // Backend returns { success: true, comments: [...], count: X }
-  // Return comments array for compatibility
-  return Array.isArray(res) ? res : (res?.comments || []);
+  try {
+    const res = await http('GET', `${API_BASE}/events/${id}/comments`);
+    // Backend returns { success: true, comments: [...], count: X }
+    // Return comments array for compatibility
+    return Array.isArray(res) ? res : (res?.comments || []);
+  } catch (error) {
+    // If it's a 401 error, the http helper already handled redirect
+    // Just return empty array to prevent further errors
+    if (error.message?.includes('Session expired')) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getEventRatings(id) {
   // Backend requires auth, so use http helper which includes token
-  const res = await http('GET', `${API_BASE}/events/${id}/ratings`);
-  // Backend returns { success: true, averageRating: X, ratings: [...], count: X }
-  // Convert to expected format: { average: X, ratings: [...], count: X, histogram: {} }
-  if (Array.isArray(res)) {
-    // If it's already an array (old format), convert it
-    const count = res.length;
-    const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
-    const average = count > 0 ? total / count : 0;
+  try {
+    const res = await http('GET', `${API_BASE}/events/${id}/ratings`);
+    // Backend returns { success: true, averageRating: X, ratings: [...], count: X }
+    // Convert to expected format: { average: X, ratings: [...], count: X, histogram: {} }
+    if (Array.isArray(res)) {
+      // If it's already an array (old format), convert it
+      const count = res.length;
+      const total = res.reduce((sum, r) => sum + (r.rating || r.value || 0), 0);
+      const average = count > 0 ? total / count : 0;
+      const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
+        acc[v] = res.filter(r => (r.rating || r.value) === v).length;
+        return acc;
+      }, {});
+      return { average, count, ratings: res, histogram };
+    }
+    // New format: { success: true, averageRating: X, ratings: [...], count: X }
+    const average = res.averageRating ?? res.average ?? 0;
+    const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
+    const ratings = res.ratings || [];
     const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
-      acc[v] = res.filter(r => (r.rating || r.value) === v).length;
+      acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
       return acc;
     }, {});
-    return { average, count, ratings: res, histogram };
+    return { average, count, ratings, histogram };
+  } catch (error) {
+    // If it's a 401 error, the http helper already handled redirect
+    // Just return default values to prevent further errors
+    if (error.message?.includes('Session expired')) {
+      return { average: 0, count: 0, ratings: [], histogram: {} };
+    }
+    throw error;
   }
-  // New format: { success: true, averageRating: X, ratings: [...], count: X }
-  const average = res.averageRating ?? res.average ?? 0;
-  const count = res.count ?? (Array.isArray(res.ratings) ? res.ratings.length : 0);
-  const ratings = res.ratings || [];
-  const histogram = [1, 2, 3, 4, 5].reduce((acc, v) => {
-    acc[v] = ratings.filter(r => (r.rating || r.value) === v).length;
-    return acc;
-  }, {});
-  return { average, count, ratings, histogram };
 }
 
-export function rateEvent(id, value) {
-  // Backend expects POST /events/:id/ratings with { rating: value }
-  // Frontend was calling /events/:id/rate with { value }
-  return http('POST', `${API_BASE}/events/${id}/ratings`, { rating: value });
+export function rateEvent(id, data) {
+  // Backend expects POST /events/:id/ratings with { ratings: {...}, comment } (New) or { rating: value } (Legacy)
+  const payload = typeof data === 'object' ? data : { rating: data };
+  return http('POST', `${API_BASE}/events/${id}/ratings`, payload);
+}
+
+export function getEventAnalytics(id) {
+  return http('GET', `${API_BASE}/events/${id}/analytics`);
 }
 
 // Comments (auth required to add/delete)
@@ -377,7 +422,7 @@ export async function notifyAllUsersAboutNewEvent(event) {
       const adminService = await import('./adminService');
       const professors = await adminService.listAllUsers('Professor');
       const professorList = Array.isArray(professors?.users) ? professors.users : (Array.isArray(professors) ? professors : []);
-      
+
       // Create notification for each professor
       professorList.forEach(professor => {
         const professorId = String(professor._id || professor.id);

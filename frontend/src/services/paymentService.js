@@ -16,6 +16,17 @@ async function http(method, url, body) {
   const text = await res.text();
   const data = text ? (() => { try { return JSON.parse(text); } catch { return { raw: text }; } })() : {};
   if (!res.ok) {
+    // Handle 401 Unauthorized - clear token and redirect to login
+    if (res.status === 401) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.href = '/Login';
+      }
+      throw new Error('Session expired. Please login again.');
+    }
     const msg = (data && (data.message || data.error)) || `Request failed (${res.status})`;
     throw new Error(msg);
   }
