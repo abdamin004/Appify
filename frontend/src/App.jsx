@@ -37,6 +37,7 @@ import EventDetails from "./components/EventDetails";
 import VendorDocuments from "./components/Admin/VendorDocuments";
 import AttendeesReport from "./components/Admin/AttendeesReport";
 import SalesReport from "./components/Admin/SalesReport";
+import ChatBot from "./components/ChatBot/ChatBot";
 
 
 function App() {
@@ -68,7 +69,7 @@ function App() {
         bodyClassName="custom-toast-body"
       />
       <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
-      
+      <ChatBot />
       
       <div style={{ paddingTop: '70px' }}>
         <Routes>

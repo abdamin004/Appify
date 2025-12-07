@@ -24,11 +24,13 @@ services:
       - "5001:5001"
     depends_on:
       - mongodb
+      - qdrant
     volumes:
       - ./backend:/app
       - /app/node_modules  # Keeps container's node_modules intact (good for perf)
     networks:
       - university-network
+    command: sh -c "npm install && npm run dev"
     environment:
       - PORT=${PORT}
       - MONGODB_URI=${MONGODB_URI}
@@ -40,6 +42,10 @@ services:
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678}
+      - N8N_LINKEDIN_WEBHOOK_PATH=${N8N_LINKEDIN_WEBHOOK_PATH:-/webhook-test/post}
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
 
 
   frontend:
@@ -89,9 +95,32 @@ services:
       retries: 3
       start_period: 40s
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: university_events_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - university-network
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   mongo-data:
   n8n-data:
+  qdrant-data:
 
 networks:
   university-network:

@@ -89,4 +89,7 @@ router.delete('/favorites/:eventId', auth, roleCheck('Student', 'Staff', 'TA', '
 // View my favorites list
 router.get('/favorites/mine', auth, roleCheck('Student', 'Staff', 'TA', 'Professor'), eventController.getMyFavoriteEvents);
 
+// Create LinkedIn post for an event
+router.post('/:id/linkedin-post', auth, roleCheck('Admin', 'EventOffice', 'Professor'), eventController.createLinkedInPost);
+
 module.exports = router;

@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
+const { connectQdrant } = require('./config/qdrant');
 
 // Connect to database
 connectDB().then(async () => {
@@ -21,6 +22,24 @@ connectDB().then(async () => {
     await seedCourts();
   } catch (err) {
     console.error('seedCourts failed to run:', err);
+  }
+
+  // Connect to Qdrant and create collections
+  try {
+    await connectQdrant();
+    // Create events_embeddings collection if it doesn't exist (only if OpenAI API key is set)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const { ensureCollectionExists } = require('./utils/embeddings');
+        await ensureCollectionExists();
+      } catch (embedErr) {
+        console.error('Failed to create embeddings collection:', embedErr.message);
+      }
+    } else {
+      console.log('⚠️  OPENAI_API_KEY not set, skipping embeddings collection creation');
+    }
+  } catch (err) {
+    console.error('Qdrant connection failed:', err);
   }
 }).catch(err => {
   console.error('Failed to connect to DB on startup:', err);
@@ -45,6 +64,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/polls', require('./routes/polls'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/chat', require('./routes/chat'));
 
 // Root route
 app.get('/', (req, res) => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations } from '../services/eventService';
+import { getEventById, getEventComments, getEventRatings, addEventComment, deleteEventComment, registerForEvent, rateEvent, deleteEvent, exportEventRegistrations, createLinkedInPost } from '../services/eventService';
 import { getAttendedIds, toggleAttended } from '../services/attendanceService';
 import { showToast, confirmDialog } from '../utils/toast';
 import { colors, spacing, borderRadius, shadows, typography, transitions, buttonStyles, inputStyles } from '../utils/designSystem';
@@ -23,6 +23,7 @@ export default function EventDetails() {
   const [ratingHover, setRatingHover] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [postingToLinkedIn, setPostingToLinkedIn] = useState(false);
 
   // Define these before useEffect to avoid initialization errors
   const tokenPresent = (() => {
@@ -225,6 +226,32 @@ export default function EventDetails() {
       showToast.error(err.message || 'Failed to export registrations');
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleCreateLinkedInPost() {
+    if (!event) return;
+
+    const confirmed = await confirmDialog(
+      'This will create a telegram message to university students post via n8n workflow. Continue?',
+      'Create Telegram Message to University Students'
+    );
+    if (!confirmed) return;
+
+    try {
+      setPostingToLinkedIn(true);
+      const eventId = event._id || event.id;
+      const result = await createLinkedInPost(eventId);
+      
+      if (result.success) {
+        showToast.success(result.message || 'LinkedIn post request sent successfully!');
+      } else {
+        showToast.error(result.message || 'Failed to create LinkedIn post');
+      }
+    } catch (err) {
+      showToast.error(err.message || 'Failed to create LinkedIn post');
+    } finally {
+      setPostingToLinkedIn(false);
     }
   }
 
@@ -753,6 +780,44 @@ export default function EventDetails() {
                         }}
                       >
                         📤 Unarchive
+                      </button>
+                    )}
+                    
+                    {/* LinkedIn Post Button - EventOffice/Admin/Professor can create LinkedIn posts */}
+                    {(isEventOffice || canEdit) && event && (
+                      <button
+                        onClick={handleCreateLinkedInPost}
+                        disabled={postingToLinkedIn}
+                        style={{
+                          padding: `${spacing.sm} ${spacing.lg}`,
+                          background: postingToLinkedIn ? colors.gray400 : '#0077b5',
+                          color: colors.white,
+                          border: 'none',
+                          borderRadius: borderRadius.xl,
+                          fontWeight: typography.fontWeight.bold,
+                          fontSize: typography.fontSize.sm,
+                          cursor: postingToLinkedIn ? 'not-allowed' : 'pointer',
+                          transition: transitions.normal,
+                          boxShadow: shadows.sm,
+                          whiteSpace: 'nowrap',
+                          opacity: postingToLinkedIn ? 0.7 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!postingToLinkedIn) {
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.boxShadow = shadows.md;
+                            e.target.style.opacity = 0.9;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!postingToLinkedIn) {
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = shadows.sm;
+                            e.target.style.opacity = 1;
+                          }
+                        }}
+                      >
+                        {postingToLinkedIn ? '⏳ Posting...' : '💼 Post to LinkedIn'}
                       </button>
                     )}
                     

@@ -695,7 +695,7 @@ function StudentDashboard() {
         : [];
       
       setFavouriteEvents(filtered);
-    } catch (e) {
+      } catch (e) {
       console.error("Error fetching favorites:", e);
       setFavouriteEvents([]);
     }
@@ -709,7 +709,7 @@ function StudentDashboard() {
       // Filter events that user has access to
       const filtered = Array.isArray(events) 
         ? events.filter(ev => {
-            const eventId = ev._id || ev.id;
+        const eventId = ev._id || ev.id;
             return canUserAccessEvent(eventId);
           })
         : [];

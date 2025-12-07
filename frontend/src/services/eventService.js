@@ -268,6 +268,29 @@ export async function getMyFavoriteEvents() {
   return Array.isArray(res) ? res : (res?.events || []);
 }
 
+export async function createLinkedInPost(eventId) {
+  const token = (typeof localStorage !== 'undefined') ? (localStorage.getItem('token') || '') : '';
+  if (!token) {
+    throw new Error('You must be logged in to create LinkedIn posts');
+  }
+
+  const response = await fetch(`${API_BASE}/events/${eventId}/linkedin-post`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || `Failed to create LinkedIn post (${response.status})`);
+  }
+
+  return data;
+}
+
 export async function getEventRecommendations() {
   const res = await http('GET', `${API_BASE}/events/recommendations`);
   
